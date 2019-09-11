@@ -1,0 +1,444 @@
+
+/*
+ * 功能描述:将一致性比对结果落地
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "CAFMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(CAFMgr)
+
+CAFMgr::CAFMgr()
+{
+	
+}
+
+CAFMgr::~CAFMgr()
+{
+	
+}
+
+int CAFMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	int iRet = 0;
+	char ym[6+1] = {0};
+	getCurDateTime(ym,"yyyymm");
+	m_Ibear = br;
+	m_CfgInfo = pServerCfg;
+	m_logFile = m_CfgInfo->logFile;
+	strcpy(m_DataType,processName);
+	memset(m_CtrlFlag,0,sizeof(m_CtrlFlag));
+	printf("outdir=%s\n",m_CfgInfo->out_cfg_info.outdir);
+	printf("tmpdir=%s\n",m_CfgInfo->out_cfg_info.tmpdir);
+	iRet = getControlInfo();
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	if (strcmp(m_DataType,"2") == 0)
+	{
+		iRet = insertHisInit(ym,m_DataType);
+		if (iRet != 0)
+		{
+			m_Ibear->Rollback();
+			return iRet;
+		}
+		iRet = deleteInit(m_DataType);
+		if (iRet != 0)
+		{
+			m_Ibear->Rollback();
+			return iRet;
+		}
+		m_Ibear->Commit();
+	}
+	iRet = selectTable_FileType(m_DataType);
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	return iRet;
+}
+
+int CAFMgr::insertHisInit(char *ym,char *data_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("YM",ym));
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->DML("INS_HIS_INIT",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_HIS_INIT is ERROR,ERRNO[%s]ERRMSG[%s][%s]",m_Ibear->no_error,m_Ibear->sql_error,data_type);
+		printf ("FILE[%s]LINE[%d]INS_HIS_INIT ERR_MSG[%s][%s]\n", __FILE__, __LINE__,m_Ibear->sql_error,data_type);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	return 0;
+}
+
+int CAFMgr::deleteInit(char *data_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->DML("DEL_INIT",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_INIT is ERROR,ERRNO[%s]ERRMSG[%s][%s]",m_Ibear->no_error,m_Ibear->sql_error,data_type);
+		printf ("FILE[%s]LINE[%d]DEL_INIT ERR_MSG[%s][%s]\n", __FILE__, __LINE__,m_Ibear->sql_error,data_type);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	return 0;
+}
+
+int CAFMgr::selectTable_FileType(char *data_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->queryForList("SEL_TABLE_FILETYPE",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_TABLE_FILETYPE is ERROR,ERRNO[%s]ERRMSG[%s][%s]",m_Ibear->no_error,m_Ibear->sql_error,data_type);
+		printf ("FILE[%s]LINE[%d]SEL_TABLE_FILETYPE ERR_MSG[%s][%s]\n", __FILE__, __LINE__,m_Ibear->sql_error,data_type);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	for (vector<vector<string> >::iterator it=list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stTableFileType *data = new stTableFileType();
+		strcpy(data->table_name,v_row[0].c_str());
+		strcpy(data->file_type,v_row[1].c_str());
+		m_TableFileType.push_back(data);
+	}
+	return iRet;
+}
+
+int CAFMgr::getControlInfo()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<string> v_row;
+	iRet = m_Ibear->queryForObject("SEL_CON_INFO",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|SEL_CON_INFO is ERROR,ERRMSG[%s]",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+
+	if (v_row.size() > 0)
+	{
+		strcpy(m_CtrlFlag,v_row[0].c_str());
+	}
+	else 
+	{
+		strcpy(m_CtrlFlag,"0");
+	}
+  return iRet;
+}
+
+int CAFMgr::process()
+{
+	int iRet = 0;
+	char ym[6+1] = {0};
+	char ymd[8+1] = {0};
+	char date[14+1] = {0};
+	char fileName[128] = {0};
+	char filePath[1024] = {0};
+	
+	getCurDateTime(ym,"yyyymm");
+	getCurDateTime(ymd,"yyyymmdd");
+	sprintf(date,"%s",CurrSysDate(16));
+	GDF_FILE *pFile = NULL;
+	//循环处理repair中的数据，根据tablename，filetype进行处理
+	for(vector<stTableFileType*>::iterator it = m_TableFileType.begin();it!=m_TableFileType.end();it++)
+	{
+		stTableFileType *tf_data = *it;
+		iRet = getRepairDatas(m_DataType,tf_data->table_name,tf_data->file_type);
+		if (iRet != 0)
+		{
+			return iRet;
+		}
+		
+		int num = 0;
+		for(map<string,stRepairData*>::iterator it = m_RepairDatas.begin();it!=m_RepairDatas.end();it++)
+		{
+			stRepairData *data = it->second;
+			iRet = insertRepairHis(ym,data->table_name,data->key_id,m_DataType);
+			if (iRet != 0)
+			{
+				continue;
+			}
+			iRet = deleteRepairData(data->table_name,data->key_id,m_DataType);
+			if (iRet != 0)
+			{
+				continue;
+			}
+			
+			char note[1024] = {0};
+			if (strcmp(m_DataType,"1") == 0)
+			{
+				if (num % 10000 == 0)
+				{
+					if (pFile != NULL)
+					{
+						pFile->Fflush();
+						pFile->Close();
+						delete pFile;
+						pFile = NULL;
+					}
+					
+					int fileNum = num / 10000;
+					char c_fileNum[4+1] = {0};
+					sprintf(filePath,"%s/%s_%s",m_CfgInfo->out_cfg_info.outdir,data->table_name,m_DataType);
+					if (access(filePath,NULL) !=0)
+					{
+						m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"目录%s不存在，程序进行创建",filePath);
+	#ifdef _DEBUG_INFO_
+		printf("目录%s不存在，程序进行创建\n",filePath);
+	#endif
+						if (mkdir(filePath,0755) == -1)
+						{
+							m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"目录%s创建失败!!!",filePath);
+							return -1;
+						}
+					}
+					sprintf(c_fileNum,"%04d",fileNum);
+					sprintf(fileName,"%s_%s_%s_%s.repair",data->table_name,ymd,data->file_type,c_fileNum);
+					m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"fileName[%s/%s]",filePath,fileName);
+	#ifdef _DEBUG_INFO_
+		printf("fileName[%s/%s]\n",filePath,fileName);
+	#endif
+					pFile = new GDF_FILE (filePath, fileName);
+					if (0 != pFile->Open ("a+"))
+					{
+						m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File [%s/%s] Is Failed.]",filePath,fileName);
+						printf ("FILE[%s]LINE[%d]ERR_MSG[Open File [%s/%s] Is Failed.]\n", __FILE__, __LINE__,filePath,fileName);
+						return RET_FAIL;
+					}
+					//num = pFile->getLines();
+				}
+				//check_type=0时，按等于4方式处理(无差异)
+				printf("%s,%s\n",m_CtrlFlag,data->check_type);
+				if (strcmp(m_CtrlFlag,"0") == 0 && strcmp(data->check_type,"0") == 0)
+				{
+					sprintf(note,"%s|N|%s|%s\n",data->check_sn,data->is_deal,data->deal_time);
+				}
+				else //按原方式处理
+				{
+					sprintf(note,"%s|%s|%s|%s\n",data->check_sn,data->check_result,data->is_deal,data->deal_time);
+				}
+				
+	#ifdef _DEBUG_INFO_
+		printf("note[%s]\n",note);
+	#endif
+				pFile->Write (note, strlen(note), 1);
+				num ++;
+			}
+			else if(strcmp(m_DataType,"2") == 0 && strcmp(data->check_type,"4") != 0)
+			{
+				if (pFile != NULL)
+				{
+					pFile->Fflush();
+					pFile->Close();
+					delete pFile;
+					pFile = NULL;
+				}
+				
+				sprintf(filePath,"%s/bds2cloud",m_CfgInfo->out_cfg_info.outdir);
+				if (access(filePath,NULL) !=0)
+				{
+	#ifdef _DEBUG_INFO_
+		printf("目录%s不存在，程序进行创建\n",filePath);
+	#endif
+					if (mkdir(filePath,0755) == -1)
+					{
+						m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"目录%s创建失败!!!",filePath);
+						return -1;
+					}
+				}
+				sprintf(fileName,"bds2cloud_%s.edit",date);
+	#ifdef _DEBUG_INFO_
+		printf("fileName[%s/%s]\n",filePath,fileName);
+	#endif
+				pFile = new GDF_FILE (filePath, fileName);
+				if (0 != pFile->Open ("a+"))
+				{
+					m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File [%s/%s] Is Failed.]",filePath,fileName);
+					printf ("FILE[%s]LINE[%d]ERR_MSG[Open File [%s/%s] Is Failed.]\n", __FILE__, __LINE__,filePath,fileName);
+					return RET_FAIL;
+				}
+				
+				sprintf(note,"%s|%s|%s|%s|%s\n",data->deal_time,data->table_name,data->key_id,data->check_type,data->is_deal);
+	#ifdef _DEBUG_INFO_
+		printf("note[%s]\n",note);
+	#endif
+				pFile->Write (note, strlen(note), 1);
+			}
+		}
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"table_name[%s],fileType[%s]",tf_data->table_name,tf_data->file_type);
+		printf("%s,%s\n",tf_data->table_name,tf_data->file_type);
+		m_Ibear->Commit();
+		
+		if (pFile != NULL)
+		{
+			pFile->Fflush();
+			pFile->Close();
+			delete pFile;
+			pFile = NULL;
+		}
+		
+		if (iRet != 0)
+		{
+			m_Ibear->Rollback();
+			return iRet;
+		}
+		if (m_RepairDatas.size() > 0)
+		{
+			clearDataList(m_RepairDatas);
+		}
+	}
+	
+	if (strcmp(m_DataType,"1") == 0)
+	{
+		for (vector<stTableFileType*>::iterator it = m_TableFileType.begin();it!=m_TableFileType.end();it++)
+		{
+			stTableFileType *tf_data = *it;
+			sprintf(filePath,"%s/%s_%s",m_CfgInfo->out_cfg_info.outdir,tf_data->table_name,m_DataType);
+			sprintf(fileName,"%s%s_AUDIT_SUCCESS",tf_data->table_name,ymd);
+			pFile = new GDF_FILE (filePath, fileName);
+			if (0 != pFile->Open ("a+"))
+			{
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File [%s/%s] Is Failed.]",filePath,fileName);
+				printf ("FILE[%s]LINE[%d]ERR_MSG[Open File [%s/%s] Is Failed.]\n", __FILE__, __LINE__,filePath,fileName);
+				return RET_FAIL;
+			}
+			pFile->Write ("", 1, 1);
+			pFile->Fflush();
+			if (pFile != NULL)
+			{
+				pFile->Close();
+				delete pFile;
+				pFile = NULL;
+			}
+		}
+	}
+	else
+	{
+		sprintf(filePath,"%s/bds2cloud",m_CfgInfo->out_cfg_info.outdir);
+		sprintf(fileName,"%s_AUDIT_SUCCESS",date);
+		pFile = new GDF_FILE (filePath, fileName);
+		if (0 != pFile->Open ("a+"))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File [%s/%s] Is Failed.]",filePath,fileName);
+			printf ("FILE[%s]LINE[%d]ERR_MSG[Open File [%s/%s] Is Failed.]\n", __FILE__, __LINE__,filePath,fileName);
+			return RET_FAIL;
+		}
+		pFile->Write ("", 1, 1);
+		pFile->Fflush();
+		if (pFile != NULL)
+		{
+			pFile->Close();
+			delete pFile;
+			pFile = NULL;
+		}
+	}
+	
+	return iRet;
+}
+
+int CAFMgr::getRepairDatas(char *data_type,char *check_table,char *file_type)
+{
+	int iRet = 0;
+	vector<vector<string> > list;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	inParams.insert(pair<string,string>("CHECK_TABLE",check_table));
+	inParams.insert(pair<string,string>("FILE_TYPE",file_type));
+	iRet = m_Ibear->queryForList("SEL_REPAIR",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_REPAIR is ERROR,ERRNO[%s]ERRMSG[%s]",m_Ibear->no_error,m_Ibear->sql_error);
+		printf ("FILE[%s]LINE[%d]SEL_REPAIR ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	for (vector<vector<string> >::iterator it=list.begin();it!=list.end();it++)
+	{
+		char key[1024] = {0};
+		vector<string> v_row = *it;
+		stRepairData *data = new stRepairData();
+		strcpy(data->check_sn,v_row[0].c_str());
+		strcpy(data->key_id,v_row[1].c_str());
+		strcpy(data->table_name,v_row[2].c_str());
+		strcpy(data->check_type,v_row[3].c_str());
+		strcpy(data->check_result,v_row[4].c_str());
+		strcpy(data->is_deal,v_row[5].c_str());
+		strcpy(data->deal_time,v_row[6].c_str());
+		strcpy(data->file_type,v_row[7].c_str());
+		sprintf(key,"%s-%s-%s",data->key_id,data->table_name,data_type);
+		m_RepairDatas.insert(pair<string,stRepairData*>(string(key),data));
+	}
+	
+	return iRet;
+}
+
+int CAFMgr::deleteRepairData(char *table_name,char *key_value,char *data_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->DML("DEL_REPAIR",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_REPAIR is ERROR,ERRNO[%s]ERRMSG[%s][%s][%s][%s]",m_Ibear->no_error,m_Ibear->sql_error,key_value,table_name,data_type);
+		printf ("FILE[%s]LINE[%d]DEL_REPAIR is ERROR,ERRNO[%s]ERRMSG[%s][%s][%s][%s]\n", __FILE__, __LINE__,m_Ibear->no_error,m_Ibear->sql_error,key_value,table_name,data_type);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+
+	return iRet;
+}
+
+int CAFMgr::insertRepairHis(char *ym,char *table_name,char *key_value,char *data_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("YM",ym));
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->DML("INS_REPAIR_HIS",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_REPAIR_HIS is ERROR,ERRNO[%s]ERRMSG[%s][%s][%s][%s]",m_Ibear->no_error,m_Ibear->sql_error,key_value,table_name,data_type);
+		printf ("FILE[%s]LINE[%d]INS_REPAIR_HIS is ERROR,ERRNO[%s]ERRMSG[%s][%s][%s][%s]\n", __FILE__, __LINE__,m_Ibear->no_error,m_Ibear->sql_error,key_value,table_name,data_type);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+int CAFMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int CAFMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

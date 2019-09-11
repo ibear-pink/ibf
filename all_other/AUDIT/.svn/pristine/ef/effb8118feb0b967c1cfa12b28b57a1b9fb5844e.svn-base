@@ -1,0 +1,8 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+	int sendMessageProxy(char *proxy_url, char *topic, char *clientid, char *message, char *group, int charset, int timeout, char *out);
+#ifdef __cplusplus
+}
+#endif
+

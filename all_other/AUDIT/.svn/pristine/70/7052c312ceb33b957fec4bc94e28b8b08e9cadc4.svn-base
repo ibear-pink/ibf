@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "RTOBDeal.h"
+
+IMPLEMENT_CLASS(RTOBDeal)
+
+RTOBDeal::RTOBDeal()
+{
+	
+}
+
+RTOBDeal::~RTOBDeal()
+{
+
+}
+
+int RTOBDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int RTOBDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

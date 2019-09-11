@@ -1,0 +1,88 @@
+/**
+ * describe:文件接口类定义
+ * create date:2013-10-28
+ * author wangzhia
+ */
+#ifndef _GDF_FILE_H_
+#define _GDF_FILE_H_
+
+#include <unistd.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <vector>
+#include <sys/types.h>
+#include <dirent.h>
+#include "Define.h"
+
+using namespace std;
+
+class GDF_FILE
+{
+public:
+	GDF_FILE (void);
+	
+	GDF_FILE (const char *szFilePath, const char *szFileName);
+	
+	virtual ~GDF_FILE (void);
+	
+	Ret Open (const char *szMode);
+	
+	Ret Close (void);
+	
+	Ret Rename (const char *destFile);
+	
+	Ret Remove (void);
+	
+	size_t Write (const char *buffer, size_t size, size_t count);
+	
+	size_t Read (void *p, size_t size, size_t count)
+	{
+		return fread (p, size, count, this->m_Fp);
+	}
+	
+	//Ret Copy(const char *src_file, const char *des_file)
+
+	//Ret Move(const char *src_file, const char *des_file);
+
+	Int32 Fflush (void);
+	
+	void MakeFullName (char *szFullName);
+	
+	char *GetFileName () {return m_FileName;}
+	
+	char *GetFullFileName () {return m_FullFileName;}
+	
+	bool IsFileExist (void);
+	
+	bool IsFilePointerNull (void);
+	
+	void SetFileStartTime () {m_StartTime = time(NULL);}
+	
+	time_t GetFileStartTime () {return m_StartTime;}
+			
+	Ret getFileList(char *indir);
+	
+	bool is_dir(mode_t t){return S_ISDIR(t);}
+	
+	bool is_reg(mode_t t){return S_ISREG(t);}
+	
+	Ret Copy(const char *src_file, const char *des_file);
+	
+	Ret Move(const char *src_file, const char *des_file);
+
+public:
+	vector<stFileInfo *> mFileList;
+	
+private:
+	FILE *m_Fp;
+	
+	char m_FileName[512];
+	
+	char m_FilePath[512];
+	
+	char m_FullFileName[1024];
+	
+	time_t m_StartTime;
+};
+
+#endif

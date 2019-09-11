@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMapConfig>
+	<settings cacheModelsEnabled="false"
+			testModel="false"
+			autoCommit="0"
+			defaultDBNum="0"
+			autoClearEnabled="TransationClear"
+			maxOverflaw="256"
+			performanceAnalyzeEnabled="false"
+			performanceLogPath="./"
+			performanceThreshold="1000"/>
+			
+	<sqlMap resource="./data.xml" />
+</sqlMapConfig>
+

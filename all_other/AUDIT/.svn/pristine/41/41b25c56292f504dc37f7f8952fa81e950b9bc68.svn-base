@@ -1,0 +1,22 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<insert id="INS_DATA"  parameterClass="Map" db_no="0">insert into CHECK_DATA_INTERFACE(KEY_VALUE,CHECK_TABLE,DATA_TYPE) values(${KEY_VALUE|char},${CHECK_TABLE|char},'2')</insert>
+	<select id="BDS_USER_INFO"  parameterClass="Map" resultNum="1" db_no="1">select PHONE_NO from BDSADM.BDS_USER_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERBRAND_REL"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_USERBRAND_REL where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_BILLDAY_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_BILLDAY_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERPRC_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_USERPRC_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERPRCATTR_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_USERPRCATTR_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERGROUPMBR_INFO"  parameterClass="Map" resultNum="1" db_no="1">select MEMBER_ID from BDSADM.BDS_USERGROUPMBR_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERGROUP_INFO"  parameterClass="Map" resultNum="1" db_no="1">select GROUP_ID_NO from BDSADM.BDS_USERGROUP_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERTEAMMBR_INFO"  parameterClass="Map" resultNum="1" db_no="1">select OBJECT_ID from BDSADM.BDS_USERTEAMMBR_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERTEAM_INFO"  parameterClass="Map" resultNum="1" db_no="1">select TEAM_ID_NO from BDSADM.BDS_USERTEAM_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERSVC_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_USERSVC_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERSVCATTRTRACE_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_USERSVCATTRTRACE_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERSVCTRACE_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_USERSVCTRACE_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_CONUSER_INFO"  parameterClass="Map" resultNum="1" db_no="1">select ID_NO from BDSADM.BDS_CONUSER_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERTRANS"  parameterClass="Map" resultNum="1" db_no="1">select FROM_ID_NO from BDSADM.BDS_USERTRANS where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_USERPRCGIVE_INFO"  parameterClass="Map" resultNum="1" db_no="1">select FROM_ID_NO from BDSADM.BDS_USERPRCGIVE_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+	<select id="BDS_CONTRACT_INFO"  parameterClass="Map" resultNum="1" db_no="1">select CONTRACT_NO from BDSADM.BDS_CONTRACT_INFO where DEAL_TIME @gt=sysdate-3600+1</select>
+</sqlMap>
+

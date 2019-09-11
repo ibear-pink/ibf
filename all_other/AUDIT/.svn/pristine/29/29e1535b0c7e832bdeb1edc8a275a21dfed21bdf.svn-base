@@ -1,0 +1,11 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_PROCWS" parameterClass="Map" resultNum="2" db_no="0">select mod(dispseq,#PNUM#),count(1) from AUDIT_PROCWS_C#REGION_CODE#01 where status='0' group by mod(dispseq,#PNUM1#)</select>
+	<select id="CNT_FRIST" parameterClass="Map" resultNum="1" db_no="0">select count(1) from AUDIT_MERGE_#TYPE#_#YM# where KPI_PASS=3</select>
+	<insert id="INS_FRIST_HIS" parameterClass="Map" db_no="0">insert into AUDIT_MERGE_#TYPE#_HIS_#YM# select batchsn,merge_type,day_billcycl,region_code,audit_id,records,amount,rec_attr,rec_time,KPI_PASS,KPI_TIME from AUDIT_MERGE_#TYPE1#_#YM1# where KPI_PASS=3</insert>
+	<delete id="DEL_FRIST" parameterClass="Map" db_no="0">delete from AUDIT_MERGE_#TYPE#_#YM# where KPI_PASS=3</delete>
+	<select id="SEL_FRIST" parameterClass="Map" resultNum="1" db_no="0">select distinct batchsn from AUDIT_MERGE_#TYPE#_#YM# where rownum @lt 10000</select>
+	<insert id="INS_PROCWS" parameterClass="Map" db_no="0">insert into AUDIT_PROCWS_C#REGION_CODE#01(batchsn,wsseq,dispseq,status,gen_time,deal_time,deal_code) values(${BATCHSN|char},${WSSEQ|char},${DISPSEQ|int},'0',sysdate,sysdate,'0')</insert>
+</sqlMap>
+

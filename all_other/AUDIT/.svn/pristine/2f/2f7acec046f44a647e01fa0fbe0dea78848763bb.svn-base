@@ -1,0 +1,8 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<delete id="DEL_OFAC_HIS"  parameterClass="Map" db_no="1">
+delete from MD_APP_PROCWS_OFAC_HIS_CX#NUM# where wsseq=${WSSEQ|char} and batchsn=${BATCHSN|char} 
+	</delete>
+</sqlMap>
+

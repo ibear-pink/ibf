@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "Check_BDSDeal.h"
+
+IMPLEMENT_CLASS(Check_BDSDeal)
+
+Check_BDSDeal::Check_BDSDeal()
+{
+	
+}
+
+Check_BDSDeal::~Check_BDSDeal()
+{
+
+}
+
+int Check_BDSDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int Check_BDSDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

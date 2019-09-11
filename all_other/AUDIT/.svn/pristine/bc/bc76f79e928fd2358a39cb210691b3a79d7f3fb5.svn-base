@@ -1,0 +1,22 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="insert_Add">
+	<insert id="INS_USER_ADD" parameterClass="Map" db_no="0">insert into BDS_USER_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|char},${VALUE5|char},${VALUE6|char},${VALUE7|char},${VALUE8|char},${VALUE9|char},${VALUE10|char},${VALUE11|char},${VALUE12|char},${VALUE13|long},'0','0','0','0','0',${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USERBRAND_ADD" parameterClass="Map" db_no="0">insert into BDS_USERBRAND_REL_ADD values(${VALUE0|long},${VALUE1|char},${VALUE2|char},${VALUE3|char},${VALUE4|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_BILLDAY_ADD" parameterClass="Map" db_no="0">insert into BDS_BILLDAY_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|long},${VALUE5|long},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USERPRC_ADD" parameterClass="Map" db_no="0">insert into BDS_USERPRC_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|long},${VALUE3|char},${VALUE4|long},${VALUE5|long},${VALUE6|char},${VALUE7|char},${VALUE8|char},${VALUE9|char},${VALUE10|long},${VALUE11|long},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USERPRCATTR_ADD" parameterClass="Map" db_no="0">insert into BDS_USERPRCATTR_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|long},${VALUE5|char},${VALUE6|char},${VALUE7|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_UGM_ADD" parameterClass="Map" db_no="0">insert into BDS_USERGROUPMBR_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|long},${VALUE5|long},${VALUE6|char},${VALUE7|char},${VALUE8|char},${VALUE9|char},${VALUE10|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_UG_ADD" parameterClass="Map" db_no="0">insert into BDS_USERGROUP_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|char},${VALUE5|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_UTM_ADD" parameterClass="Map" db_no="0">insert into BDS_USERTEAMMBR_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|long},${VALUE4|long},${VALUE5|char},${VALUE6|char},${VALUE7|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_UT_ADD" parameterClass="Map" db_no="0">insert into BDS_USERTEAM_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|long},${VALUE4|long},${VALUE5|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USVC_ADD" parameterClass="Map" db_no="0">insert into BDS_USERSVC_INFO_ADD values(${VALUE0|long},${VALUE1|char},${VALUE2|char},${VALUE3|long},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USVCAT_ADD" parameterClass="Map" db_no="0">insert into BDS_USERSVCATTRTRACE_INFO_ADD values(${VALUE0|long},${VALUE1|char},${VALUE2|long},${VALUE3|char},${VALUE4|char},${VALUE5|char},${VALUE6|char},${VALUE7|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USVCT_ADD" parameterClass="Map" db_no="0">insert into BDS_USERSVCTRACE_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|char},${VALUE5|char},${VALUE6|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_CONUSER_ADD" parameterClass="Map" db_no="0">insert into BDS_CONUSER_INFO_ADD values(${VALUE0|long},${VALUE1|char},${VALUE2|long},${VALUE3|char},${VALUE4|long},${VALUE5|long},${VALUE6|long},${VALUE7|char},${VALUE8|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USERT_ADD" parameterClass="Map" db_no="0">insert into BDS_USERTRANS_ADD values(${VALUE0|long},${VALUE1|char},${VALUE2|long},${VALUE3|char},${VALUE4|char},${VALUE5|char},${VALUE6|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_USERPRCG_ADD" parameterClass="Map" db_no="0">insert into BDS_USERPRCGIVE_INFO_ADD values(${VALUE0|long},${VALUE1|char},${VALUE2|long},${VALUE3|char},${VALUE4|long},${VALUE5|char},${VALUE6|char},${VALUE7|char},${VALUE8|char},${VALUE9|char},${VALUE10|char},${VALUE11|char},${VALUE12|char},${VALUE13|char},${VALUE14|char},${VALUE15|char},${VALUE16|char},${DML_TYPE|char},sysdate,'0')</insert>
+	<insert id="INS_CONTRACT_ADD" parameterClass="Map" db_no="0">insert into BDS_CONTRACT_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|char},${VALUE5|char},${VALUE6|long},${DML_TYPE|char},sysdate,'0')</insert>
+
+</sqlMap>
+

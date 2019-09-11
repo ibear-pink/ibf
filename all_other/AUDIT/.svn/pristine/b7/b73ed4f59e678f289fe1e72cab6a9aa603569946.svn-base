@@ -1,0 +1,879 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "GETKPI_TLMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(GETKPI_TLMgr)
+
+GETKPI_TLMgr::GETKPI_TLMgr()
+{
+	
+}
+
+GETKPI_TLMgr::~GETKPI_TLMgr()
+{
+	
+}
+
+int GETKPI_TLMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	memset(&m_szInData, 0, sizeof(m_szInData));
+	sprintf(m_szInData.busi_type,"%s","0");    /*子服务标识 没有的话统一填0*/
+	m_szInData.thread_id = 0;
+	
+	int iRet = 0;
+	char app_pid[10+1] = {0};
+	memset(m_YM,0,sizeof(m_YM));
+	m_Ibear = br;
+	m_CfgInfo = pServerCfg;
+	m_logFile = m_CfgInfo->logFile;
+	
+	if (m_AuditKPICfgs.size() != 0)
+	{
+		clearDataList(m_AuditKPICfgs);
+	}
+	m_ProInfo = pInfo;
+	sprintf(app_pid,"%d",getpid());
+	iRet = appStart(br,m_ProInfo->ipAddress,m_ProInfo->program_name,m_ProInfo->procUnikey,app_pid);
+	if (iRet != 0)
+	{
+  	printf("进程不允许启动[%s] \n",getErrInfo());
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"appStart失败[%d][%s,%s,%s,%s]!!!\n",iRet,pInfo->ipAddress,pInfo->procUnikey,pInfo->program_name,app_pid);
+  	m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程不允许启动[%s]",getErrInfo());
+  	return -1;
+	}
+	if (0 != getAuditKPIStatic())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getAuditKPIStatic is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	return iRet;
+}
+
+int GETKPI_TLMgr::process()
+{
+	long t1 = 0,t2 = 0;
+	t1 = getUTime();
+	m_szInData.record_count = 0;
+	
+	if (0 == isAppStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+	{
+		//可以停止
+		if (0 == appStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+		{
+	  	printf("进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+			//m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+
+			exit(0);
+		}
+	}
+	int iRet = 0;
+	char start_hour[2+1] = {0};
+	char start_time[4+1] = {0};
+	memset(m_YM,0,sizeof(m_YM));
+	getCurDateTime(m_YM,"yyyymm");
+	getCurDateTime(start_hour,"hh");
+	getCurDateTime(start_time,"miss");
+	printf("--------%s%s\n",start_hour,start_time);
+	if (strcmp(start_time,m_CfgInfo->deal_time) != 0 || atoi(start_hour)%atoi(m_CfgInfo->time_rate) != 0)
+	{
+		usleep(100000);
+		return 0;
+	}
+	printf("启动程序【%s:%s】\n",start_hour,start_time);
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"程序启动KPI汇总处理[%s:%s]",start_hour,start_time);
+	sleep(1);
+	//删除KPI日志
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"删除KPI日志[%s]",m_YM);
+	if (0 != deleteKPILog(m_YM))
+	{
+		iRet = RET_FAIL;
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"deleteKPILog is ERROR!!!\n");
+		return iRet;
+	}
+	
+	//循环公式
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"循环公式,公式个数[%ld]",m_AuditKPICfgs.size());
+	for (vector<stAuditKPICfg*>::iterator it = m_AuditKPICfgs.begin();it!=m_AuditKPICfgs.end();it++)
+	{
+		stAuditKPICfg *kpicfg = *it;
+		iRet = ProDismenProcess(kpicfg);
+		if (iRet != 0)
+		{
+			m_Ibear->Rollback();
+		}
+		else 
+		{
+			m_Ibear->Commit();
+		}
+	}
+	
+	t2 = getUTime();
+	m_szInData.time_cost = (t2-t1)/1000.000;
+	m_logMon->pushMonitorBaseInfo(m_szInData);
+
+	return iRet;
+}
+
+int GETKPI_TLMgr::SplitString (const char *buff,vector<string> *operation,vector<vector<string> > *values)
+{
+	int j = 0;
+	char tmpBuf[1024];
+	char tStr[1024];
+	vector<string> operation_tmp;
+	vector<vector<string> > values_tmp;
+	int i = 0, end = 0, begin = 0;
+	vector<string> value;
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	strcpy (tmpBuf, buff);
+	int len = strlen(tmpBuf);
+
+	while (i <= len)
+	{
+		//printf("%c %d\n",tmpBuf[i],i);
+		if (tmpBuf[i] == '|' || i == len)
+		{
+			end = i;
+			i++;
+		}
+		else if (tmpBuf[i] == '+' || tmpBuf[i] == '-')
+		{
+			char op[1+1] = {0};
+			op[0] = tmpBuf[i];
+			operation_tmp.push_back(string(op));
+			//printf("OP：%s,%d\n",op,j);
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		//printf("%d,%d\n",begin,end);
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		begin = i;
+		//printf("tStr：%s,%d\n",tStr,j);
+		value.push_back(string(tStr));
+		
+		if (tmpBuf[i-1] == '+' || tmpBuf[i-1] == '-' || i == len+1)
+		{
+			//printf("value=%ld\n",value.size());
+			values_tmp.push_back(value);
+			value.clear();
+			j++;
+		}
+	}
+	
+	*values = values_tmp;
+	*operation = operation_tmp;
+	
+	return 0;
+}
+
+int GETKPI_TLMgr::SplitStringBySP (const char *buff, char split_char, string key[])
+{
+	int size = 0,j = 0;
+	
+	char tmpBuf[1024];
+	char tStr[1024];
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	
+	strcpy (tmpBuf, buff);
+	
+	int len = strlen(tmpBuf);
+	if (tmpBuf[len-1] != split_char && tmpBuf[len-1] != '\n')
+	{
+		tmpBuf[len] = split_char;
+		len = len+1;
+	}
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == split_char)
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		size++;
+		
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		key[j] = string(tStr);
+		j ++;
+		begin = i;
+	}
+	
+	return j;
+}
+//取KPI配置数据
+int GETKPI_TLMgr::getAuditKPIStatic()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	char wsseq[25] = {0};
+	char notes[1024] = {0};
+	iRet = m_Ibear->queryForList("SEL_KPI_CFG",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_KPI_CFG ERRNO[%s]ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPICfg *order = new stAuditKPICfg();
+		
+		strcpy(order->Parameter,v_row[0].c_str());
+		strcpy(order->Audit_type,v_row[1].c_str());
+		strcpy(order->Dismension_org,v_row[2].c_str());
+		strcpy(order->Dismension_date,v_row[3].c_str());
+		strcpy(order->Audit_form,v_row[4].c_str());
+		
+		m_AuditKPICfgs.push_back(order);
+	}
+  return iRet;
+}
+
+//清除KPI日志
+int GETKPI_TLMgr::deleteKPILog(char *ym)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	iRet = m_Ibear->DML("DEL_KPI_LOG",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_KPI_LOG ERRNO[%s]ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//记录KPI日志（KPI未做平）
+int GETKPI_TLMgr::insertKPILog(char *ym,stAuditKPICfg *kpicfg,char *audit_type,char *org_ins,char *date_ins,long records,char *form_ins)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	map<string,string> inParams;
+
+	sprintf(crecords,"%ld",records);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("AUDIT_TYPE"),string(audit_type)));
+	inParams.insert(pair<string,string>(string("ORG_INS"),string(org_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("FORM_INS"),string(form_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	
+	iRet = m_Ibear->DML("INS_KPI_LOG",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_KPI_LOG ERRNO[%s]ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//记录KPI his
+int GETKPI_TLMgr::insertKPIHis(char *ym,stAuditKPICfg *kpicfg,char *audit_type,char *org_ins,char *date_ins,long records,char *form_ins)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	map<string,string> inParams;
+	
+	sprintf(crecords,"%ld",records);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("AUDIT_TYPE"),string(audit_type)));
+	inParams.insert(pair<string,string>(string("ORG_INS"),string(org_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("FORM_INS"),string(form_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	
+	iRet = m_Ibear->DML("INS_KPI_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_KPI_HIS ERRNO[%s]ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPI_TLMgr::getSecondAudit(char *ym, bool day_billcycl,char *merge_type, bool region_code,char *audit_id,int num)
+{
+	int iRet = RET_OK;
+	char sql_note[1024] = {0};
+	char sql_head[128] = {0};
+	char sql_model[1024] = {0};
+	char sql_where[512] = {0};
+	char sql_end[128] = {0};
+	string merges[20];
+	int i = 2,j = 0;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+
+	strcpy(sql_model," from AUDIT_TOTAL_LOG_#YM# ");
+	sprintf(sql_head,"select sum(records),sum(amount)",sql_head);
+	
+	//TRUE:按日；FALSE:按月
+	if (day_billcycl)
+	{
+		i++;
+		sprintf(sql_head,"%s,day_billcycl",sql_head);
+		
+		//printf("sql_head1:%s\n",sql_head);
+		//group by
+		if (strcmp(sql_end,"") == 0)
+		{
+			sprintf(sql_end,"group by day_billcycl",sql_end);
+		}
+		else 
+		{
+			sprintf(sql_end,"%s,day_billcycl",sql_end);
+		}
+	}
+	
+	//TRUE:按地市；FALSE:按省份
+	if (region_code)
+	{
+		i++;
+		sprintf(sql_head,"%s,region_code",sql_head);
+		
+		//printf("sql_head2:%s\n",sql_head);
+		//group by
+		if (strcmp(sql_end,"") == 0)
+		{
+			sprintf(sql_end,"group by region_code",sql_end);
+		}
+		else 
+		{
+			sprintf(sql_end,"%s,region_code",sql_end);
+		}
+	}
+	if (strcmp(merge_type,"") != 0)
+	{
+		j = SplitStringBySP(merge_type,',',merges);
+		if (j == 1)
+		{
+			if (strcmp(sql_where,"") == 0)
+			{
+				strcpy(sql_where,"where merge_type=${MERGE_TYPE|char} ");
+			}
+			else 
+			{
+				sprintf(sql_where,"%s and merge_type=${MERGE_TYPE|char} ",sql_where);
+			}
+		}
+		else if(j > 1)
+		{
+			if (strcmp(sql_where,"") == 0)
+			{
+				strcpy(sql_where,"where merge_type in(");
+			}
+			else 
+			{
+				sprintf(sql_where,"%s and merge_type in(",sql_where);
+			}
+			for(int z = 0; z < j; z++)
+			{
+				char key[20] = {0};
+				sprintf(key,"MERGE_TYPE%d",z);
+				if (z<j-1)
+				{
+					sprintf(sql_where,"%s${%s|char},",sql_where,key);
+				}
+				else 
+				{
+					sprintf(sql_where,"%s${%s|char}) ",sql_where,key);
+				}
+			}
+		}
+	}
+	if (strcmp(audit_id,"") != 0)
+	{
+		if (strcmp(sql_where,"") == 0)
+		{
+			strcpy(sql_where,"where audit_id=${AUDIT_ID|char} ");
+		}
+		else 
+		{
+			sprintf(sql_where,"%s and audit_id=${AUDIT_ID|char}  ",sql_where);
+		}
+	}
+	
+	sprintf(sql_note,"%s%s%s%s",sql_head,sql_model,sql_where,sql_end);
+	
+	stSqlMap *sqlmap = new stSqlMap();
+	if (sqlmap == NULL)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"mem is ERROR!!!\n");
+		printf("mem is ERROR\n");
+		return RET_FAIL;
+	}
+	strcpy(sqlmap->db_no,"1");
+	sprintf(sqlmap->res_num,"%d",i);
+	strcpy(sqlmap->sql,sql_note);
+
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	if (strcmp(merge_type,"") != 0)
+	{
+		if (j <= 1)
+		{
+			inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge_type)));
+		}
+		else
+		{
+			for(int z = 0; z < j; z++)
+			{
+				char key[20] = {0};
+				sprintf(key,"MERGE_TYPE%d",z);
+				inParams.insert(pair<string,string>(string(key),merges[z]));
+#ifdef _DEBUG_INFO_
+	printf("key[%s][%s]\n",key,merges[z].c_str());
+#endif
+			}
+		}
+	}
+	if (strcmp(audit_id,"") != 0)
+	{
+		inParams.insert(pair<string,string>(string("AUDIT_ID"),string(audit_id)));
+	}
+	
+	iRet = m_Ibear->queryForListBySQL(sqlmap,inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"[%s] isERROR ERRNO[%s]ERR_MSG[%s]\n",sqlmap->sql,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	if (list.size() == 0)
+	{
+		for (map<string,vector<stAuditKPIs*> >::iterator iter = m_VB.begin(); iter!=m_VB.end(); iter++)
+		{
+			stAuditKPIs *order_tmp = new stAuditKPIs();
+			strcpy(order_tmp->date_ins,(iter->second)[0]->date_ins);
+			strcpy(order_tmp->org_ins,(iter->second)[0]->org_ins);
+			printf("size=%ld[%s,%s]\n",(iter->second).size(),order_tmp->date_ins,order_tmp->org_ins);
+			(iter->second).push_back(order_tmp);
+		}
+	}
+
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		
+		stAuditKPIs *order = new stAuditKPIs();
+		char key[100] = {0};
+		
+		order->records = atol(v_row[0].c_str());
+		order->amount = atol(v_row[1].c_str());
+		if (day_billcycl && region_code)
+		{
+			strcpy(order->date_ins,v_row[2].c_str());
+			strcpy(order->org_ins,v_row[3].c_str());
+		}
+		else if(!day_billcycl && region_code)
+		{
+			strcpy(order->org_ins,v_row[2].c_str());
+			strcpy(order->date_ins,ym);
+		}
+		else if(day_billcycl && !region_code)
+		{
+			strcpy(order->date_ins,v_row[2].c_str());
+			strcpy(order->org_ins,"0");
+		}
+		else 
+		{
+			strcpy(order->date_ins,ym);
+			strcpy(order->org_ins,"0");
+		}
+		sprintf(key,"%s|%s",order->date_ins,order->org_ins);
+		
+		if (num == 0)
+		{
+			vector<stAuditKPIs*> v_kps;
+			v_kps.push_back(order);
+			m_VB.insert(pair<string,vector<stAuditKPIs*> >(string(key),v_kps));
+		}
+		else 
+		{
+#ifdef _DEBUG_INFO_
+	printf("[num=%d]key:%s\n",num,key);
+#endif
+			map<string,vector<stAuditKPIs*> >::iterator iter = m_VB.find(string(key));
+			if (iter!=m_VB.end())
+			{
+				//当前元素数量小于当前位数(从0开始)
+				for (int i = (iter->second).size(); i < num; i++)
+				{
+					stAuditKPIs *order_tmp = new stAuditKPIs();
+					strcpy(order_tmp->date_ins,order->date_ins);
+					strcpy(order_tmp->org_ins,order->org_ins);
+					(iter->second).push_back(order_tmp);
+				}
+				(iter->second).push_back(order);
+			}
+			else
+			{
+				vector<stAuditKPIs*> v_kps;
+				for (int i = 0; i < num; i++)
+				{
+					stAuditKPIs *order_tmp = new stAuditKPIs();
+					strcpy(order_tmp->date_ins,order->date_ins);
+					strcpy(order_tmp->org_ins,order->org_ins);
+					v_kps.push_back(order_tmp);
+				}
+				v_kps.push_back(order);
+				m_VB.insert(pair<string,vector<stAuditKPIs*> >(string(key),v_kps));
+			}
+			
+		}
+	}
+	
+	for (map<string,vector<stAuditKPIs*> >::iterator iter = m_VB.begin(); iter!=m_VB.end(); iter++)
+	{
+		if ((iter->second).size() <= num)
+		{
+			stAuditKPIs *order_tmp = new stAuditKPIs();
+			strcpy(order_tmp->date_ins,(iter->second)[0]->date_ins);
+			strcpy(order_tmp->org_ins,(iter->second)[0]->org_ins);
+			(iter->second).push_back(order_tmp);
+		}
+	}
+	
+  return iRet;
+}
+
+//判断所有公式是否平衡
+int GETKPI_TLMgr::ProDismenProcess(stAuditKPICfg *kpicfg)
+{
+	int iRet = RET_OK;
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"(%s)公式[%s],维度[%s,%s]\n",kpicfg->Audit_type,kpicfg->Audit_form,kpicfg->Dismension_org,kpicfg->Dismension_date);
+#ifdef _DEBUG_INFO_
+	printf("(%s)公式[%s],维度[%s,%s]\n",kpicfg->Audit_type,kpicfg->Audit_form,kpicfg->Dismension_org,kpicfg->Dismension_date);
+#endif
+	bool day_billcycl;
+	bool region_code;
+	vector<string> operation;//公式运算符
+	vector<vector<string> > values;//公式元素
+	//解析公式
+	if (0 != SplitString (kpicfg->Audit_form,&operation,&values))
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"解析公式错误\n");
+		printf("解析公式错误\n");
+		return RET_FAIL;
+	}
+	//判断地市级，批次级维度
+	if (strstr(kpicfg->Dismension_org,"PRO") != 0 && strstr(kpicfg->Dismension_date,"MON") != 0)
+	{
+		region_code = false;
+		day_billcycl = false;
+		if (0 != ProRealDismenDeal(kpicfg,operation,values,day_billcycl,region_code))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProRealDismenDeal is ERROR[false,false]\n");
+			return RET_FAIL;
+		}
+	}
+	if (strstr(kpicfg->Dismension_org,"PRO") != 0 && strstr(kpicfg->Dismension_date,"DAY") != 0)
+	{
+		region_code = false;
+		day_billcycl = true;
+		if (0 != ProRealDismenDeal(kpicfg,operation,values,day_billcycl,region_code))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProRealDismenDeal is ERROR[false,true]\n");
+			return RET_FAIL;
+		}
+	}
+	if (strstr(kpicfg->Dismension_org,"ORG") != 0 && strstr(kpicfg->Dismension_date,"MON") != 0) 
+	{
+		region_code = true;
+		day_billcycl = false;
+		if (0 != ProRealDismenDeal(kpicfg,operation,values,day_billcycl,region_code))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProRealDismenDeal is ERROR[true,false]\n");
+			return RET_FAIL;
+		}
+	}
+	if (strstr(kpicfg->Dismension_org,"ORG") != 0 && strstr(kpicfg->Dismension_date,"DAY") != 0) 
+	{
+		region_code = true;
+		day_billcycl = true;
+		if (0 != ProRealDismenDeal(kpicfg,operation,values,day_billcycl,region_code))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProRealDismenDeal is ERROR[true,true]\n");
+			return RET_FAIL;
+		}
+	}
+	
+	if(strstr(kpicfg->Dismension_org,"ORG") == 0 && strstr(kpicfg->Dismension_org,"PRO") == 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"Dismension_org配置错误，请检查!!!\n");
+		printf("Dismension_org配置错误，请检查!!!\n");
+		return -1;
+	}
+	if(strstr(kpicfg->Dismension_date,"DAY") == 0 && strstr(kpicfg->Dismension_date,"MON") == 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"Dismension_date配置错误，请检查!!!\n");
+		printf("Dismension_org配置错误，请检查!!!\n");
+		return -1;
+	}
+	
+	//清理内存
+	operation.clear();
+	values.clear();
+	
+	return iRet;
+}
+
+int GETKPI_TLMgr::ProRealDismenDeal(stAuditKPICfg *kpicfg,vector<string> operation,vector<vector<string> > values,bool day_billcycl,bool region_code)
+{
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"日账KPI:%d,地市KPI:%d",day_billcycl,region_code);
+	printf("日账KPI:%d,地市KPI:%d\n",day_billcycl,region_code);
+	int iRet = 0;
+	char merge_type[50] = {0};
+	char audit_id[10] = {0};
+	int num = 0;	
+	//解析公式元素，获得每个元素的值
+	for(vector<vector<string> >::iterator it = values.begin();it!= values.end();it++)
+	{
+		vector<string> value = *it;
+		if (value.size() == 1)
+		{
+			strcpy(audit_id,value[0].c_str());
+			strcpy(merge_type,"");
+#ifdef _DEBUG_INFO_
+	printf("audit_id:%s\n",audit_id);
+#endif
+		}
+		else 
+		{
+			strcpy(audit_id,value[0].c_str());
+			strcpy(merge_type,value[1].c_str());
+#ifdef _DEBUG_INFO_
+	printf("audit_id:%s,merge_type:%s\n",audit_id,merge_type);
+#endif
+		}
+		//获取数据
+		if (0 != getSecondAudit(m_YM,day_billcycl,merge_type,region_code,audit_id,num))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getSecondAudit is ERROR\n");
+			return RET_FAIL;
+		}
+		num++;
+	}
+
+	for (map<string,vector<stAuditKPIs*> >::iterator iter=m_VB.begin();iter!=m_VB.end();iter++)
+	{
+		m_szInData.record_count ++;
+		vector<stAuditKPIs*> left_values= iter->second;
+		long res_records = 0,res_amount = 0;
+		char form_records[255+1] = {0};
+		char form_amount[255+1] = {0};
+		//循环公式元素
+		iRet = ProFormObjectProcess(values,operation,left_values,&res_records,&res_amount,form_records,form_amount);
+		if (iRet != 0)
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProFormObjectProcess is ERROR\n");
+			return iRet;
+		}
+		char org_ins[64+1] = {0};
+		char date_ins[16+1] = {0};
+		char audit_type[1+1] = {0};
+		strcpy(org_ins,left_values[0]->org_ins);
+		strcpy(date_ins,left_values[0]->date_ins);
+		//解析数学公式，获得KPI结果
+		if (strcmp(kpicfg->Audit_type,"A") == 0)
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"结果records=%ld,%s\n",res_records,form_records);
+#ifdef _DEBUG_INFO_
+	printf("结果records=%ld,%s\n",res_records,form_records);
+#endif
+			//KPI未做平，记录KPI的值，并记入his中
+			strcpy(audit_type,"A");
+			if (0 != ProFormDeal(res_records,form_records,org_ins,date_ins,kpicfg,audit_type))
+			{
+				printf("ProFormDeal[A] is ERROR!!! \n");
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProFormDeal[A] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+		}
+		else if (strcmp(kpicfg->Audit_type,"B") == 0)
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"结果amount=%ld,%s\n",res_amount,form_amount);
+#ifdef _DEBUG_INFO_
+	printf("结果amount=%ld,%s\n",res_amount,form_amount);
+#endif
+			//KPI未做平，记录KPI的值，并记入his中
+			strcpy(audit_type,"B");
+			if (0 != ProFormDeal(res_amount,form_amount,org_ins,date_ins,kpicfg,audit_type))
+			{
+				printf("ProFormDeal[B] is ERROR!!! \n");
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProFormDeal[B] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+		}
+		else if (strcmp(kpicfg->Audit_type,"C") == 0)
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"结果records=%ld,%s\n",res_records,form_records);
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"结果amount=%ld,%s\n",res_amount,form_amount);
+#ifdef _DEBUG_INFO_
+	printf("结果records=%ld,%s\n",res_records,form_records);
+	printf("结果amount=%ld,%s\n",res_amount,form_amount);
+#endif
+			//KPI未做平，记录KPI的值，并记入his中
+			strcpy(audit_type,"A");
+			if (0 != ProFormDeal(res_records,form_records,org_ins,date_ins,kpicfg,audit_type))
+			{
+				printf("ProFormDeal[A] is ERROR!!! \n");
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProFormDeal[A] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+			strcpy(audit_type,"B");
+			if (0 != ProFormDeal(res_amount,form_amount,org_ins,date_ins,kpicfg,audit_type))
+			{
+				printf("ProFormDeal[B] is ERROR!!! \n");
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProFormDeal[B] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+		}
+	}
+	//清理数据内存
+	clearDataList(m_VB);
+	
+	return iRet;
+}
+
+int GETKPI_TLMgr::ProFormDeal(long res,char *form,char *org_ins,char *date_ins,stAuditKPICfg *kpicfg,char *audit_type)
+{
+	int iRet = 0;
+#ifdef _DEBUG_INFO_
+	printf("opp:%s,date:%s\n",org_ins,date_ins);
+#endif
+	//记录KPI日志（KPI未做平）
+	if (0 != insertKPILog(m_YM,kpicfg,audit_type,org_ins,date_ins,res,form))
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"insertKPILog is ERROR\n");
+		iRet = RET_FAIL;
+		return iRet;
+	}
+	//记录KPI his
+	if (0 != insertKPIHis(m_YM,kpicfg,audit_type,org_ins,date_ins,res,form))
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"insertKPIHis is ERROR\n");
+		iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	return iRet;
+}
+
+//执行一个KPI公式，返回该公式的KPI值
+int GETKPI_TLMgr::ProFormObjectProcess(vector<vector<string> > values,vector<string> operation,vector<stAuditKPIs*> left_values,long *res_records,long *res_amount,char *form_records,char *form_amount)
+{
+	int iRet = RET_OK;
+	int ys_num = 0,ys_count = 0;//公式中的元素个数
+	long res_records_temp = 0,res_amount_temp = 0;
+	char form_records_temp[255+1] = {0};
+	char form_amount_temp[255+1] = {0};
+	char merge_type[100] = {0};
+	char audit_id[10] = {0};
+	int num = 0;
+	long left_records = 0,left_mount = 0;
+#ifdef _DEBUG_INFO_
+	printf("size=%ld\n",left_values.size());
+#endif
+	//执行KPI公式
+	for (vector<stAuditKPIs*>::iterator it = left_values.begin();it!=left_values.end();it++ )
+	{
+		stAuditKPIs *kpis = *it;
+		left_records = kpis->records;
+		left_mount = kpis->amount;
+#ifdef _DEBUG_INFO_
+	printf("left_records=%ld,left_mount=%ld\n",left_records,left_mount);
+#endif
+		if (num == 0)
+		{
+			res_records_temp = left_records;
+			res_amount_temp = left_mount;
+			sprintf(form_records_temp,"%ld",left_records);
+			sprintf(form_amount_temp,"%ld",left_mount);
+		}
+		else 
+		{
+			char opt[1+1] = {0};
+			strcpy(opt,operation[num-1].c_str());
+			if (strcmp(opt,"+") == 0)
+			{
+				res_records_temp += left_records;
+				res_amount_temp += left_mount;
+				sprintf(form_records_temp,"%s+%ld",form_records_temp,left_records);
+				sprintf(form_amount_temp,"%s+%ld",form_amount_temp,left_mount);
+			}
+			else if (strcmp(opt,"-") == 0)
+			{
+				res_records_temp -= left_records;
+				res_amount_temp -= left_mount;
+				sprintf(form_records_temp,"%s-%ld",form_records_temp,left_records);
+				sprintf(form_amount_temp,"%s-%ld",form_amount_temp,left_mount);
+			}
+			else 
+			{
+				iRet = RET_FAIL;
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"公式配置错误!!![%s]\n",opt);
+				printf("公式配置错误!!![%s]\n",opt);
+				return iRet;
+			}
+		}
+		num++;
+	}
+
+	*res_records = res_records_temp;
+	*res_amount = res_amount_temp;
+	strcpy(form_records,form_records_temp);
+	strcpy(form_amount,form_amount_temp);
+	return iRet;
+}
+
+int GETKPI_TLMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int GETKPI_TLMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

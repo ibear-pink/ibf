@@ -1,0 +1,488 @@
+#ifndef _DEFINE_H_
+#define _DEFINE_H_
+
+#include <pthread.h>
+
+#define BEST_BUF			8192		/*文件系统最佳缓存大小*/
+
+/* DATA TYPE DEFINATION */
+#ifdef _32BIT_SERVER
+typedef unsigned long long	UnInt64;
+typedef unsigned int		UnInt32;
+typedef int					Int32;
+typedef long long			Int64;
+#elif _64BIT_SERVER
+typedef unsigned long		UnInt64;
+typedef unsigned int		UnInt32;
+typedef int					Int32;
+typedef long				Int64;
+#else
+typedef unsigned long long	UnInt64;
+typedef unsigned int		UnInt32;
+typedef int					Int32;
+typedef long long			Int64;
+#endif
+
+#define STOP_TASKNUM 30	/*进程数*/
+#define MAX_DB_NUM 10 /*最大数据库链接个数*/
+
+//文件结束符内容，长度
+#define DEF_FILE_END_FLAG "#\0"
+#define DEF_FILE_END_FLAG_SIZE 1
+
+/*object中opr操作公共信息*/
+#define OPR_SELECT			3
+#define OPR_INSERT			1
+#define OPR_DELETE			2
+#define OPR_DELETE_X		4
+#define OPR_UPDATE 			5
+#define OPR_PROJECT			6
+
+/*DSC数据库标示db_no*/
+#define ORACLE_DB_A  		15
+#define ORACLE_DB_B  		16
+#define ORACLE_DB_BAK_A 17
+#define ORACLE_DB_BAK_B 18
+
+#define STOP_OP_TYPE 				"STOP"
+#define INFORM_CLIENT_NAME 	"STOP"
+#define NOOWNER_FILE 				"noowner"
+#define STOP_OP_CODE				"C200"
+#define PAY_OP_CODE					"8000"
+#define BAKPAY_OP_CODE			"8003"
+#define APP_NAME						"BILLQRY"
+#define STATIC_BLLL					"static"
+#define DEFINE_PAY_CODE			"DEFINE_PAY_CODE"
+
+#define USER_CLASS_NAME 		"stUserInfo"
+#define FEE_CLASS_NAME 			"stStopFeeMsg"
+#define CUR_USER_CLASS_NAME "stCurUserInfo"
+
+#define MAX_DEQUE_NUM				1000
+#define MAX_BUFLEN 			4096
+#define MAX_LOG_SERVER_NUM	10
+#define MAX_BUSINESS_THREAD	40
+#define MAX_PARSE_FILE_NUM	16
+#define MAX_PARSE_FIEL_NUM	32
+#define MAX_CFGDATA_NUM			1024
+#define MAX_LOG_LENGTH			204800
+#define USER_LOG_NUMS				100
+#define MAX_THREAD_WAITTIME	60000000
+/*socket 相关信息*/
+#define MAXDATASIZE 1000
+
+struct MSG_BILLQUERYDATA_ 
+{ 
+char Version[16]; /* 写死iBoss1.0，右补空格 */ 
+char ID_NO[32]; /* 用户ID，左补“0” */ 
+char Contract_NO[32]; /* 账户ID，左补“0” */ 
+char QueryType[3]; /* 业务标识： 
+                                     01：用户、账户查询账本信息；用户、账户综合账单； 
+                                     02：用户、账户查询账本信息；用户、账户明细账单； 
+                                     03：用户、账户明细账单； 
+                                     04：用户、账户查询账本信息；用户、账户综合账单；账单落地； 
+                                     05：用户、账户查询账本信息；用户、账户综合账单；冲销落地； 
+                                  */ 
+char Reserv[16];        /* 预留未用，输入空格即可 */ 
+};
+
+
+typedef enum
+{
+	RET_FAIL = -1,
+	RET_OK = 0,
+	RET_QUIT = 1
+} Ret;
+
+/*线程状态*/
+enum _THREAD_STAT
+{
+	THREAD_STAT_INITIALIZE		= 0,
+	THREAD_STAT_RUNNING			= 1,
+	THREAD_STAT_SUSPEND			= 2,
+	THREAD_STAT_EXIT			= 3
+};
+
+typedef struct THREADINFO
+{
+	UnInt32					serialno;				//一组线程中线程序列号,默认0开始
+	pthread_t		    pid;					//线程ID
+	pthread_attr_t	attr;					//线程属性
+	char           	describe[1024+1]; 		//线程描述
+	UnInt32			    stat;					//0:初始化,1:正常运行2:线程挂起,3:线程退出
+	void *					pclass;					//线程所属对象指针
+	
+	THREADINFO()
+	{
+		serialno = 0;
+		pid = 0;
+		stat = THREAD_STAT_INITIALIZE;
+		pclass = NULL;
+		memset (describe, 0, sizeof(describe));
+	}
+} sThreadInfo;
+
+/*信控产品条件参考属性类型*/
+#define STOP_SECTION_RULE_TYPE		"0"
+#define STOP_PRODUCT_RULE_TYPE		"1"
+#define STOP_GOSTOP_RULE_TYPE			"2"
+
+#define STOP_LOGINOPR_DEFINE 			"$0"
+
+#define MAPPARM PROT_READ|PROT_WRITE
+#define  FORKERROR		-101
+
+#define ERROR		-1
+#define INFO		2
+#define DEBUG		3
+
+#define	OK			 0
+#define NOTFOUND 1403
+#define NOSTOP		"N"
+#define CANSTOP		"Y"
+
+#define   AC_LOG_MONITOR     1  	    /*MONITOR message*/
+#define 	AC_LOG_ERROR       2       /*normal ERROR message*/
+#define		AC_LOG_WARN        3       /*WARING message*/
+#define 	AC_LOG_INFO        4       /*normal INFORMATION message*/
+#define		AC_LOG_DEBUG       5       /*DEBUG message*/
+#define		AC_LOG_COUNT       6       /*COUNT message*/
+
+/*判断条件操作符*/
+#define OPERATOR_STRING_GT		">" 		 //数值比较，>
+#define OPERATOR_STRING_LT		"<"       //数值比较，<
+#define OPERATOR_STRING_EQ		"=="       //数值比较，==
+#define OPERATOR_STRING_GE		">="       //数值比较，>=
+#define OPERATOR_STRING_LE		"<="       //数值比较，<=
+#define OPERATOR_STRING_NE		"!="       //数值比较，!=
+#define OPERATOR_STRING_IN		"in"
+#define OPERATOR_STRING_OUT   "out"
+#define OPERATOR_STRING_COMPARE	"cmp"
+
+#define REF_VALUE_TYPE_8AA			"8AA"
+#define REF_VALUE_TYPE_8AB			"8AB"
+#define REF_VALUE_TYPE_8AC			"8AC"
+#define REF_VALUE_TYPE_8AD			"8AD"
+
+/*外部属性定义*/
+#define EXTER_PROPERTY_SYSDATE							"SYSDATE"
+#define EXTER_PROPERTY_CUR_CONTRACT_NO 			"CUR_CONTRACT_NO"
+#define EXTER_PROPERTY_LAST_STOP_CONTRACT_NO "LAST_CONTRACT_NO"
+#define EXTER_PROPERTY_HOLIDAY_FLAG 				"HOLIDAY_FLAG"
+#define EXTER_PROPERTY_USER_CONTACT_ID			"CONTACT_ID"
+#define EXTER_PROPERTY_MODULE_ID						"MODULE_ID"
+#define EXTER_PROPERTY_CUR_MODULE_ID				"CUR_MODULE_ID"
+#define EXTER_PROPERTY_SERV_IDS 						"SERV_IDS"
+#define EXTER_PROPERTY_OTHER_DATA						"OTHER_DATA"
+#define EXTER_PROPERTY_OTHER_DATA_1					"OTHER_DATA_1"
+#define EXTER_PROPERTY_IN_DB_LABEL					"IN_DB_LABEL"
+#define EXTER_PROPERTY_CREDIT_AWAKE_FLAG		"CREDIT_AWAKE_FLAG"
+#define EXTER_PROPERTY_CREDIT_CJ_FLAG				"CREDIT_CJ_FLAG"
+#define EXTER_PROPERTY_JL_GOTO_AWOKE_CODE		"JL_GOTO_AWOKE_CODE"
+#define EXTER_PROPERTY_JL_GOTO_AWOKE_OTHER  "JL_GOTO_AWOKE_OTHER"
+#define EXTER_PROPERTY_TASK_TYPE  					"TASK_TYPE"
+#define EXTER_PROPERTY_SYSDATE_YEAR					"SYSDATE_YEAR"
+#define EXTER_PROPERTY_SYSDATE_MONTH				"SYSDATE_MONTH"
+#define EXTER_PROPERTY_SYSDATE_DAY					"SYSDATE_DAY"
+#define EXTER_PROPERTY_SYSDATE_HOUR					"SYSDATE_HOUR"
+#define EXTER_PROPERTY_EXPIRE_YEAR					"EXPIRE_YEAR"
+#define EXTER_PROPERTY_EXPIRE_MONTH					"EXPIRE_MONTH"
+#define EXTER_PROPERTY_EXPIRE_DAY						"EXPIRE_DAY"
+#define EXTER_PROPERTY_DIS_EXPIRE_YEAR			"DIS_EXPIRE_YEAR"
+#define EXTER_PROPERTY_DIS_EXPIRE_MONTH			"DIS_EXPIRE_MONTH"
+#define EXTER_PROPERTY_STOP_HOUR						"STOP_HOUR"
+#define EXTER_PROPERTY_ABS_CUR_BALANCE			"ABS_CUR_BALANCE"
+#define EXTER_PROPERTY_SMS_CUR_BALANCE			"SMS_CUR_BALANCE"
+#define EXTER_PROPERTY_GROUP_RULE						"GROUP_RULE"
+#define EXTER_PROPERTY_TOTAL_DATE						"TOTAL_DATE"
+#define EXTER_PROPERTY_STOP_RUN_CODE				"STOP_RUN_CODE"
+#define EXTER_PROPERTY_STOP_ID_NO						"STOP_ID_NO"
+#define EXTER_PROPERTY_STOP_PHONE_NO				"STOP_PHONE_NO"
+#define EXTER_PROPERTY_LAST_SUC_PRODUCTID		"LAST_SUC_PRODUCTID"
+#define EXTER_PROPERTY_LAST_SUC_SECTIONID		"LAST_SUC_SECTIONID"
+#define EXTER_PROPERTY_OVER_FEE_YUAN				"OVER_FEE_YUAN"
+#define EXTER_PROPERTY_AWOKE_FEE_YUAN				"AWOKE_FEE_YUAN"
+#define EXTER_PROPERTY_SMS_LIMIT_OWE				"SMS_LIMIT_OWE"
+#define EXTER_PROPERTY_SMS_STOP_DAYS				"SMS_STOP_DAYS"
+#define EXTER_PROPERTY_SMS_LIMIT_DAYS				"SMS_LIMIT_DAYS"
+#define EXTER_PROPERTY_STOP_USER_GRADE_CODE "STOP_USER_GRADE_CODE"
+#define EXTER_PROPERTY_STOP_SM_CODE					"STOP_SM_CODE"
+#define EXTER_PROPERTY_STOP_LIST_TYPE				"STOP_LIST_TYPE"
+#define EXTER_PROPERTY_G_SERV_FLAG					"G_SERV_FLAG"
+#define EXTER_PROPERTY_G_SERV_CODE					"G_SERV_CODE"
+#define EXTER_PROPERTY_UN_EXPIRE_DAY				"UN_EXPIRE_DAY"
+#define EXTER_PROPERTY_LIMIT_OWE_YUAN				"LIMIT_OWE_YUAN"
+#define EXTER_PROPERTY_CUR_BILL_FEE					"CUR_BILL_FEE"
+#define EXTER_PROPERTY_LASTMONTH_OWE_FEE		"LASTMONTH_OWE_FEE"
+#define EXTER_PROPERTY_SECONDMONTH_OWE_FEE  "SECONDMONTH_OWE_FEE"
+#define EXTER_PROPERTY_BSM_NAME							"BSM_NAME"
+#define EXTER_PROPERTY_KD_OPEN_FLAG					"KD_OPEN_FLAG"
+#define EXTER_PROPERTY_NEW_SECTION_RUN_CODE "NEW_SECTION_RUN_CODE"
+#define EXTER_PROPERTY_USERCHG_REMARK				"USERCHG_REMARK"
+#define EXTER_PROPERTY_COM_CUR_BALANCE_REAL "COM_CUR_BALANCE_REAL"
+#define EXTER_PROPERTY_J_FLAG								"J_FLAG"
+#define EXTER_PROPERTY_J_LIMIT_FLAG							"J_LIMIT_FLAG"
+
+#define EXTER_PROPERTY_SINGLESTOP_DAYS 	"SINGLE"
+#define EXTER_PROPERTY_VOICESTOP_DAYS 	"VOICE"
+#define EXTER_PROPERTY_RESTOP_HOURS 		"RESTOP"
+#define EXTER_PROPERTY_LIMIT_DAYS 			"LIMIT"
+#define EXTER_PROPERTY_OWE_AWAKE_TIMES 	"OWE_TIME"
+#define EXTER_PROPERTY_CALLING_TIMES 		"CALL_TIME"
+#define EXTER_PROPERTY_AWAKE_TIMES 			"AWAKE_TIME"
+#define EXTER_PROPERTY_OWE_AWAKE_FEE 		"OWE_AWAKE_FEE"
+#define EXTER_PROPERTY_AWAKE_FEE 				"AWAKE_FEE"
+#define EXTER_PROPERTY_OVER_FEE 				"OVER_FEE"
+
+/*策略间关系*/
+#define SECTION_RELA_MUTEX		"88A"
+#define SECTION_RELA_SYNC		"88B"
+
+///////////////
+//服务端处理模式
+enum
+{
+	SERVER_SYNC_MODE			= 1,
+	SERVER_ASYNC_MODE			= 2
+};
+
+/*日志类型声明*/
+enum
+{
+	LOG_SYS_NORMAL					= 1000,			//通用日志
+	LOG_SYS_RUNNING					= 1001,			//运行日志
+	LOG_SYS_WARNING					= 1002,			//告警日志
+	LOG_SYS_ERROR					= 1003,			//错误日志
+	LOG_APP_STATINFO				= 1004,			//统计日志
+	LOG_APP_PERFORMANCE				= 1009			//性能分析
+};
+
+#define INTERFACE_TYPE_STOPPH_LOG_HEAD	"stopph"	//实时信控
+#define INTERFACE_TYPE_ACCT_ITEM_HEAD		"acct"		//账务定时
+#define INTERFACE_TYPE_GET_DATA_HEAD		"data"		//取数据
+#define INTERFACE_TYPE_STOP_PATCH_HEAD	"stpatch"		//停机补丁
+#define INTERFACE_TYPE_OTHER_HEAD 			"other" 	//自定义
+
+/*协议转换接口类型*/
+enum
+{
+	INTERFACE_TYPE_FILE		= 1,	//文件接口
+	INTERFACE_TYPE_TABLE	= 2,	//接口表
+	INTERFACE_TYPE_FIX_TIME	= 3,	//定时接口
+	INTERFACE_TYPE_API		= 4		//API
+};
+
+/*接口业务类型*/
+enum
+{
+	INTERFACE_BUSINESS_TYPE_OTHER = 0,//自定义
+	INTERFACE_BUSINESS_TYPE_STOPPH_LOG = 1,	//信控
+	INTERFACE_BUSINESS_TYPE_ACCT_ITEM	= 2,	//账务
+	INTERFACE_BUSINESS_TYPE_GET_DATA =3, //提数
+	INTERFACE_BUSINESS_TYPE_STOP_PATCH = 4 //停机补丁
+};
+#define STR_LOG_SYS_NORMAL		"NORMAL"
+#define STR_LOG_SYS_RUNNING		"RUNNING"
+#define STR_LOG_SYS_WARNING		"WARNING"
+#define STR_LOG_SYS_ERROR		"ERROR"
+#define STR_LOG_APP_STATINFO	"STAT"
+#define STR_LOG_APP_PERFORMANCE	"PERFORMANCE"	
+
+#define STR_PATH_RUNLOG			"runlog"
+#define STR_PATH_TEMP			"temp"
+#define FILE_EXTEN_NAME		"log"
+
+#define STR_PROGRAM_NAME		"rtStopMain"
+
+/*日志备份方式*/
+enum
+{
+	LOG_BACKUP_DATE				= 1,	//日期方式备份
+	LOG_BACKUP_SIZE				= 2,	//文件大小方式备份
+	LOG_BACKUP_INTERVAL_TIME	= 3,	//时间间隔方式备份
+	LOG_BACKUP_HOUR				= 4		//小时方式备份
+};
+
+enum
+{
+	WRITE_FILE_SIZE_TYPE			= 1,//文件大小
+	WRITE_FILE_INTERVAL_TIME_TYPE	= 2,//时间间隔
+	WRITE_FILE_END_FILE_TYPE		= 3,//入口文件处理完时备份
+	WRITE_FILE_IMMEDIATE_TYPE		= 4//即时备份
+};
+
+/*断点定义*/
+#define BREAK_POINT_0   '0'  				/*正常终止*/
+#define BREAK_POINT_1   '1'  				/*处理记录中断*/
+#define BREAK_POINT_2   '2'  				/*移错单文件中断*/
+#define BREAK_POINT_3   '3'  				/*移入口到备份中断*/
+#define	BREAK_POINT_4		'4'					/*移入口到错误目录中断*/
+#define	BREAK_POINT_5		'5'					/*将出口文件从临时目录移到正式目录*/
+
+/*信控增量文件字段位置宏定义*/
+#define STOPPH_LOG_FILE_NUM_SEQ					"seq"
+#define STOPPH_LOG_FILE_NUM_TYPE				"task_type"
+#define STOPPH_LOG_FILE_NUM_CONTRACT_NO	"contract_no"
+#define STOPPH_LOG_FILE_NUM_USER_ID			"user_id"
+#define STOPPH_LOG_FILE_NUM_TIME				"time"
+#define STOPPH_LOG_FILE_NUM_STATE				"state"
+#define STOPPH_LOG_FILE_NUM_PHONE				"phone_no"
+#define STOPPH_LOG_FILE_NUM_LIMIT_OWE		"limit_owe"
+#define STOPPH_LOG_FILE_NUM_EXPIRE_DAY	"expire_day"
+#define STOPPH_LOG_FILE_NUM_DATE				"date"
+#define STOPPH_LOG_FILE_NUM_CODE				"code"
+#define STOPPH_LOG_FILE_NUM_PAYSN				"pay_sn"
+#define STOPPH_LOG_FILE_NUM_STATUS			"status"
+#define STOPPH_LOG_FILE_NUM_HEADSTR			"headstr"
+#define STOPPH_LOG_FILE_NUM_JFLAG				"j_flag"
+
+
+/*信控增量文件字段位置宏定义*/
+/*#define STOPPH_LOG_FILE_NUM_SEQ					1
+#define STOPPH_LOG_FILE_NUM_TYPE				2
+#define STOPPH_LOG_FILE_NUM_CONTRACT_NO	3
+#define STOPPH_LOG_FILE_NUM_USER_ID			4
+#define STOPPH_LOG_FILE_NUM_TIME				5
+#define STOPPH_LOG_FILE_NUM_STATE				6*/
+/*账务字段位置宏定义*/
+/*#define ACCT_ITEM_FILE_NUM_SEQ					1
+#define ACCT_ITEM_FILE_NUM_USER_ID			2
+#define ACCT_ITEM_FILE_NUM_CONTRACT_NO	3
+#define ACCT_ITEM_FILE_NUM_PHONE				4
+#define ACCT_ITEM_FILE_NUM_LIMIT_OWE    5
+#define ACCT_ITEM_FILE_NUM_EXPIRE_DAY   6
+#define ACCT_ITEM_FILE_NUM_DATE					7
+#define ACCT_ITEM_FILE_NUM_CODE					8*/
+/*(局拆)增量文件字段位置宏定义*/
+/*#define GET_JB_DATA_FILE_NUM_USER_ID			1
+#define GET_JB_DATA_FILE_NUM_PHONE_NO			2
+#define GET_JB_DATA_FILE_NUM_CONTRACT_NO	3*/
+
+#define FILEPATH_LEN 128
+#define STOP_SUCESS 2001
+#define CC_MAXBUSINESSCTR         11500              /* 开关配置最大数量 */
+
+#define SPELIST_RED_AWOKE		"43"/*list_type红名单标示-催缴*/
+#define SPELIST_RED_STOP		"44"/*list_type红名单标示-免停*/
+#define SPELIST_AWOKE "26"/*list_type话费催缴标示*/
+#define SPELIST_PUB 	"00"
+
+#define ALL_REGION_CODE "99" /*泛型地市*/
+
+#ifdef _JL_MOBILE_
+#define USER_CREDIT_CODE_DEFINE "S"  /*用户默认信誉等级*/
+#elif _SC_MOBILE_
+#define USER_CREDIT_CODE_DEFINE "N"  /*用户默认信誉等级*/
+#endif
+
+#define USER_HOLIDAY_STOP_FLAG_DEFINE "0"  /*用户默认节假日免停机标示*/
+#define USER_OWE_FLAG_DEFINE "1"  /*用户默认是否开通欠费额度服务*/
+#define USER_VALID_FLAG_DEFINE "0"  /*用户默认是否启动信誉度*/
+#define NOT_COM_CODE_DEFINE "NU"  /*不参考字段默认值*/
+#define STOP_SYSTEM_LOGIN_ON 	"system"
+
+//配置文件stop_common.conf的func_list值定义
+#define BUSINESS_FUNC_STOP_SYSTEM_PRODUCT "stop_system_product"
+#define BUSINESS_FUNC_STOP_USER_PRODUCT 	"stop_user_product"
+#define BUSINESS_FUNC_CONTRACT_STOP 			"contract_stop"
+#define BUSINESS_FUNC_USER_STOP 					"user_stop"
+#define BUSINESS_FUNC_CONTRACT_FEE 				"contract_fee"
+#define BUSINESS_FUNC_USER_FEE 						"user_fee"
+#define BUSINESS_FUNC_INSERT_AWOKE_HIS 		"insert_awoke_his"
+#define BUSINESS_FUNC_HOME_STOP 					"home_stop"
+#define BUSINESS_FUNC_AWAKECFG_STOP 			"awake_cfg_stop"
+#define BUSINESS_FUNC_PAY_TYPE	 					"pay_type"
+#define BUSINESS_FUNC_ACCT_ITEM_TYPE 			"acct_item_type"
+#define BUSINESS_FUNC_REALTIME_WRITEOFF 	"realtime_writeoff"
+#define BUSINESS_FUNC_DISTINCT_RESULT 		"distinct_result"
+
+//配置文件stop_common.conf的func_list值的编号定义
+enum
+{
+	BUSINESS_FUNC_NO_STOP_SYSTEM_PRODUCT		= 0,
+	BUSINESS_FUNC_NO_STOP_USER_PRODUCT		= 1,
+	BUSINESS_FUNC_NO_CONTRACT_STOP	= 2,
+	BUSINESS_FUNC_NO_USER_STOP		= 3,
+	BUSINESS_FUNC_NO_INSERT_AWOKE_HIS =4,
+	BUSINESS_FUNC_NO_HOME_STOP = 6,
+	BUSINESS_FUNC_NO_AWAKECFG_STOP = 7,
+	BUSINESS_FUNC_NO_PAY_TYPE = 8,
+	BUSINESS_FUNC_NO_ACCT_ITEM_TYPE = 9,
+	BUSINESS_FUNC_NO_REALTIME_WRITEOFF = 10,
+	BUSINESS_FUNC_NO_DISTINCT_RESULT = 11,
+	BUSINESS_FUNC_NO_USER_FEE = 12,
+	BUSINESS_FUNC_NO_CONTRACT_FEE = 13
+};
+
+//stop_ref_object的sql取值方式的属性值定义
+#define OBJECT_SQL_PARAM_PHONE_NO "phone_no"
+#define OBJECT_SQL_PARAM_ID_NO "id_no"
+#define OBJECT_SQL_PARAM_CONTRACT_NO "contract_no"
+#define OBJECT_SQL_PARAM_YYYYMM "yyyymm"
+#define OBJECT_SQL_PARAM_ID_NO_1 "id1"
+#define OBJECT_SQL_PARAM_ID_NO_2 "id2"
+#define OBJECT_SQL_PARAM_CONTRACT_NO_1 "co1"
+#define OBJECT_SQL_PARAM_CONTRACT_NO_2 "co2"
+#define OBJECT_SQL_PARAM_SM_CODE "sm_code"
+//add jiahh 
+#define OBJECT_SQL_PARAM_REGION_ID "region_id"
+#define OBJECT_SQL_PARAM_RUN_CODE "run_code"
+#define OBJECT_SQL_PARAM_PREPAY_FEE "prepay_fee"
+#define OBJECT_SQL_PARAM_OWE_FEE "owe_fee"
+#define OBJECT_SQL_PARAM_LIMIT_HIGH "limit_high"
+
+#define OBJECT_SQL_PARAM_YYYYMM_1 "ym"
+#define OBJECT_SQL_PARAM_CREDIT_CLASS "credit_class"
+
+#define STOP_SECTION_CODE_AWOKE7 "7"
+#define STOP_SECTION_CODE_AWOKE8 "8"
+#define STOP_OP_CODE_ASTOP "C201"
+
+#define PERSON_CONTRACT_TYPE "0"//个人账户type
+#define GROUP_CONTRACT_TYPE "1"//集团账户type
+#define FAMILY_PUBLIC_CONTRACT_TYPE "2"//家庭公共账户type
+
+#define STOP_SECTION_MODULE_AWOKE7 "AWOKE:7"
+#define STOP_SECTION_MODULE_AWOKE8 "AWOKE:8"
+
+#define JAVA_INTERFACE_SERV_ORD "1"
+#define JAVA_INTERFACE_SEND_MSG "2"
+#define JAVA_INTERFACE_ORDER "3"
+#define JAVA_INTERFACE_B_ORDER "4"
+
+#define AWOKE_TYPE_AWAK	"AWK:7"
+#define AWOKE_TYPE_OVER	"AWK:8"
+#define AWOKE_TYPE_PAY	"PAY:A"
+
+#define SQL_PARAM_CHAR "char"
+#define SQL_PARAM_LONG "long"
+#define SQL_PARAM_DATE "date"
+#define SQL_PARAM_INT  "int"
+
+#define DEFINE_BILL_ORDER "99999999"
+
+#define MAX_PARAM_NUM  30
+enum
+{
+	ERRCODE_DEAL_RECORD       		= 20,
+	ERRCODE_GET_RECORD				= 21
+};
+
+/*备份模式（1：文件方式，2：表方式）*/
+enum
+{
+	NO_BACKUP = 0,  //不做备份
+	BACKUP_TYPE_FILE		= 1,	//文件接口
+	BACKUP_TYPE_TABLE	= 2	//接口表
+};
+
+#define OPEN_USERCHG_OLDRUN "01"
+
+typedef struct
+{
+	char sFileName[1024];
+	char sModifyTime[14+1];
+} stFileInfo;
+
+
+#endif

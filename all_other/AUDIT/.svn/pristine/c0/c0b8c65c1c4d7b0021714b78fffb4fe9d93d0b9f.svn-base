@@ -1,0 +1,119 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _GETKPI_MANAGER_H_
+#define _GETKPI_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+//稽核指标配置
+typedef struct
+{
+	char Parameter[20+1];//指标项目
+	char Audit_type[2+1];//稽核项
+	char Dismension_bah[20+1];//维度批次
+	char Dismension_org[20+1];//维度地市
+	char Dismension_date[20+1];//维度时间
+	char Audit_form[100+1];//稽核公式
+} stAuditKPICfg;
+
+//KPI基数
+typedef struct
+{
+	long records;
+	long amount;
+	char merge_type[50];
+	char audit_id[5+1];
+	char bah_ins[64+1];
+	char org_ins[16+1];
+	char date_ins[16+1];
+} stAuditKPIs;
+
+class GETKPIMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(GETKPIMgr)
+public:
+	
+	GETKPIMgr();
+	~GETKPIMgr();
+	
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+	
+	int ProInterface(map<string,string> *values);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+
+	//根据批次判断所有公式是否平衡	
+	int ProBatchProcess(char *batchsn,char *org_ins,char *date_ins,vector<stAuditKPIs*> VA);
+	
+	//处理公式结果
+	int ProFormDeal(long res,char *form,char *batchsn,char *org_ins,char *date_ins,stAuditKPICfg *kpicfg,char *audit_type,bool *isall_ok);
+	
+	//执行一个KPI公式，返回该公式的KPI值
+	int ProFormObjectProcess(vector<vector<string> > values,vector<string> operation,vector<stAuditKPIs*> VA,char *audit_type,long *res_records,char *form_records,long *res_amount,char *form_amount);
+	
+	//取KPI配置数据
+	int getAuditKPIStatic();
+	
+	//取工单数据
+	int getAuditKPIProcws(char *p_count,char *p_num);
+	
+	//插入接口数据到历史表
+	int insertAuditProcwsHis(char *ym,char *batchsn,char *status);
+	
+	//删除接口数据
+	int deleteAuditProcws(char *batchsn);
+	
+	//一次稽核数据上锁
+	int updFristAuditLock(char *ym, char *table_name,char *p_count,char *p_num);
+
+	//获取一次稽核数据
+	int getFristAudit(char *ym, char *table_name);
+	
+	//删除一次稽核数据
+	int deleteFristAudit(char *ym,char *table_name,char *batchsn);
+	
+	//修改一次稽核数据
+	int updateFristAudit(char *ym,char *table_name,char *batchsn);
+	
+	//一次稽核数据入his
+	int insertFirstStatusHis(char *ym,char *table_name,char *batchsn);
+	
+	//查询KPI日志
+	int seleteKPIBatch(char *ym, char *bah_ins, char *parameter, char *audit_type, char *audit_batch);
+	
+	//删除KPI日志
+	int deleteKPILog(char *ym, char *bah_ins, char *parameter, char *audit_type);
+	
+	//记录KPI日志（KPI未做平）
+	int insertKPILog(char *ym,stAuditKPICfg *kpicfg,char *bah_ins,char *org_ins,char *date_ins,char *form_ins,long records,char *audit_type);
+	
+	//记录KPI his
+	int insertKPIHis(char *ym,stAuditKPICfg *kpicfg,char *bah_ins,char *org_ins,char *date_ins,char *form_ins,long records,char *audit_type);
+	
+public:
+	ibear *m_Ibear;
+	
+	vector<stAuditKPICfg*> m_AuditKPICfgs;
+	map<string,vector<stAuditKPIs*> > VB;
+	char m_pidNum[64+1];	
+	char m_pidCount[64+1];
+	char m_tableName[64];
+	char m_YM[6+1];
+	DC_AxLogFile *m_logFile;
+	stAppCfg_Proc_Server *m_CfgInfo;
+	stAppCfg_System *m_ProInfo;
+	ComMonitor *m_logMon;
+	StrInData m_szInData;
+};
+#endif
+
+

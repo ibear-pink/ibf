@@ -1,0 +1,49 @@
+
+/**
+ * describe:³Ø¹«¹²Àà
+ * create date:2016/2/22 15:46:06
+ * author:wangzhia
+ */
+#ifndef _POOR_H_
+#define _POOR_H_
+
+#include "avltree.h"
+#include "Task.h"
+#include "Define.h"
+#include "CMutexLock.h"
+
+using namespace std;
+
+//³Ø
+template<class D> 
+class Poor
+{
+private:
+	deque2<D> m_DataList;
+
+public:
+	Poor();
+	
+	~Poor();
+	
+	void PutRecord (D *d) {m_DataList.push_first (d);}
+		
+	D *GetRecord () {return m_DataList.pop();}
+	
+	void ClearRecord () {m_DataList.clear();};
+	
+	int GetRecordNum () {return m_DataList.sum();};
+	
+};
+
+template<class D> 
+Poor<D>::Poor()
+{
+}
+
+template<class D> 
+Poor<D>::~Poor()
+{
+}
+
+#endif

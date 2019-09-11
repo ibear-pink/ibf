@@ -1,0 +1,2 @@
+LD_LIBRARY_PATH=/acct/work/wangzhia/ibear_all/ibear/lib:/acct/work/wangzhia/ibear_all/xml2/lib:$LD_LIBRARY_PATH
+./test sqlMapConfig.xml

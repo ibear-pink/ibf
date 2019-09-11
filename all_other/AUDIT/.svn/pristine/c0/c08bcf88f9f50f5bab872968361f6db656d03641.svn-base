@@ -1,0 +1,18 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<update id="UPD_OFAC" parameterClass="Map" db_no="0">update AUDIT_MERGE_OFAC_#YM# set rec_attr='1',rec_time=sysdate where rec_attr='0'</update>
+	<delete id="DEL_OFAC" parameterClass="Map" db_no="0">delete from AUDIT_MERGE_OFAC_#YM# where rec_attr='1'</delete>
+	<insert id="INS_OFAC_HIS" parameterClass="Map" db_no="0">insert into AUDIT_MERGE_OFAC_HIS_#YM# select batchsn,merge_type,day_billcycl,region_code,audit_id,records,amount,rec_attr,rec_time from AUDIT_MERGE_OFAC_#YM1# where rec_attr='1'</insert>
+	<select id="SEL_KPI_CFG" parameterClass="Map" resultNum="5" db_no="0">select Parameter,Audit_type,OPP_DISMEN,DATE_DISMEN,Audit_Form from AUDIT_KPI_STATIC</select>
+	<select id="SEL_KPI_COUNT" parameterClass="Map" resultNum="1" db_no="0">select count(1) from AUDIT_KPI_LOG_MODEL where OPP_INS=${OPP_INS|char} and DATE_INS=${DATE_INS|char} and AUDIT_FORM=${AUDIT_FORM|char}</select>
+	<insert id="INS_KPI_MODEL" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_MODEL(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'1',sysdate)</insert>
+	<delete id="DEL_KPI_MODEL" parameterClass="Map" db_no="0">delete from AUDIT_KPI_LOG_MODEL where audit_attr='1'</delete>
+	<insert id="INS_KPI_LOG" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_#YM#_#BATCH_X#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+	<insert id="INS_KPI_LOG_TO" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_#YM#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+	<insert id="INS_KPI_HIS" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_HIS_#YM#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+	<delete id="DEL_KPI_LOG" parameterClass="Map" db_no="0">delete from AUDIT_KPI_LOG_#YM#</delete>
+	<update id="UPD_KPI_MODEL_F" parameterClass="Map" db_no="0">update AUDIT_KPI_LOG_MODEL set audit_attr='2',audit_time=sysdate where OPP_INS=${OPP_INS|char} and DATE_INS=${DATE_INS|char} and AUDIT_FORM=${AUDIT_FORM|char}</update>
+	<update id="UPD_KPI_MODEL" parameterClass="Map" db_no="0">update AUDIT_KPI_LOG_MODEL set audit_attr='1',audit_time=sysdate,Audit_RECORDS=${AUDIT_RECORDS|long},AUDIT_AMOUNT=${AUDIT_AMOUNT|long} where OPP_INS=${OPP_INS|char} and DATE_INS=${DATE_INS|char} and AUDIT_FORM=${AUDIT_FORM|char}</update>
+</sqlMap>
+

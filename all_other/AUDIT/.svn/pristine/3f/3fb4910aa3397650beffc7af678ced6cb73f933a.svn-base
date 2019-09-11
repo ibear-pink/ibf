@@ -1,0 +1,63 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _RTOB_MANAGER_H_
+#define _RTOB_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+typedef struct
+{
+	char batchsn[64+1];
+	char wsseq[25+1];
+	char notes[1024+1];
+} stOrder;
+
+class RTOBMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(RTOBMgr)
+public:
+	
+	RTOBMgr();
+	~RTOBMgr();
+	void run (void);
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+	int process();
+	int ProInterface(map<string,string> *values);
+	int UpdPoorStatus(stDealTask *pTask);
+	
+	int dealTempFile();
+	int dealUnFlagData();
+	//取flag=1的一批数据
+	int getOrderListByFlag(char *table_name);
+	//取首行的批次
+	int getOrderBatchSn(char *table_name,char *batchsn);
+	//根据批次取一批数据
+	int getOrderList(char *table_name,char *batchsn);
+	//根据批次将flag改为正在处理
+	int updateOrderByBah(char *table_name,char *batchsn);
+	//批量删除正在处理的数据
+	int deleteOrderByFlag(char *table_name);
+	//批量删除批次数据
+	int deleteOrderByBatchsn(char *table_name,char *batchsn);
+
+public:
+	ibear *m_Ibear;
+	stAppCfg_Proc_Server *m_CfgInfo;
+	stAppCfg_System *m_ProInfo;
+	bool m_ServerExitFlag;
+	vector<stOrder*> m_interfaceTable;
+	char m_TableName[128+1];
+	DC_AxLogFile *m_logFile;
+	ComMonitor *m_logMon;
+	StrInData m_szInData;
+};
+#endif
+
+

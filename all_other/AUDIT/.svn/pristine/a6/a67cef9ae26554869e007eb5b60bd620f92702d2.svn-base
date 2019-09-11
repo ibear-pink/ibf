@@ -1,0 +1,173 @@
+/**
+ *SQL语句宏定义
+ */
+
+#ifndef _STOP_SQL_H_
+#define _STOP_SQL_H_
+
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_BUSINESS_FUNC		16
+#define MAX_BUSINESS_LOGIC		10
+#define MAX_DATA_INFO  64
+#define MAX_DB_SQL				64
+
+enum INSTANCE_PSQL_NO
+{
+	I_SQL_GET_CCT_DEALDATA_INFO_INFO = 0
+};
+
+//获取用户信息
+#define DB_TABLE_SQL_GET_DATA_INFO									"get_data"
+#define DB_TABLE_SQL_GET_CCT_DEALDATA_INFO					"get_cct_dealdata_info"
+
+
+extern const char STRING_SQL_GET_STOP_CCT_BUSINESS_CTRL_INFO[1024];
+extern const char STRING_SQL_GET_STOP_BAL_PHONECOMM_CONF_INFO[1024];
+extern const char STRING_SQL_GET_STOP_PRODUCT_INFO[1024];
+extern const char STRING_SQL_GET_STOP_PRODUCT_INFO_ALL[1024];
+extern const char STRING_SQL_GET_STOP_SYSTEM_PRODUCT_INFO[1024];
+extern const char STRING_SQL_GET_STOP_USER_PRODUCT_INFO[1024];
+extern const char STRING_SQL_GET_STOP_SECTION_INFO[1024];
+extern const char STRING_SQL_GET_STOP_RULE_INFO[1024];
+extern const char STRING_SQL_GET_STOP_RULE_RELA_INFO[1024];;
+extern const char STRING_SQL_GET_STOP_REF_OBJECT_INFO[1024];
+extern const char STRING_SQL_GET_STOP_RESULT_FIELD_INFO[1024];
+extern const char STRING_SQL_GET_STOP_RESULT_INFO[1024];
+extern const char STRING_SQL_GET_SERVRELA_INFO[1024];
+extern const char STRING_SQL_GET_STOP_TIME_INFO[1024];
+extern const char STRING_SQL_INS_STOP_TIME_INFO[1024];
+extern const char STRING_SQL_UPD_STOP_TIME_INFO[1024];
+extern const char STRING_SQL_INS_STOP_HIS_INFO[1024];
+extern const char STRING_SQL_INS_REMAINFEE_RECD[1024];
+extern const char STRING_SQL_INS_USERCHG_RECD[1024];
+extern const char STRING_SQL_INS_KEEPPHONE_HIS[1024];
+extern const char STRING_SQL_DEL_KEEPPHONE_INFO[1024];
+extern const char STRING_SQL_GET_PUB_IDROUTE_CONF[1024];
+extern const char STRING_SQL_INS_LOGINOPR_RECD[1024];
+extern const char STRING_SQL_INS_TESTINTERFACE_RECD[1024];
+extern const char STRING_SQL_INS_SMSSEND_HIS[1024];
+extern const char STRING_SQL_INS_SMSSEND_ERR[1024];
+extern const char STRING_SQL_INS_PUSH_INFO[1024];
+
+extern const char STRING_SQL_GET_SMS_TEMPLATE[1024];
+extern const char STRING_SQL_GET_SMS_TIME[1024];
+
+extern const char STRING_SQL_GET_FEEAWOKE_INFO[1024];
+extern const char STRING_SQL_GET_STOPAWOKE_INFO[1024];
+//extern const char STRING_SQL_GET_FAMILE_INFO[1024];
+extern const char STRING_SQL_GET_HOLIDAY_INFO[1024];
+extern const char STRING_SQL_GET_RUNCODE_INFO[1024];
+extern const char STRING_SQL_GET_PAYCODE_INFO[1024];
+
+extern const char STRING_SQL_GET_USER_INFO[1024];
+extern const char STRING_SQL_GET_USER_BRAND_INFO[1024];
+extern const char STRING_SQL_GET_USER_REGION_INFO[1024];
+extern const char STRING_SQL_GET_CONTRACT_INFO[1024];
+extern const char STRING_SQL_GET_UR_FEEAWOKEADD_INFO[1024];
+extern const char STRING_SQL_GET_UR_SPECIALLIST_INFO[1024];
+extern const char STRING_SQL_GET_AC_CONUSERREL_INFO_BY_C[1024];
+extern const char STRING_SQL_GET_AC_CONUSERREL_INFO_BY_U[1024];
+extern const char STRING_SQL_GET_FAMILY_INFO[1024];
+extern const char STRING_SQL_GET_SLAVE_ID[1024];
+extern const char STRING_SQL_GET_SLAVE_ID_SERVER[1024];
+
+extern const char STRING_SQL_GET_STOP_BAL_ACCTBOOK_INFO[1024];
+extern const char STRING_SQL_GET_STOP_ACT_WRTOFF_CTRL[1024];
+extern const char STRING_SQL_GET_STOP_BAL_ACCTBOOK_WRTOFF[1024];
+extern const char STRING_SQL_GET_STOP_BAL_ACCTBOOK_INFO_PRE[1024];
+extern const char STRING_SQL_GET_STOP_ACT_UNPAYOWE_NORMAL[1024];
+extern const char STRING_SQL_GET_STOP_ACT_UNPAYOWE__WRTOFF[1024];
+extern const char STRING_SQL_GET_STOP_CARD_LIMIT[1024];
+extern const char STRING_SQL_GET_STOP_CREDIT_LEVEL[1024];
+extern const char STRING_SQL_GET_WRITEPLAN_CONF[1024];
+//extern const char STRING_SQL_GET_ACCTBOOK_INFO_SPE[1024];
+//extern const char STRING_SQL_GET_STOP_BAL_ACCTBOOK_INFO_DET[1024];
+//extern const char STRING_SQL_GET_STOP_BAL_ACCTBOOK_INFO_DET_WRTOFF[1024];
+extern const char STRING_SQL_GET_STOP_ACT_UNPAYOWE_NORMAL_DET[1024];
+extern const char STRING_SQL_GET_STOP_ACT_UNPAYOWE__WRTOFF_DET[1024];
+extern const char STRING_SQL_GET_SUM_UNPAYOWE_INFO[1024];
+extern const char STRING_SQL_GET_SUM_UNPAYOWE_INFO_OFF[1024];
+extern const char STRING_SQL_GET_UNPAYOWE_INFO_DET_CONID[1024];
+extern const char STRING_SQL_GET_UNPAYOWE_INFO_DET[1024];
+extern const char STRING_SQL_GET_UNPAYOWE_INFO_DET_CONID_OFF[1024];
+extern const char STRING_SQL_GET_UNPAYOWE_INFO_DET_OFF[1024];
+extern const char STRING_SQL_GET_SPE_ACCT_FLAG_INFO[1024];
+extern const char STRING_SQL_GET_PUB_BALANCE[1024];
+extern const char STRING_SQL_GET_PUB_BALANCE_OFF[1024];
+extern const char STRING_SQL_GET_ACCTBOOK_INFO[1024];
+extern const char STRING_SQL_GET_ACCTBOOK_INFO_OFF[1024];
+extern const char STRING_SQL_GET_WRTOFF_MONTH[1024];
+extern const char STRING_SQL_GET_UNPAYOWE_DETAIL[1024];
+extern const char STRING_SQL_GET_UNPAYOWE_PRE_DETAIL[1024];
+extern const char STRING_SQL_GET_WHITE_LIST_NOSTOP[1024];
+extern const char STRING_SQL_GET_WHITE_LIST_STOP[1024];
+extern const char STRING_SQL_GET_USERCHG_RUNCODE_INFO[1024];
+
+/*后台公共配置表获取*/
+extern const char STRING_SQL_GET_CCT_DEMOLITION_CONF[1024];/*配置表*/
+/*获取流水*/
+extern const char STRING_SQL_GET_ACCEPT_INFO[1024];
+
+/*获取dead信息*/
+extern const char STRING_SQL_GET_AC_CONUSERRELDEAD_INFO_BY_C[1024];
+extern const char STRING_SQL_GET_USERDEAD_INFO[1024];
+extern const char STRING_SQL_GET_ACCT_BALDEAD_INFO[1024];
+extern const char STRING_SQL_GET_ACCT_BALDEAD_INFO_OFF[1024];
+extern const char STRING_SQL_GET_CREDIT_HIS_INFO[1024];
+
+/*获取所有的消费信息*/
+extern const char STRING_SQL_GET_ALLPAY_UNPAY_INFO[1024];
+extern const char STRING_SQL_GET_ALLPAY_PAYED_INFO[1024];
+
+/*批量比对信控Test代码*/
+extern const char STRING_SQL_UPD_USERDETAIL_INFO[1024];
+
+extern const char STRING_SQL_UPD_USERSTOP_INFO[1024];
+extern const char STRING_SQL_INS_USERSTOP_INFO[1024];
+
+/*业务函数列表*/
+typedef struct
+{
+	char busi_func_key[32];
+	int size;
+	char busi_func[MAX_BUSINESS_FUNC][64];
+} BUSI_FUNCTION_INFO;
+
+typedef struct
+{
+	int size;
+	BUSI_FUNCTION_INFO busi_info[MAX_BUSINESS_LOGIC];
+} BUSI_FUNCTION;
+
+typedef struct
+{
+	char op_code[4+1];
+	int data_num;
+	char sqlstr[1024];
+} GET_DATA_INFO;
+
+typedef struct
+{
+	int opcode_num;
+	char opcodes[MAX_DATA_INFO][10];
+	int rownum;
+} BUSI_OPCODE;
+
+typedef struct
+{
+  int datanum;
+  char sql_info[MAX_DB_SQL][1024];
+  GET_DATA_INFO getdata[MAX_DATA_INFO];
+} DB_TABLE_SQL_INFO;
+
+typedef struct
+{
+	BUSI_FUNCTION funcInfo;
+	DB_TABLE_SQL_INFO sqlInfo;
+	BUSI_OPCODE opodeInfo;
+} STOP_COMMON_CONF;
+	
+
+#endif

@@ -1,0 +1,33 @@
+/**
+ * description:ª•≥‚À¯¿‡
+ * author:wangzhia
+ * create date:2013-10-28
+ */
+#include "CMutexLock.h"
+
+CMutexLock::CMutexLock ()
+{
+	if (0 == pthread_mutex_init (&m_lock, NULL))
+	{
+		m_valid = true;
+	}
+	else
+	{
+		m_valid = false;
+	}
+}
+
+CMutexLock::~CMutexLock ()
+{
+	if (m_valid)
+	{
+		pthread_mutex_destroy (&m_lock);
+		
+		m_valid = false;
+	}
+}
+
+bool CMutexLock::IsValid ()
+{
+	return m_valid;
+}

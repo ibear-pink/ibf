@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "CAFDeal.h"
+
+IMPLEMENT_CLASS(CAFDeal)
+
+CAFDeal::CAFDeal()
+{
+	
+}
+
+CAFDeal::~CAFDeal()
+{
+
+}
+
+int CAFDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int CAFDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

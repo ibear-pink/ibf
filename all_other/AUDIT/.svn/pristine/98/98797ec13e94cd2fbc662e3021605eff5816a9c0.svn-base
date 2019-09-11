@@ -1,0 +1,337 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+ 
+#include "CProServerManager.h"
+#include "CLogManager.h"
+
+CProServerManager::CProServerManager ()
+{
+	memset (&m_AppCfg, 0, sizeof(stAppCfg));
+}
+ 
+CProServerManager::~CProServerManager()
+{
+	map<string, CDealDataMgr*>::iterator iter;
+	for (iter = m_DealDataMgr.begin(); iter != m_DealDataMgr.end(); iter++)
+	{
+		CDealDataMgr *pData = iter->second;
+		
+		delete pData;
+		printf("delete pData\n");
+		pData = NULL;
+		printf("pData is NULL\n");
+	}
+	
+	m_DealDataMgr.clear();
+	
+	//App_LogManager::Instance()->Close ();
+}
+
+bool CProServerManager::Init (char *fileName,string input[])
+{
+	char szError[255] = {0};
+	strcpy (m_ProcessName,input[0].c_str());
+	strcpy (m_AppCfg.chCfgFile, fileName);
+#ifdef _DEBUG_INFO_
+	printf ("m_AppCfg.chCfgFile = %s\n", m_AppCfg.chCfgFile);
+#endif
+#if defined (_SDFS_DEAL_FILE_) || defined (_SDFS_LOG_FILE_)
+	printf("初始化SDFS\n");
+	if( -1 == sinit_route( 0, szError ))
+	{
+		printf("sinit_route error %s\n",szError);
+		return RET_FAIL;
+	}
+#endif
+	/*读配置文件*/
+	strcpy(m_AppCfg.host_id,input[1].c_str());
+	if (busi_cfgfile_read(&m_AppCfg))
+	{
+		printf("cfg file error--%s\n", m_AppCfg.chCfgFile);
+		return RET_FAIL;
+	}
+	printf("bak:%s\n",m_AppCfg.stServer.server_info[0].bak_cfg_info.bakdir);
+	
+	//加载日志服务
+	char binName[32] = {0};
+	getBinNameByPath(m_ProcessName,binName);
+	string sLogPath = string(m_AppCfg.stLogServer.log_path);
+	string sLogName = string(binName);
+	if (!logFile.InitLog(sLogPath,sLogName,true))
+	{
+		printf("InitLog(%s|%s) is ERROR[%s]!!!\n",sLogPath.c_str(),sLogName.c_str(),logFile.getErrInfo());
+		return false;
+	}
+	printf("binName=%s|m_ProcessName=%s\n",binName,m_ProcessName);
+	//设置错误日志生成时间间隔15分钟
+	logFile.setErrLogInfo(15);
+	m_AppCfg.stServer.server_info[0].logFile = &logFile;
+	logFile.WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"InitLog 加载成功:%s|%s\n",sLogPath.c_str(),sLogName.c_str());
+
+	//判断是否需要注册zk
+	if (m_AppCfg.stZKServer.use_zk)
+	{
+		logFile.WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"zk开始注册\n");
+		char Zk_Name[32+1] = {0};
+		if (!InitZK(&(m_AppCfg.stZKServer),Zk_Name,binName))
+		{
+			return false;
+		}
+		strcpy (m_InputStr,Zk_Name);
+		InitZK_change_path ();
+	}
+	else 
+	{
+		strcpy (m_InputStr,input[2].c_str());
+	}
+	
+	logFile.WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"zk返回令牌值：%s\n",m_InputStr);
+	
+	m_Set = new stSettings();
+	if (0 != init_XxmlFile(m_AppCfg.stSystem.ibear_name,&m_sqlconfs,m_Set))
+	{
+		logFile.WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"init_XxmlFile is error \n");
+		return false;
+	}
+	logFile.WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"共加载sql语句[%ld]个\n",m_sqlconfs.size());
+
+	return true;
+}
+
+int CProServerManager::InitZK_change_path()
+{
+	//MODEL=OFRM,IN_PWS=acctadm.MD_APP_PROCWS_OFRM_HIS_CF01
+	char up_processName[32] = {0};//集群目录名
+	char src[32] = {0};
+	strcpy(src,"{zk_name}");
+	char src_host[32] = {0};
+	strcpy(src_host,"{host_id}");
+	
+	stAppCfg_Proc_Server *m_CfgInfo;
+	m_CfgInfo = &(m_AppCfg.stServer.server_info[0]);
+	//替换配置文件中ibear_name,tmdir和bakdir中的{host_id}，替换为当前集群名称
+	if( NULL==str_strrep(m_AppCfg.stSystem.ibear_name,m_AppCfg.stSystem.ibear_name,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->bak_cfg_info.tmpdir,m_CfgInfo->bak_cfg_info.tmpdir,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->bak_cfg_info.bakdir,m_CfgInfo->bak_cfg_info.bakdir,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->file_cfg_info.indir,m_CfgInfo->file_cfg_info.indir,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->file_cfg_info.errdir,m_CfgInfo->file_cfg_info.errdir,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->file_cfg_info.runlog,m_CfgInfo->file_cfg_info.runlog,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->out_cfg_info.outdir,m_CfgInfo->out_cfg_info.outdir,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->out_cfg_info.tmpdir,m_CfgInfo->out_cfg_info.tmpdir,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+	
+	if(0 != SplitString(up_processName,m_InputStr,',',1))
+	{
+		return 0;
+	}
+	if(0 != SplitString(up_processName,up_processName,'=',2))
+	{
+		return 0;
+	}
+	//替换配置文件中tmdir和bakdir中的{zk_name}，替换为zk令牌，并转换为小写
+	if( NULL==str_strrep(m_CfgInfo->bak_cfg_info.tmpdir,m_CfgInfo->bak_cfg_info.tmpdir,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->bak_cfg_info.bakdir,m_CfgInfo->bak_cfg_info.bakdir,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->file_cfg_info.indir,m_CfgInfo->file_cfg_info.indir,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->file_cfg_info.errdir,m_CfgInfo->file_cfg_info.errdir,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->file_cfg_info.runlog,m_CfgInfo->file_cfg_info.runlog,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->out_cfg_info.outdir,m_CfgInfo->out_cfg_info.outdir,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	if( NULL==str_strrep(m_CfgInfo->out_cfg_info.tmpdir,m_CfgInfo->out_cfg_info.tmpdir,src,str_lower(up_processName)))
+	{
+		return -1;
+	}
+	return 0;
+}
+
+bool CProServerManager::InitZK (stAppCfg_ZK_Info *zk_info,char *Zk_Name,char *proc_name)
+{
+  //ZOOKEEPER注册
+  char szkCluster[7+1] = {0};
+  char szkAttr[15+1] = {0};
+  char szkServer[15+1] = {0};
+  char szkType[3+1] = {0};
+	char src_host[32] = {0};
+	strcpy(src_host,"{host_id}");
+  
+	//替换配置文件中ZK_CLUSTER中的{host_id},替换为当前集群名称
+	if( NULL==str_strrep(zk_info->zk_cluster,zk_info->zk_cluster,src_host,m_AppCfg.host_id))
+	{
+		return -1;
+	}
+  strcpy(szkCluster,zk_info->zk_cluster);
+  printf("注册集群号：%s\n",szkCluster);
+  strcpy(szkAttr,zk_info->zk_attr);
+  strcpy(szkServer,zk_info->zk_service);
+  strcpy(szkType,zk_info->zk_type);
+  if( 0 == strlen(szkCluster) || 0 == strlen(szkAttr) || 0 == strlen(szkServer) || 0 == strlen(szkType) )
+  {
+    logFile.WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ZK_OFAC cfg error.please check!\n");
+		return false;
+  }
+  logFile.WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"集群号=%s\n",szkCluster);
+	ComZooKeeper *pComZooKeeper ;//注册zookeeper
+  pComZooKeeper = new ComZooKeeper(szkCluster,szkAttr,szkServer,szkType,proc_name);
+  if(0!=pComZooKeeper->isRegister())
+  {
+  	logFile.WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ZooKeeper程序注册失败\n");
+  	return false;
+  }
+	strcpy(m_AppCfg.stSystem.ipAddress,pComZooKeeper->ipAddress);
+	strcpy(m_AppCfg.stSystem.procUnikey,pComZooKeeper->procUnikey);
+	strcpy(m_AppCfg.stSystem.program_name,proc_name);
+	
+  strcpy(Zk_Name,pComZooKeeper->staticdata);/*进程唯一标识*/
+
+  return true;
+}
+
+bool CProServerManager::Start (map<string,string> classMap)
+{
+	int process_num = m_AppCfg.stServer.server_num;
+	
+	//根据配置启动业务服务器
+	if (m_AppCfg.stServer.server_num <= 1)
+	{
+		//日志管理中心初始化
+		int log_thread_num = 0;
+		/*if (!App_LogManager::Instance()->Init (&m_AppCfg))
+		{
+			printf ("App_LogManager Init Is Failed.\n");
+			return false;
+		}
+		
+		//日志管理中心启动
+		App_LogManager::Instance()->start ();
+		for (int i = 0; i < m_AppCfg.stLogServer.log_num; i++)
+		{
+			struct log_server *pNode = &(m_AppCfg.stLogServer.log_mgr[i]);
+			log_thread_num = pNode->log_thread_num;
+		}
+		sleep (3);
+		*/
+		//其他日志加载
+		for (int iLooper = 0; iLooper < m_AppCfg.stServer.server_num; iLooper++)
+		{
+			CDealDataMgr *pMgr = new CDealDataMgr(classMap);
+			
+			m_AppCfg.stServer.server_info[iLooper].pid_num = iLooper;
+			
+			if (pMgr->Init(&(m_AppCfg.stServer.server_info[iLooper]), &(m_AppCfg.stSystem), &(m_AppCfg.parse_info), m_InputStr,1,log_thread_num,m_sqlconfs,m_Set) != 0)
+			{
+				return false;
+			}
+			
+			usleep (100);
+			
+			if (pMgr->Process() != 0)
+			{
+				return false;
+			}
+			if (m_AppCfg.stServer.server_info[iLooper].deal_type == 1)
+			{
+				m_DealDataMgr.insert(pair<string, CDealDataMgr*>(string(m_AppCfg.stServer.server_info[iLooper].server_name), pMgr));
+			}
+		}
+	}
+	else
+	{
+		for (int iLooper = 0; iLooper < m_AppCfg.stServer.server_num; iLooper++)
+		{
+			int i,curMsgPos;
+			pid_t pid; 
+			if ((pid=fork())<0)
+			{
+				printf("初始化业务服务器失败 error!\n");
+				exit(1);
+			}
+			else if (pid>0){
+				printf("first parent pid[%d] ppid=[%d] 成功!\n",getpid(),getppid());
+			}
+			else if (pid==0)
+			{
+				//日志管理中心初始化
+				/*if (!App_LogManager::Instance()->Init (&m_AppCfg,iLooper))
+				{
+					printf ("App_LogManager Init Is Failed.\n");
+					return false;
+				}
+				
+				//日志管理中心启动
+				App_LogManager::Instance()->start ();
+				*/
+				int log_thread_num = 0;
+				for (int i = 0; i < m_AppCfg.stLogServer.log_num; i++)
+				{
+					struct log_server *pNode = &(m_AppCfg.stLogServer.log_mgr[i]);
+					log_thread_num = pNode->log_thread_num;
+				}
+				
+				CDealDataMgr *pMgr = new CDealDataMgr(classMap);
+				
+				m_AppCfg.stServer.server_info[iLooper].pid_num = iLooper;
+				
+				if (pMgr->Init(&(m_AppCfg.stServer.server_info[iLooper]), &(m_AppCfg.stSystem), &(m_AppCfg.parse_info), m_InputStr,process_num,log_thread_num,m_sqlconfs,m_Set) != 0)
+				{
+					return false;
+				}
+				
+				usleep (100);
+				
+				if (pMgr->Process() != 0)
+				{
+					return false;
+				}
+				if (m_AppCfg.stServer.server_info[iLooper].deal_type == 1)
+				{
+					m_DealDataMgr.insert(pair<string, CDealDataMgr*>(string(m_AppCfg.stServer.server_info[iLooper].server_name), pMgr));
+				}
+				return true;
+			}
+		}
+	}
+	return true;
+}
+

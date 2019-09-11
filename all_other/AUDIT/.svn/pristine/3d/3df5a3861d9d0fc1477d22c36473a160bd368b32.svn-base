@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "GetKPIDataDeal.h"
+
+IMPLEMENT_CLASS(GetKPIDataDeal)
+
+GetKPIDataDeal::GetKPIDataDeal()
+{
+	
+}
+
+GetKPIDataDeal::~GetKPIDataDeal()
+{
+
+}
+
+int GetKPIDataDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int GetKPIDataDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

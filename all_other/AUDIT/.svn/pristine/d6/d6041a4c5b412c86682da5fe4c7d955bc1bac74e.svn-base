@@ -1,0 +1,123 @@
+/**
+ * description:文件生成类
+ * author:
+ * date:2014/11/7 10:19:53
+ */
+ 
+#ifndef _CREMINF_FILE_H_
+#define _CREMINF_FILE_H_
+
+#include <cstdarg>
+#include <unistd.h>
+#include <string>
+#include <iostream>
+#include <map>
+#include "avltree.h"
+#include "Define.h"
+#ifdef _SDFS_DEAL_FILE_
+	#include "SDFS_FILE.h"
+#else
+	#include "FILE.h"
+#endif
+#include "Thread.h"
+#include "CMutexLock.h"
+#include "Singleton.h"
+#include "rtStopPub.h"
+#include "CLogManager.h"
+
+typedef struct
+{
+	char bakDir[1024];			/*备份目录*/
+	char tmpDir[1024];			/*临时目录*/
+	UnInt32 type;						/*备份模式是文件方式还是表方式*/
+	UnInt32 writeMode;			/*写文件采用同步还是异步模式*/
+	UnInt32 backupType;			/*移动文件类型*/
+	UnInt32 interval;			/*文件间隔*/
+	UnInt32 backupSize;
+} stBakConfigInfo;
+
+typedef struct
+{
+	int fileEnd;
+	char fileNameHead[64];		/*文件名头部*/
+	char fileName[1024];		/*文件名称*/
+	char fileContent[4096];		/*文件内容*/
+} stPubFileInfo;
+
+using namespace std;
+class CDealFileBak : public Thread
+{
+public:
+	CDealFileBak(void);
+	
+	~CDealFileBak(void);
+	
+	void run(void);
+	
+	//备份文件
+	void BackUp ();
+	
+	void Process (void);
+	
+	void SetBackupFlag (bool tFlag) {m_BackupFlag = tFlag;};
+		
+	void Init (stBakConfigInfo *pBakInfo);
+	
+	Ret WriteFile (stPubFileInfo *tFileInfo);
+private:
+	//判断文件是否满足备份条件
+#ifdef _SDFS_DEAL_FILE_
+	bool IsBackup (SDFS_GDF_FILE *pDealFile);
+#else
+	bool IsBackup (GDF_FILE *pDealFile);
+#endif
+private:
+	//线程启动次数控制标识
+#ifdef _SDFS_DEAL_FILE_
+	map<string, SDFS_GDF_FILE *> m_FileMgr;
+#else
+	map<string, GDF_FILE *> m_FileMgr;
+#endif
+	
+	CMutexLock *m_MutexLocker;
+	
+	deque2<stPubFileInfo> m_FileContentQueue;
+	
+	//线程启动次数控制标识
+	int m_ProTimes;
+	
+	bool m_BackupFlag;
+	
+	int m_SerialNum;
+	
+	char m_LastDay[8+1];
+	
+	deque2<stPubFileInfo> m_FileContentQueue_Bak;
+	
+	stBakConfigInfo m_BakConfInfo;
+};
+typedef GDF_Singleton<CDealFileBak> App_ProDealFileBak;
+
+class CDealFileBakManager : public Thread
+{
+public:
+	CDealFileBakManager(void);
+	
+	~CDealFileBakManager(void);
+	
+	void run(void);
+	
+	void Process(void);
+	
+	void Init (stBakConfigInfo *pBakInfo);
+	
+private:
+	//线程启动次数控制标识
+	int m_ProTimes;
+	
+	stBakConfigInfo m_BakConfInfo;
+};
+
+typedef GDF_Singleton<CDealFileBakManager> App_ProDealFileBakManager;
+
+#endif

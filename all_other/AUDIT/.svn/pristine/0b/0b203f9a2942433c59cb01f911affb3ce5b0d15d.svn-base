@@ -1,0 +1,33 @@
+
+include /account/c000/pkg/src/cpp/AUDIT/public/makefile.cfg
+
+OBJ = GetKPIDataData.o GetKPIDataMgr.o GetKPIDataDeal.o GetKPIData.o $(PUBOBJDIR)/CommonFun.o
+
+BIN=KPIDE_x001_cx00
+RELBIN=KPIDE
+
+all:${BIN} install clean
+
+.cpp.o:
+	echo "Compiling the $<"
+	$(CC) -c ${CFLAGS} ${INCLUDE} $<
+.c.o:
+	echo "Compiling the $<"
+	$(CC) -c ${CFLAGS} ${INCLUDE} $<
+
+clean:
+	rm -f GetKPIDataData.o GetKPIDataMgr.o GetKPIDataDeal.o GetKPIData.o
+
+######################################################################
+
+${BIN}: $(OBJ)
+	$(CC) ${CFLAGS} -o $@ $? ${LIB}
+
+######################################################################
+
+install:
+	
+	cp ${BIN} ${APP_BIN}/${RELBIN}
+	mv ${BIN} ${ACCT_BIN}
+
+

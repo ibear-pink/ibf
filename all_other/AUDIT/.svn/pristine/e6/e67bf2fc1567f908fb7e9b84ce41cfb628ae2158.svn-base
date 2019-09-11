@@ -1,0 +1,28 @@
+#!/bin/ksh
+#_EXTEND_LIBS=-L/opt/hp-gcc/lib/hpux64
+
+AUDIT_HOME=/account/c000/pkg/src/cpp/AUDIT
+DSCI_PATH=/account/plat/dsci
+XML_PATH=${AUDIT_HOME}/xml2
+
+DCI_INCLUDE=-I${DSCI_PATH}/include
+DCI_LIB=-L${DSCI_PATH}/lib -ldsci
+
+XML_INCLUDE=-I${XML_PATH}/include
+XML_LIB=-L${XML_PATH}/lib -lxml2
+
+IFLAGS=-DSS_64BIT_SERVER -D_REENTRANT -D_DSCI_ -D_DEBUG_INFO_
+
+INCLUDE=-I. ${DCI_INCLUDE} ${XML_INCLUDE} 
+
+#LIB=-L. ${_EXTEND_LIBS} ${DCI_LIB} ${XML_LIB} 
+LIB=-L. ${DCI_LIB} ${XML_LIB} 
+
+LIBORA=$(ORACLE_HOME)/lib -lpthread -lclntsh
+
+.SUFFIXES:.cpp .o
+
+CFLAGS = ${IFLAGS} ${INCLUDE}
+
+#CC=aCC -AA +DD64 -mt -lm -g -D_LARGEFILE64_SOURCE  -D_XOPEN_SOURCE_EXTENDED -Wl,+s -Wl,+n +DSblended +z +p +inst_implicit_include 
+CC=g++ -m64 -g -O2 -fpermissive

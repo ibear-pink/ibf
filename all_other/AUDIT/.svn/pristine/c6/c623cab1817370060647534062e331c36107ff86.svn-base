@@ -1,0 +1,109 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+#ifndef _CLOG_FILE_H_
+#define _CLOG_FILE_H_
+
+#include <cstdarg>
+#include <unistd.h>
+#include <string>
+#include <iostream>
+#include <map>
+#include "avltree.h"
+#include "rtStopPub.h"
+#include "FILE.h"
+#ifdef _SDFS_DEAL_FILE_
+#include "SDFS_FILE.h"
+#endif
+#include "Thread.h"
+#include "CMutexLock.h"
+
+using namespace std;
+
+typedef struct
+{
+	int size;
+	char buff[MAX_LOG_LENGTH];
+} stLogInfo;
+
+class CLogFile : public Thread
+{
+public:
+	CLogFile (void);
+	
+	~CLogFile(void);
+	
+	void WriteLog (UnInt32 nLevel, const char *fmt, ...);
+	
+	void run (void);
+	
+	Ret InitLogFile (const string &sLogPath, const string &sLogName, UnInt32 nLogType, UnInt32 nInterval, UnInt32 nBackupSize, Int32 nProcMode, Int32 backupType);
+	
+	void DoLog (const char *sBuf);
+	
+	Ret BackupLog (void);
+	
+private:
+	bool IsBackup (void);
+	
+private:
+	string m_LogPath;
+	
+	string m_StrLogName;		//模块名字
+	
+	UnInt32 m_LogType;			//日志类型
+	
+	//SDFS_GDF_FILE *m_File;
+	GDF_FILE *m_File;
+	
+	UnInt32 m_IntervalTime;
+	
+	UnInt32 m_BackupSize;
+	
+	Int32 m_ProcMode;
+	
+	UnInt32 m_BackUpType;
+	
+	time_t m_OTime;
+	
+	char m_CreateTime[14+1];
+	
+	CMutexLock *m_MutexLocker;
+	
+	deque2<stLogInfo> m_LogQueue;
+};
+
+class CLogServer
+{
+public:
+	CLogServer (void);
+	
+	~CLogServer (void);
+	
+	void SetLogInfo (const char *sLogPath, const char *sLogName);
+	
+	Ret Backup ();
+	
+	void Close (void);
+	
+	Ret AddLogFile (UnInt32 nLogType, UnInt32 nInterval, UnInt32 nBackupSize, Int32 nProcMode, Int32 backupType);
+	
+	Ret DelLogFile (UnInt32 nLogType);
+	
+	CLogFile *GetLogFile (UnInt32 nLogType);
+	
+private:
+	typedef map<int, CLogFile *> mapLogFile;
+	
+	mapLogFile m_MapLogFile;
+	
+	UnInt32 m_nCount;
+	
+	string m_LogPath;
+	
+	string m_StrLogName;		//模块名字
+};
+
+#endif

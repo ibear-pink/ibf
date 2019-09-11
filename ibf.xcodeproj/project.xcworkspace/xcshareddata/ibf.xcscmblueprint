@@ -1,0 +1,187 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "9DA43D68751FF54DCD184BCFDC7B2ACE765B8840+++91871B4",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++D772792" : {
+
+    },
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2878+++5A2202A" : {
+
+    },
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++7772+++3D10196" : {
+
+    },
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++4727+++331B73A" : {
+
+    },
+    "fb83a747-9195-4a21-af76-cd44675210ae++7608+++7A39B26" : {
+
+    },
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2041+++FA80A44" : {
+
+    },
+    "fb83a747-9195-4a21-af76-cd44675210ae++615+++BBC03AF" : {
+
+    },
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2006+++345D3FF" : {
+
+    },
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2601+++62D56C8" : {
+
+    },
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3394+++54AA54C" : {
+
+    },
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++6FC6B0B" : {
+
+    },
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++4A1F0F0" : {
+
+    },
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3343+++577F9A1" : {
+
+    }
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++D772792" : 9223372036854775807,
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2878+++5A2202A" : 9223372036854775807,
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++7772+++3D10196" : 9223372036854775807,
+    "9DA43D68751FF54DCD184BCFDC7B2ACE765B8840+++91871B4" : 9223372036854775807,
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++4727+++331B73A" : 9223372036854775807,
+    "258C58866A20279EAA8C141FA3091E73663A8936+++2A4CA67" : 9223372036854775807,
+    "09C5E760AF7BA5C539AA701845474AC63F505F8C+++423DF1B" : 9223372036854775807,
+    "fb83a747-9195-4a21-af76-cd44675210ae++7608+++7A39B26" : 9223372036854775807,
+    "A8207C32D071F08C6B136F9B5C5A21956C84A4E5+++6C2A98A" : 9223372036854775807,
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2041+++FA80A44" : 9223372036854775807,
+    "fb83a747-9195-4a21-af76-cd44675210ae++615+++BBC03AF" : 9223372036854775807,
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2006+++345D3FF" : 9223372036854775807,
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2601+++62D56C8" : 9223372036854775807,
+    "398D6942A5D99184FF7FF502C51ADA4347B24F2C+++CBBC19F" : 9223372036854775807,
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3394+++54AA54C" : 9223372036854775807,
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++6FC6B0B" : 9223372036854775807,
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++4A1F0F0" : 9223372036854775807,
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3343+++577F9A1" : 9223372036854775807,
+    "6BAEC902CE7D9C8D4C895640FCB98DDC3C89C597+++3ADC33B" : 9223372036854775807
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "4B6E8EE1-182C-4C97-BC5F-CEAD2781D6FA",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++D772792" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/6.0%E7%A0%94%E5%8F%91%E9%A1%B9%E7%9B%AE\/%E5%B7%A5%E5%8D%95\/AcctMgrOrder\/AcctMgrBackApp",
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2878+++5A2202A" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96\/BILLING_AHMob_ActDeal%20Cloud\/51%E6%BA%90%E4%BB%A3%E7%A0%81\/%E8%B4%A6%E5%8A%A1\/%E8%B4%A6%E5%8A%A1%E5%A4%84%E7%90%86\/%E4%BA%91%E6%9C%BA\/pkg\/bat",
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++7772+++3D10196" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96\/BILLING_AHMob_ActDeal%20Cloud\/51%E6%BA%90%E4%BB%A3%E7%A0%81\/%E8%B4%A6%E5%8A%A1\/%E5%87%BA%E8%B4%A6%E6%B5%81%E7%A8%8B%E5%8E%9F%E5%A7%8B%E7%89%88%E6%9C%AC%E8%84%9A%E6%9C%AC",
+    "9DA43D68751FF54DCD184BCFDC7B2ACE765B8840+++91871B4" : "ibf\/",
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++4727+++331B73A" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96\/BILLING_AHMob_ActDeal%20Cloud\/51%E6%BA%90%E4%BB%A3%E7%A0%81\/%E8%B4%A6%E5%8A%A1\/%E8%B4%A6%E5%8A%A1%E5%A4%84%E7%90%86\/%E4%BA%91%E6%9C%BA\/pkg\/cfg",
+    "258C58866A20279EAA8C141FA3091E73663A8936+++2A4CA67" : "ibf\/icfg_all\/",
+    "09C5E760AF7BA5C539AA701845474AC63F505F8C+++423DF1B" : "ibf\/ifile_all\/",
+    "fb83a747-9195-4a21-af76-cd44675210ae++7608+++7A39B26" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96",
+    "A8207C32D071F08C6B136F9B5C5A21956C84A4E5+++6C2A98A" : "ibf\/bg_public\/",
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2041+++FA80A44" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/me\/%E5%AD%A6%E4%B9%A0%E6%80%BB%E7%BB%93\/2015%E5%B9%B4%E5%BA%A6%E6%80%BB%E7%BB%93ppt",
+    "fb83a747-9195-4a21-af76-cd44675210ae++615+++BBC03AF" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E9%BB%91%E9%BE%99%E6%B1%9F%E9%A1%B9%E7%9B%AE\/svn_HLJMob_CRM_6.0",
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2006+++345D3FF" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/6.0%E7%A0%94%E5%8F%91%E9%A1%B9%E7%9B%AE\/%E5%B7%A5%E5%8D%95",
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2601+++62D56C8" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96\/BILLING_AHMob_ActDeal%20Cloud\/51%E6%BA%90%E4%BB%A3%E7%A0%81\/%E8%B4%A6%E5%8A%A1\/%E8%B4%A6%E5%8A%A1%E5%A4%84%E7%90%86\/%E4%BA%91%E6%9C%BA\/pkg\/src\/cpp\/AUDIT",
+    "398D6942A5D99184FF7FF502C51ADA4347B24F2C+++CBBC19F" : "ibf\/ilog_all\/",
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3394+++54AA54C" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96\/BILLING_AHMob_ActDeal%20Cloud\/12%E9%A1%B9%E7%9B%AE%E8%AE%A1%E5%88%92",
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++6FC6B0B" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/6.0%E7%A0%94%E5%8F%91%E9%A1%B9%E7%9B%AE\/%E5%B7%A5%E5%8D%95\/AcctMgrOrder\/AcctMgrBackApp",
+    "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++4A1F0F0" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/6.0%E7%A0%94%E5%8F%91%E9%A1%B9%E7%9B%AE\/%E5%B7%A5%E5%8D%95\/AcctMgrOrder\/AcctMgrBackApp",
+    "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3343+++577F9A1" : "..\/%E5%8A%9E%E5%85%AC\/si-tech\/%E4%BA%91%E5%8C%96\/BILLING_AHMob_ActDeal%20Cloud",
+    "6BAEC902CE7D9C8D4C895640FCB98DDC3C89C597+++3ADC33B" : "ibf\/ibear_all\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "ibf",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "ibf.xcodeproj",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/ibear-pink\/ifile_all.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "09C5E760AF7BA5C539AA701845474AC63F505F8C+++423DF1B"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/ibear-pink\/icfg_all.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "258C58866A20279EAA8C141FA3091E73663A8936+++2A4CA67"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/ibear-pink\/ilog_all.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "398D6942A5D99184FF7FF502C51ADA4347B24F2C+++CBBC19F"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "github.com:ibear-pink\/ibear_all.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "6BAEC902CE7D9C8D4C895640FCB98DDC3C89C597+++3ADC33B"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "172.21.3.101",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "9DA43D68751FF54DCD184BCFDC7B2ACE765B8840+++91871B4"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/ibear-pink\/bg_public.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "A8207C32D071F08C6B136F9B5C5A21956C84A4E5+++6C2A98A"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/Billing",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2006+++345D3FF"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/Billing",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++2041+++FA80A44"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/Billing",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++4A1F0F0"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/Billing",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++6FC6B0B"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/Billing",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "b8cf6e26-6509-488c-8ee1-d11e46ea0e3e++5282+++D772792"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/BILLING_AHMob_ActDeal%20Cloud",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2601+++62D56C8"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/BILLING_AHMob_ActDeal%20Cloud",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++2878+++5A2202A"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/BILLING_AHMob_ActDeal%20Cloud",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3343+++577F9A1"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/BILLING_AHMob_ActDeal%20Cloud",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++3394+++54AA54C"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/BILLING_AHMob_ActDeal%20Cloud",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++4727+++331B73A"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/BILLING_AHMob_ActDeal%20Cloud",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "bbca9fdb-784f-4464-8c7f-a92af16d9eb4++7772+++3D10196"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/HLJMob_CRM_6.0",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "fb83a747-9195-4a21-af76-cd44675210ae++615+++BBC03AF"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/172.16.9.106:9001\/svn\/POD_ST_ProjectCM",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "fb83a747-9195-4a21-af76-cd44675210ae++7608+++7A39B26"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _CAF_MANAGER_H_
+#define _CAF_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+typedef struct{
+	char check_sn[128+1];
+	char key_id[128+1];
+	char table_name[30+1];
+	char check_type[1+1];
+	char check_result[1+1];
+	char is_deal[1+1];
+	char deal_time[20+1];
+} stRepairData;
+
+class CAFMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(CAFMgr)
+public:
+	
+	CAFMgr();
+	~CAFMgr();
+    
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+	
+	int ProInterface(map<string,string> *values);
+	
+	int deleteInit(char *data_type);
+	
+	int insertInit(char *ym,char *data_type);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+	
+	int insertRepairHis(char *ym,char *table_name,char *key_value,char *data_type);
+	
+	int deleteRepairData(char *table_name,char *key_value,char *data_type);
+	
+	int getRepairDatas(char *data_type);
+	
+public:
+	char m_DataType[1+1];
+	ibear *m_Ibear;
+	stAppCfg_Proc_Server *m_CfgInfo;
+	vector<stRepairData*> m_RepairDatas;
+	vector<string> m_TableNames;
+	DC_AxLogFile *m_logFile;
+};
+#endif
+
+

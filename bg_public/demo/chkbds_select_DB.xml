@@ -1,0 +1,7 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="data">
+	<select id="SEL_INTERFACE" parameterClass="Map" db_no="1">
+		select order_id,insert_time,order_context from ORDER_RTSTOPLOG_CHG where deal_flag='0' and process_key=#CUR_NUM#
+	</select>
+</sqlMap>

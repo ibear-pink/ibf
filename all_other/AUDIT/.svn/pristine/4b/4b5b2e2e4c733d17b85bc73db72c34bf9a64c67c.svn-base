@@ -1,0 +1,318 @@
+
+/*
+ * 功能描述:生成KPI接口数据
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "GetKPIDataMgr.h"
+#include "CDealData.h"
+#define MAXNUM 10
+
+IMPLEMENT_CLASS(GetKPIDataMgr)
+
+GetKPIDataMgr::GetKPIDataMgr()
+{
+	
+}
+
+GetKPIDataMgr::~GetKPIDataMgr()
+{
+	
+}
+
+int GetKPIDataMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	memset(&m_szInData, 0, sizeof(m_szInData));
+	sprintf(m_szInData.busi_type,"%s","0");    /*子服务标识 没有的话统一填0*/
+	m_szInData.thread_id = 0;
+	
+	int iRet = 0;
+	char pid_num[3+1] = {0};
+	char app_pid[10+1] = {0};
+	m_CfgInfo = pServerCfg;	
+	m_logFile = m_CfgInfo->logFile;
+	m_ProInfo = pInfo;
+	sprintf(app_pid,"%d",getpid());
+	iRet = appStart(br,m_ProInfo->ipAddress,m_ProInfo->program_name,m_ProInfo->procUnikey,app_pid);
+	if (iRet != 0)
+	{
+  	printf("进程不允许启动[%s] \n",getErrInfo());
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"appStart失败[%d][%s,%s,%s,%s]!!!\n",iRet,pInfo->ipAddress,pInfo->procUnikey,pInfo->program_name,app_pid);
+  	m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程不允许启动[%s]",getErrInfo());
+  	return -1;
+	}
+	
+	m_tableNames[0] = string("SYSTEM");
+	m_tableNames[1] = string("OFRM");
+	m_tableNames[2] = string("FBSTD");
+	m_tableNames[3] = string("OFAC");
+	m_tableNames[4] = string("RAMP");
+	m_tableNames[5] = string("CDSP");
+	m_tableNames[6] = string("CDWS");
+	m_tableNames[7] = string("SNMP");
+	
+	m_Ibear = br;
+	return iRet;
+}
+
+int GetKPIDataMgr::process()
+{
+	long t1 = 0,t2 = 0;
+	t1 = getUTime();
+	m_szInData.record_count = 0;
+	
+	if (0 == isAppStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+	{
+		//可以停止
+		if (0 == appStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+		{
+	  	printf("进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+
+			exit(0);
+		}
+	}
+	int iRet = 0;
+	memset(m_YM,0,sizeof(m_YM));
+	getCurDateTime(m_YM,"yyyymm");
+
+	for (int i = 0;i < 8; i++)
+	{
+		int count = 0;
+		//删除一次稽核表中KPI_PASS=3的数据，并录入到his表中
+		iRet = selectFristCount(m_tableNames[i],m_YM,&count);
+		if (0 != iRet)
+		{
+			exit(0);
+		}
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"table_Name=%s,count=%d\n",m_tableNames[i].c_str(),count);
+		if (count > 0)
+		{
+			iRet = insertFristHis(m_tableNames[i],m_YM);
+			if (0 != iRet)
+			{
+				exit(0);
+			}
+			iRet = deleteFrist(m_tableNames[i],m_YM);
+			if (0 != iRet)
+			{
+				exit(0);
+			}
+			if (iRet == 0)
+			{
+				m_Ibear->Commit();
+			}
+			else 
+			{
+				m_Ibear->Rollback();
+			}
+		}
+		
+		//查看当前接口表的数据状态
+		/*iRet = selectPROCWScount(m_pidCount);
+		if (0 != iRet)
+		{
+			exit(0);
+		}*/
+		
+		iRet = selectFristBatchSn(m_tableNames[i],m_YM);
+		if (0 != iRet)
+		{
+			exit(0);
+		}
+		if (m_batchSns.size()==0)
+		{
+			sleep(1);
+			continue;
+		}
+		for (vector<string>::iterator iter = m_batchSns.begin();iter != m_batchSns.end(); iter ++)
+		{
+			m_szInData.record_count ++;
+			char batchsn[64+1] = {0};
+			char wsseq[25+1] = {0};
+			char sysdate[18+1] = {0};
+			int dispseq = 0;
+			getCurDateTime(sysdate,"yyyymmddhhmiss");
+	
+			strcpy(batchsn,(*iter).c_str());
+			sprintf(wsseq,"%s",sysdate);
+			dispseq = random(99);
+			iRet = insertDataProcws(batchsn,wsseq,dispseq);
+			if (0 != iRet)
+			{
+				break;
+			}
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"数据:batchsn=%s,wsseq=%s,dispseq=%d\n",batchsn,wsseq,dispseq);
+		}
+		m_batchSns.clear();
+	
+		if (iRet == 0)
+		{
+			m_Ibear->Commit();
+		}
+		else 
+		{
+			m_Ibear->Rollback();
+		}
+	}
+	
+	t2 = getUTime();
+	m_szInData.time_cost = (t2-t1)/1000.000;
+	m_logMon->pushMonitorBaseInfo(m_szInData);
+	
+	return iRet;
+}
+
+int GetKPIDataMgr::selectFristCount(string table_name,char *ym,int *count)
+{
+	int iRet = RET_OK;
+	int count_tmp = 0;
+	map<string,string> inParams;
+	vector<string> v_row;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),table_name));
+	
+	iRet = m_Ibear->queryForObject("CNT_FRIST",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"CNT_FRIST table_name=%s,ym=%s ERR_MSG[%s]\n",table_name.c_str(),ym,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	count_tmp = atoi(v_row[0].c_str());
+	*count = count_tmp;
+	return iRet;
+}
+
+int GetKPIDataMgr::insertFristHis(string table_name,char *ym)
+{
+	int iRet = RET_OK;
+	int count_tmp = 0;
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),table_name));
+	inParams.insert(pair<string,string>(string("YM1"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE1"),table_name));
+	
+	iRet = m_Ibear->DML("INS_FRIST_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_FRIST_HIS table_name=%s,ym=%s ERR_MSG[%s]\n",table_name.c_str(),ym,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return 0;
+}
+
+int GetKPIDataMgr::deleteFrist(string table_name,char *ym)
+{
+	int iRet = RET_OK;
+	int count_tmp = 0;
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),table_name));
+	
+	iRet = m_Ibear->DML("DEL_FRIST",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_FRIST table_name=%s,ym=%s ERR_MSG[%s]\n",table_name.c_str(),ym,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return 0;
+}
+
+int GetKPIDataMgr::selectPROCWScount(int p_num)
+{
+	int iRet = RET_OK;
+	char cp_num[2+1] = {0};
+	map<string,string> inParams;
+	vector<vector<string> >list;
+	
+	sprintf(cp_num,"%d",p_num);
+	inParams.insert(pair<string,string>(string("PNUM"),string(cp_num)));
+	inParams.insert(pair<string,string>(string("PNUM1"),string(cp_num)));
+	
+	iRet = m_Ibear->queryForList("SEL_PROCWS",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_PROCWS pnum=%d, ERR_MSG[ %s]\n",p_num,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		int num = 0;
+		map<int,int>::iterator iter = m_dataProcws.find(atoi(v_row[0].c_str()));
+		iter->second = atoi(v_row[1].c_str());
+	}
+	
+	return iRet;
+}
+
+int GetKPIDataMgr::selectFristBatchSn(string table_name,char *ym)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> >list;
+	
+	inParams.insert(pair<string,string>(string("TYPE"),table_name));
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	
+	iRet = m_Ibear->queryForList("SEL_FRIST",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_FRIST tableName=%s,ym=%s ERR_MSG[ %s]\n",table_name.c_str(),ym,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		m_batchSns.push_back(v_row[0]);
+	}
+	
+	return iRet;
+}
+
+int GetKPIDataMgr::insertDataProcws(char *batchsn,char *wsseq,int dispseq)
+{
+	int iRet = RET_OK;
+	int count_tmp = 0;
+	char c_dispseq[2+1] = {0};
+	map<string,string> inParams;
+	sprintf(c_dispseq,"%d",dispseq);
+	
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	inParams.insert(pair<string,string>(string("WSSEQ"),string(wsseq)));
+	inParams.insert(pair<string,string>(string("DISPSEQ"),string(c_dispseq)));
+	
+	iRet = m_Ibear->DML("INS_PROCWS",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_PROCWS batchsn=%s,wsseq=%s,dispseq=%d ERR_MSG[%s]\n",batchsn,wsseq,dispseq,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return 0;
+}
+
+int GetKPIDataMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int GetKPIDataMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

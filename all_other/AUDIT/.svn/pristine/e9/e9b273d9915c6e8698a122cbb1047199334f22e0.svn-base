@@ -1,0 +1,94 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/3/1 14:59:14
+ * 编码人员:wangzhia
+*/
+
+#ifndef _DEAL_DATA_MGR_H_
+#define _DEAL_DATA_MGR_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class CDealDataMgr : public Thread
+{
+public:
+	
+	CDealDataMgr(map<string,string> classMap);
+	
+	~CDealDataMgr();
+	
+	void run (void);
+	
+	void time_run (void);
+	
+	void other_run(void);
+	
+	int Process ();
+	
+	int Init(stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, char *processName,int processNum,int log_thread_num,map<string,stSqlMap*> sqlconfs,stSettings *set);
+	
+	int InitDealData();
+
+	int dealFile(stDealTask *pTask);
+
+private:
+
+	STOP_COMMON_CONF conf_info;
+	void DestroyDealData();
+
+public:
+	//业务处理结构体
+	CDealData **m_DealData;
+	Poor<stDealTask> *m_Data_Poor;
+protected:
+	
+	friend int get_ascii_value_by_pos (char *buff, int pos, char *value);
+private:
+	CPublicMgr *m_PublicMgr;
+	map<string,stSqlMap*> m_sqlconfs;
+	stSettings *m_Set;
+	char m_FreshTime[6+1];
+	
+	unsigned int m_ThreadNum;
+
+	int m_InterfaceType;							//协议转换接口类型
+	int m_IsGive;											//是否需要数据分发
+	char m_BusiName[20];							//
+	int m_ServerType;								//接口业务类型
+	int m_dealType;								//接口业务类型
+	int m_database_num;						//oracle DSC序号
+	int m_imdb_db_num;								//mdb DSC序号
+	int m_runProNum;
+	int m_curProId;
+	int m_type;
+	int m_logThreadNum;						//日志线程数
+	int m_RowNum;									//rownum总数
+	int m_OpCodeNum;							//配置文件中opcode数量
+	
+	//业务服务器名
+	char m_ServerName[64];
+	
+	stAppCfg_Proc_Server *m_CfgInfo;
+	
+	stAppCfg_System m_SystemInfo;
+		
+	stAppCfg_ParseFile m_ParseFile;
+	
+	map<int ,int> m_ParseSize;
+	map<int ,int> m_ParseSeq;
+	map<int ,int> m_ParseMain;
+	
+	map<string,string> m_interfaceTable;
+	map<int, map<string, int> > m_ParseField;
+
+	bool m_ServerExitFlag;
+		
+	stDealFileResult *m_StatInfo;
+	char m_DataName[64];
+	char m_DealName[64];
+};
+
+#endif

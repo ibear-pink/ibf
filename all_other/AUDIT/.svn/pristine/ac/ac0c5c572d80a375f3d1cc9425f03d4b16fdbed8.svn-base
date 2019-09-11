@@ -1,0 +1,10 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+  <select id="SEL_OFAC_DIS" parameterClass="Map" resultNum="4" db_no="0">select distinct region_code,audit_id,day_billcycl,MERGE_TYPE from AUDIT_MERGE_OFAC_#YM# where DAY_BILLCYCL @lt=${DAY_BILLCYCL|char} union select distinct region_code,audit_id,day_billcycl,MERGE_TYPE from AUDIT_MERGE_OFAC_HIS_#YM_HIS# where DAY_BILLCYCL @lt=${DAY_BILLCYCL_HIS|char}</select>
+  <select id="SEL_OFAC_HIS" parameterClass="Map" resultNum="2" db_no="0">SELECT SUM(RECORDS),SUM(AMOUNT) FROM AUDIT_MERGE_OFAC_HIS_#YM# WHERE MERGE_TYPE=${MERGE_TYPE|char} and DAY_BILLCYCL=${DAY_BILLCYCL|char} AND REGION_CODE=${REGION_CODE|char} AND AUDIT_ID=${AUDIT_ID|char}</select>
+  <select id="SEL_OFAC_YM" parameterClass="Map" resultNum="2" db_no="0">SELECT SUM(RECORDS),SUM(AMOUNT) FROM AUDIT_MERGE_OFAC_#YM# WHERE MERGE_TYPE=${MERGE_TYPE|char} and DAY_BILLCYCL=${DAY_BILLCYCL|char} AND REGION_CODE=${REGION_CODE|char} AND AUDIT_ID=${AUDIT_ID|char}</select>
+  <insert id="INS_OFAC" parameterClass="Map" db_no="0">insert into AC_APP_AUDIT_LOG_#YM#(MERGE_TYPE,DAY_BILLCYCL,REGION_CODE,AUDIT_ID,RECORDS,AMOUNT,REC_ATTR,REC_TIME) values(${MERGE_TYPE|char},${DAY_BILLCYCL|char},${REGION_CODE|char},${AUDIT_ID|char},${RECORD|long},${AMOUNT|long},${REC_ATTR|char},sysdate)</insert>
+  <delete id="DEL_OFAC" parameterClass="Map" db_no="0">delete from AC_APP_AUDIT_LOG_#YM# where MERGE_TYPE=${MERGE_TYPE|char} and audit_id=${AUDIT_ID|char} and region_code=${REGION_CODE|char} and DAY_BILLCYCL=${DAY_BILLCYCL|char}</delete>
+</sqlMap>
+

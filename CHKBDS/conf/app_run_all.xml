@@ -1,0 +1,9 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_APP_RUN" parameterClass="Map" resultNum="2" db_no="0">SELECT APP_CTRL,LOAD_STATIC from ACCTADM.MD_APP_RUN_INFO WHERE HOST_IP=${HOST_IP|char} AND APP_ID=${APP_ID|char}</select>
+	<update id="UPD_APP_RUN" parameterClass="Map" db_no="0">UPDATE ACCTADM.MD_APP_RUN_INFO SET APP_PID=0,APP_NAME='0',APP_STATE='DEAD',OP_TIME=to_char(sysdate) WHERE APP_NAME=${APP_NAME|char}</update>
+	<update id="UPD_APP_RUN_START" parameterClass="Map" db_no="0">UPDATE ACCTADM.MD_APP_RUN_INFO SET APP_PID=${APP_PID|char},APP_NAME=${APP_NAME|char},APP_STATE='RUN',LAST_START_TIME=to_char(sysdate),LAST_RUN_TIME=to_char(sysdate),OP_TIME=to_char(sysdate) WHERE HOST_IP=${HOST_IP|char} AND APP_ID=${APP_ID|char}</update>
+	<update id="UPD_APP_RUN_STOP" parameterClass="Map" db_no="0">UPDATE ACCTADM.MD_APP_RUN_INFO SET APP_PID=0,APP_NAME='0',APP_STATE='STOP',LAST_RUN_TIME=to_char(sysdate),OP_TIME=to_char(sysdate) WHERE HOST_IP=${HOST_IP|char} AND APP_ID=${APP_ID|char}</update>
+</sqlMap>
+

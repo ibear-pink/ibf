@@ -1,0 +1,5 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="data">
+	<select id="SEL_USER_BDS" parameterClass="Map" db_no="0">select ID_NO,CONTRACT_NO,PHONE_NO,GROUP_FLAG,MASTER_SERV_ID,PRE_RUN_CODE,RUN_CODE,RUN_TIME,CREATE_DATE,OPEN_TIME,FIRST_USEDATE,COMPLETED_DATE,BILL_START_TIME,OWNER_TYPE from BDSADM.BDS_USER_INFO where PHONE_NO=${PHONE_NO|char} $E[and ID_NO=${ID_NO|long}]</select>
+</sqlMap>

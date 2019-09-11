@@ -1,0 +1,96 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _GETKPI_TL_MANAGER_H_
+#define _GETKPI_TL_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+//稽核指标配置
+typedef struct
+{
+	char Parameter[20+1];//指标项目
+	char Audit_type[2+1];//稽核项
+	char Dismension_org[20+1];//维度地市
+	char Dismension_date[20+1];//维度时间
+	char Audit_form[100+1];//稽核公式
+} stAuditKPICfg;
+
+//KPI基数
+typedef struct
+{
+	long records;
+	long amount;
+	char merge_type[50];
+	char audit_id[10];
+	char org_ins[64+1];
+	char date_ins[16+1];
+} stAuditKPIs;
+
+class GETKPI_TLMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(GETKPI_TLMgr)
+public:
+	
+	GETKPI_TLMgr();
+	~GETKPI_TLMgr();
+    
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+	
+	int ProInterface(map<string,string> *values);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+	
+	int SplitString (const char *buff,vector<string> *operation,vector<vector<string> > *values);
+	int SplitStringBySP (const char *buff, char split_char, string key[]);
+	
+	//	
+	int ProDismenProcess(stAuditKPICfg *kpicfg);
+	
+	//根据地市，日期判断所有公式是否平衡
+	int ProRealDismenDeal(stAuditKPICfg *kpicfg,vector<string> operation,vector<vector<string> > values,bool day_billcycl,bool region_code);
+	
+	//执行一个KPI公式，返回该公式的KPI值
+	int ProFormObjectProcess(vector<vector<string> > values,vector<string> operation,vector<stAuditKPIs*> left_values,long *res_records,long *res_amount,char *form_records,char *form_amount);
+	
+	//处理公式结果
+	int ProFormDeal(long res,char *form,char *org_ins,char *date_ins,stAuditKPICfg *kpicfg,char *audit_type);
+
+	//取KPI配置数据
+	int getAuditKPIStatic();
+	
+	//获取汇总表数据
+	int getSecondAudit(char *ym, bool day_billcycl,char *merge_type, bool region_code,char *audit_id,int num);
+	
+	//删除KPI日志
+	int deleteKPILog(char *ym);
+	
+	//记录KPI日志（KPI未做平）
+	int insertKPILog(char *ym,stAuditKPICfg *kpicfg,char *audit_type,char *org_ins,char *date_ins,long records,char *form_ins);
+	
+	//记录KPI his
+	int insertKPIHis(char *ym,stAuditKPICfg *kpicfg,char *audit_type,char *org_ins,char *date_ins,long records,char *form_ins);
+	
+public:
+	ibear *m_Ibear;
+	
+	vector<stAuditKPICfg*> m_AuditKPICfgs;
+	vector<stAuditKPIs*> m_AuditKPIs;
+	map<string,vector<stAuditKPIs*> > m_VB;
+	char m_YM[6+1];
+	stAppCfg_Proc_Server *m_CfgInfo;
+	DC_AxLogFile *m_logFile;
+	stAppCfg_System *m_ProInfo;
+	
+};
+#endif
+
+

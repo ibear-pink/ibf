@@ -1,0 +1,41 @@
+#!/usr/sh
+# FOR HP 64 BIT SYSTEM
+XML_HOME=..
+IFLAGS=-DSS_64BIT_SERVER -D_REENTRANT
+INCLUDE=-I.
+
+CFLAGS = ${IFLAGS} ${INCLUDE}
+
+# FOR HP 64 BIT SYSTEM
+AR_CMD=ar -rv
+
+##################   不同主机的编译选项   ####################
+u_name=`uname -s 2>/dev/null`
+#if [ "$u_name" = "HP-UX" ] 
+#then
+#	CC=aCC -AA +DD64 -mt -lm -g -D_LARGEFILE64_SOURCE  -D_XOPEN_SOURCE_EXTENDED -Wl,+s -Wl,+n +DSblended +z +p +inst_implicit_include 
+#elif [ "$u_name" = "Linux" ] 
+#then
+	CC=gcc -m64 -g -O2
+#else
+#	echo "invalid os param"
+#	exit 1
+#fi
+
+DEFINE=-DSS_64BIT_SERVER -D_REENTRANT
+IFLAGS=-I. -I ${XML_HOME}/include 
+LIBXMLLFLAGS=  -L${XML_HOME}/lib  -lxml2
+
+COMPILE = ${CC} ${CFLAGS} ${IFLAGS} ${DEFINE} 
+MAKEEXE = ${COMPILE}
+LIBXMLOBJ=QField.o QList.o QString.o QXmlIO.o QXmlParser.o QXml.o libxml.o
+
+all:    libxml2.a  clean
+libxml2.a:${LIBXMLOBJ}
+	${AR_CMD} $@ ${LIBXMLOBJ}
+	mv -f $@ ${XML_HOME}/lib
+	@echo "### $@ loaded ###\n"
+.c.o:
+	${COMPILE} -c $<
+clean:
+	rm -f  *.o

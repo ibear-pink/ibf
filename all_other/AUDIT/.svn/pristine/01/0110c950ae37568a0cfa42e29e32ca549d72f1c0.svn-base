@@ -1,0 +1,16 @@
+cd /account/c000/pkg/src/cpp/AUDIT/RTOF
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/FTOB
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/QYFB
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/KPIDE
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/KPITG
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/KPITL
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/CHKBDS
+make -f makefile
+cd /account/c000/pkg/src/cpp/AUDIT/check_report
+make -f makefile

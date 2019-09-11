@@ -1,0 +1,713 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/3/1 14:59:14
+ * 编码人员:wangzhia
+*/
+
+#include "CDealDataMgr.h"
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+CDealDataMgr::CDealDataMgr (map<string,string> classMap)
+{
+	memset (m_ServerName, 0, sizeof(m_ServerName));
+	
+	m_ThreadNum = 0;
+	
+	m_InterfaceType = 0;
+	
+	m_CfgInfo = NULL;
+	
+	memset (&m_SystemInfo, 0, sizeof(stAppCfg_System));
+	
+	memset (&m_ParseFile, 0, sizeof(stAppCfg_ParseFile));
+	
+	m_ServerExitFlag = false;
+	
+	//根据反射实现工厂类
+	map<string,string>::iterator iter = classMap.find(string("Mgr"));
+	if (iter != classMap.end())
+	{
+		char className[64] = {0};
+		strcpy(className,iter->second.c_str());
+		printf("MRG|value:%s\n",className);
+		
+		Object* poObject = Object::CreateObject(className);
+		m_PublicMgr = dynamic_cast<CPublicMgr*>(poObject);
+	}
+	
+	map<string,string>::iterator iter1 = classMap.find(string("Data"));
+	if (iter1 != classMap.end())
+	{
+		strcpy(m_DataName,iter1->second.c_str());
+		printf("DATA|value:%s\n",m_DataName);
+	}
+	
+	map<string,string>::iterator iter2 = classMap.find(string("Deal"));
+	if (iter2 != classMap.end())
+	{
+		strcpy(m_DealName,iter2->second.c_str());
+		printf("DEAL|value:%s\n",m_DealName);
+	}
+}
+
+CDealDataMgr::~CDealDataMgr()
+{
+	printf ("CDealDataMgr destructor.\n");
+	
+	while(1)
+	{
+		if (m_ServerExitFlag)
+		{
+			DestroyDealData ();
+			
+			break;
+		}
+		else
+		{
+			setThreadState(THREAD_STAT_EXIT);
+			
+			usleep(100000);
+		}
+	}
+	if (m_PublicMgr != NULL)
+	{
+		delete m_PublicMgr;
+		m_PublicMgr = NULL;
+	}
+	#ifdef _DSC_
+	br->Quit();
+	#else
+	#endif
+}
+
+int CDealDataMgr::Init(stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, char *processName,int processNum,int log_thread_num,map<string,stSqlMap*> sqlconfs,stSettings *set)
+{
+	int ret = 0;
+	m_RowNum = 0;
+	m_OpCodeNum = 0;
+	
+	m_CfgInfo = pServerCfg;
+	m_Set = set;
+	
+	memcpy (&m_SystemInfo, pInfo, sizeof(stAppCfg_System));
+	
+	memcpy (&m_ParseFile, pParseFile, sizeof(stAppCfg_ParseFile));
+	
+	m_InterfaceType = m_CfgInfo->interface_type;
+	
+	m_IsGive = m_CfgInfo->is_give;
+	
+	m_ThreadNum = m_CfgInfo->thread_num;
+	
+	m_ServerType = m_CfgInfo->server_type;
+	
+	strcpy(m_FreshTime, m_CfgInfo->fresh_time);
+	
+	m_type = m_CfgInfo->bak_cfg_info.tab_type;
+	
+	m_dealType = m_CfgInfo->deal_type;
+	
+	m_logThreadNum = log_thread_num;
+	
+	printf("(%s)总进程数:%d,当前进程号:%d\n",processName,processNum,m_CfgInfo->pid_num);
+	sprintf(m_ServerName,"%s_0_0", m_CfgInfo->server_name);
+	
+	switch (m_ServerType)
+	{
+		case INTERFACE_BUSINESS_TYPE_STOPPH_LOG:
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_STOPPH_LOG_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_ACCT_ITEM:
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_ACCT_ITEM_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_GET_DATA:
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_GET_DATA_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_STOP_PATCH:
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_STOP_PATCH_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_OTHER:
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_OTHER_HEAD);
+			break;
+		}
+		default:
+			//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_ServerType<%d> Is Error.]\n",  __FILE__, __LINE__, m_ServerType);
+			break;
+	}
+	for (int i = 1; i <= pParseFile->size; i++)
+	{
+		stParse_Field *pNode = &(pParseFile->data[i]);
+		
+		map<string, int> tmpList;
+		
+		for (int j = 1; j <= pNode->size; j++)
+		{
+			tmpList.insert(pair<string, int>(string(pNode->field[j]), j));
+		}
+		m_ParseSize.insert (pair<int ,int>(pNode->file_type,pNode->size));
+		m_ParseMain.insert (pair<int ,int>(pNode->file_type,pNode->main_field));
+		m_ParseSeq.insert (pair<int ,int>(pNode->file_type,pNode->seq_field));
+		m_ParseField.insert (pair<int, map<string, int> > (pNode->file_type, tmpList));
+	}
+	
+	sleep (1);
+	printf("初始化数据库\n");
+	//初始化数据库句柄
+	if (0 != stop_common_init(m_SystemInfo.stop_common,&conf_info))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[stop_common_init is failed.]", __FILE__, __LINE__);
+		return RET_FAIL;
+	}
+	bear_db *ibearInfo = new bear_db();
+	for (int i=0;i<m_SystemInfo.db_num;i++)
+	{
+		ibearInfo->db_id[i] = m_SystemInfo.db_id[i];
+		printf("CDealDataMgr_Init:db[%d]序号为：%d\n",i,ibearInfo->db_id[i]);
+	}
+	ibear *br = new ibear(ibearInfo,sqlconfs,set);
+	m_sqlconfs = br->m_Sqlconfs;
+	//调用个性化init();
+	m_PublicMgr->init(br,pServerCfg,pInfo,pParseFile,&conf_info,processName,processNum,log_thread_num);
+	
+	if (m_CfgInfo->java_vm == 1)
+	{
+		//初始化java虚拟机
+		if (0 != createJavaVM())
+		{
+			printf ("FILE[%s]LINE[%d]ERR_MSG[createJavaVM is failed.]", __FILE__, __LINE__);
+			return -1;
+		}
+	}
+	
+	/*初始化业务处理线程*/
+	if (m_IsGive == 1)
+	{
+		printf("初始化业务处理线程\n");
+		if (InitDealData())
+		{
+			//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]InitDealData error.\n",  __FILE__, __LINE__ );
+			return -1;
+		}
+	}
+	printf("initMgr完成,sqlnum:%d\n",(br->m_Sqlconfs).size());
+	return 0;
+}
+
+int CDealDataMgr::Process ()
+{
+	int iRet = RET_OK;
+	
+	switch (m_InterfaceType)
+	{
+		case INTERFACE_TYPE_FILE:
+		{
+			if(m_dealType == 1)
+			{
+				iRet = this->start();
+			}
+			else if (m_dealType == 2)
+			{
+				this->time_run();
+			}
+			else 
+			{
+				this->other_run();
+			}
+			break;
+		}
+		case INTERFACE_TYPE_TABLE:
+		{
+			if(m_dealType == 1)
+			{
+				iRet = this->start();
+			}
+			else if (m_dealType == 2)
+			{
+				this->time_run();
+			}
+			else 
+			{
+				this->other_run();
+			}
+			break;
+		}
+		default:
+			//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]MSG[m_InterfaceType<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+			break;
+	}
+	return iRet;
+}
+
+void CDealDataMgr::run()
+{
+	int iRet = 0, iFlag = 0;
+	Ret ret = RET_OK;
+	
+	char fileName[1024] = {0};
+	stStopFileInfo *pFileNode = NULL;
+	CDealData *pDealData = NULL;
+	stDealTask *pTask = NULL;
+
+	char sysdate[20+1] = {0};
+	
+	while (getThreadState() == THREAD_STAT_RUNNING)
+	{
+		if (strcmp(CurrSysDate(4),m_FreshTime) == 0)
+		{
+			for (int i = 0; i < m_ThreadNum; i++)
+			{
+#ifdef _DEBUG_INFO_
+	printf("刷新%d个线程的第[%d]个信控配置%s,%s\n",m_ThreadNum,i,CurrSysDate(4),m_FreshTime);
+#endif
+				pDealData = m_DealData[i];
+				pDealData->InitCfgInfo();
+				printf("[%d]刷新配置完成!!!\n",i);
+			}
+			sleep(3);
+		}
+		
+		if (m_IsGive == 1)
+		{
+			switch (m_InterfaceType)
+			{
+				case INTERFACE_TYPE_FILE:
+				{
+				#ifdef _SDFS_DEAL_FILE_
+					SDFS_GDF_FILE *adfs_file = new SDFS_GDF_FILE();
+				#else
+					GDF_FILE *adfs_file = new GDF_FILE();
+				#endif
+					if (0 != adfs_file->getFileList(m_CfgInfo->file_cfg_info.indir))
+					{
+						printf("getFileList error\n");
+						continue;
+					}
+					adfs_file->mFileList;
+					break;
+				}
+				case INTERFACE_TYPE_TABLE:
+				{
+					//取数据到内存中
+					if (m_Data_Poor->GetRecordNum() < 100)
+					{
+						m_PublicMgr->ProInterface(&m_interfaceTable);
+						if (m_interfaceTable.size() == 0)
+						{
+							usleep (1000);
+							continue;
+						}
+						
+						//数据处理
+						for (map<string,string>::iterator dataIter = m_interfaceTable.begin(); dataIter != m_interfaceTable.end(); dataIter++)
+						{
+							if (getThreadState() == THREAD_STAT_EXIT)
+							{
+								break;
+							}
+							string fi = dataIter->second;
+							char buff[1024] = {0};
+							strcpy(buff ,fi.c_str());
+		#ifdef _DEBUG_INFO_
+			printf("buff=[%s]\n",buff);
+		#endif
+							pTask = new stDealTask;
+							if (pTask == NULL)
+							{
+								ret = RET_FAIL;
+								break;
+							}
+							else
+							{
+								//memset (pTask, 0, sizeof(stDealTask));
+								char msisdn[20] = {0};
+								char seq[25+1] = {0};
+								map<int, int>::iterator iter = m_ParseMain.find (m_ServerType);
+								int main_field = iter->second;
+								iRet = get_ascii_value_by_pos (buff, main_field, msisdn);
+								if (0 != iRet)
+								{
+									//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[get main_field IS ERROR.Please Cheack TableData.]\n",  __FILE__, __LINE__);						
+									
+									continue;
+								}
+								
+								map<int, int>::iterator iter_seq = m_ParseSeq.find (m_ServerType);
+								int seq_field = iter_seq->second;
+								iRet = get_ascii_value_by_pos (buff, seq_field, seq);
+								if (0 != iRet)
+								{
+									//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[get seq_field IS ERROR.Please Cheack TableData.]\n",  __FILE__, __LINE__);						
+									
+									continue;
+								}
+								strcpy(pTask->seq,seq);
+								strcpy(pTask->sMsisdn,msisdn);
+								pTask->isEnd = false;
+								pTask->iBusiType = m_ServerType;
+								strcpy(pTask->sBuff, buff);
+								long lMsisdn = atol (pTask->sMsisdn);
+								pTask->iDispatchKey = lMsisdn % m_logThreadNum;
+							}
+							
+							m_PublicMgr->UpdPoorStatus(pTask);
+							
+							//将处理数据放入池中
+							m_Data_Poor->PutRecord(pTask);
+						}
+						
+						switch(m_type)
+						{
+							case BACKUP_TYPE_FILE:
+							{
+								for (map<string,string>::iterator iter = m_interfaceTable.begin(); iter != m_interfaceTable.end(); iter++)
+								{
+									stPubFileInfo tFileInfo;
+									
+									memset (&tFileInfo, 0, sizeof(tFileInfo));
+		
+									string fi = iter->second;
+									char buff[1024] = {0};
+									strcpy(buff ,fi.c_str());
+									strcpy (tFileInfo.fileNameHead, m_BusiName);
+									
+									strcpy (tFileInfo.fileContent, buff);
+									sprintf (tFileInfo.fileName, "%s",m_BusiName);
+									
+									App_ProDealFileBak::Instance()->WriteFile (&tFileInfo);
+								}
+								break;
+							}
+							case BACKUP_TYPE_TABLE:	
+								break;
+							case NO_BACKUP:	
+								break;
+							default:
+							{
+								//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[backup_type<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+								
+								iFlag = THREAD_STAT_EXIT;
+								break;
+							}
+						}
+						
+						m_interfaceTable.clear();
+						break;
+					}
+					else
+					{
+						usleep(1000);
+						continue;
+					}
+				}
+				default:
+				{
+					//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[interface_type<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+					
+					setThreadState(THREAD_STAT_EXIT);
+					
+					break;
+				}
+			}
+		}
+		else
+		{
+			this->other_run();
+		}
+		if (getThreadState() == THREAD_STAT_EXIT)
+		{
+			setThreadState(THREAD_STAT_EXIT);
+			
+			m_ServerExitFlag = true;
+				
+			break;
+		}
+	}
+	
+	if (getThreadState() == THREAD_STAT_EXIT)
+	{
+		setThreadState(THREAD_STAT_EXIT);
+		
+		m_ServerExitFlag = true;
+	}
+	
+	return;
+}
+
+int CDealDataMgr::InitDealData()
+{
+	Ret iRet = RET_OK;
+	
+	int iErr = 0;
+	
+	if (m_ThreadNum < 1 || m_ThreadNum > MAX_BUSINESS_THREAD)
+	{
+		return RET_FAIL;
+	}
+
+	CDealData *pDealData = NULL;
+	
+	m_DealData = (CDealData**)operator new (sizeof(CDealData*) * m_ThreadNum);
+	
+	//创建数据池
+	//memset(m_Data_Poor,0,sizeof(Poor<stDealTask>));
+	//m_Data_Poor = (Poor<stDealTask>)malloc(sizeof(Poor<stDealTask>));
+	m_Data_Poor = new Poor<stDealTask>();
+	for(int i = 0; i < m_ThreadNum; i++)
+	{
+		m_DealData[i] = new CDealData(m_DataName,m_DealName);
+		
+		pDealData = m_DealData[i];
+		
+		pDealData->SetQueueDelayTime(10);
+		
+		pDealData->m_DispathKey = i;
+		
+		if (0 != pDealData->Init(m_CfgInfo, &m_SystemInfo, &m_ParseFile,i,m_Data_Poor,m_sqlconfs, conf_info,m_Set))
+		{
+			printf ("FILE[%s]LINE[%d]ERR_MSG[CDealData Init is failed.]", __FILE__, __LINE__);
+		
+			break;
+		}
+		
+		iRet = pDealData->start();
+		
+		if (0 != iRet)
+		{
+			printf ("FILE[%s]LINE[%d]ERR_MSG[CDealData start is failed.]", __FILE__, __LINE__);
+		
+			break;
+		}
+	}
+
+	if (0 != iRet)
+	{
+		for (int i = 0; i < m_ThreadNum; i++)
+		{
+			CDealData *pDealData = m_DealData[i];
+			
+			if (pDealData != NULL)
+			{
+				delete pDealData;
+				pDealData = NULL;
+			}
+		}
+	}
+
+	return iRet;
+}
+
+void CDealDataMgr::DestroyDealData()
+{
+	printf ("DestroyDealData CDealDataMgr destructor.\n");
+	int dealNum = 0;
+	if (m_IsGive != 1)
+		return;
+	while (1)
+	{
+		for (int i = 0; i < m_ThreadNum; i++)
+		{
+			CDealData *pDealData = m_DealData[i];
+				
+			if (pDealData != NULL)
+			{
+				if (pDealData->GetQueueNum() <= 0)
+				{
+					pDealData->setThreadState(THREAD_STAT_EXIT);
+				}
+				
+				if(pDealData->getThreadState() != THREAD_STAT_EXIT)
+				{
+					usleep(50);
+				}
+				else
+				{
+					delete pDealData;
+				
+					pDealData = NULL;
+					
+					dealNum++;
+				}
+			}
+		}
+		
+		if (dealNum >= m_ThreadNum)
+		{
+			break;
+		}
+	}
+}
+
+void CDealDataMgr::time_run()
+{
+	int iRet = 0, iFlag = 0;
+	Ret ret = RET_OK;
+	
+	char fileName[1024] = {0};
+	char sysdate[20+1] = {0};
+
+	stStopFileInfo *pFileNode = NULL;
+	CDealData *pDealData = NULL;
+	stDealTask *pTask = NULL;
+	
+	switch (m_InterfaceType)
+	{
+		case INTERFACE_TYPE_FILE:
+		{
+			return;
+		}
+		case INTERFACE_TYPE_TABLE:
+		{
+			iRet = m_PublicMgr->ProInterface(&m_interfaceTable);
+			if (0 != iRet)
+			{
+				//查不到数据就一直打日志
+				////WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]MSG[ProcInterfaceTable return value is <%d>]\n",  __FILE__, __LINE__, iRet);
+			}
+			
+			if (m_interfaceTable.size() == 0)
+			{
+				//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]MSG[<%s>无数据<%d>]\n",  __FILE__, __LINE__, m_BusiName,iRet);
+				return;
+			}
+			
+			//数据处理
+			for (map<string ,string>::iterator dataIter = m_interfaceTable.begin();dataIter != m_interfaceTable.end(); dataIter++)
+			{
+				string fi = dataIter->second;
+				char buff[1024] = {0};
+				strcpy(buff ,fi.c_str());
+#ifdef _DEBUG_INFO_
+printf("buff=[%s]\n",buff);
+#endif
+				pTask = new stDealTask;
+				if (pTask == NULL)
+				{
+					ret = RET_FAIL;
+					break;
+				}
+				else
+				{
+					char msisdn[20] = {0};
+					char seq[25+1] = {0};
+					map<int, int>::iterator iter = m_ParseMain.find (m_ServerType);
+					int main_field = iter->second;
+					iRet = get_ascii_value_by_pos (buff, main_field, msisdn);
+					if (0 != iRet)
+					{
+						//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[get main_field IS ERROR.Please Cheack TableData.]\n",  __FILE__, __LINE__);						
+						
+						continue;
+					}
+					
+					map<int, int>::iterator iter_seq = m_ParseSeq.find (m_ServerType);
+					int seq_field = iter_seq->second;
+					iRet = get_ascii_value_by_pos (buff, seq_field, seq);
+					if (0 != iRet)
+					{
+						//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[get seq_field IS ERROR.Please Cheack TableData.]\n",  __FILE__, __LINE__);						
+						
+						continue;
+					}
+					strcpy(pTask->seq,seq);
+					strcpy(pTask->sMsisdn,msisdn);
+					pTask->isEnd = false;
+					pTask->iBusiType = m_ServerType;
+					strcpy(pTask->sBuff, buff);
+					long lMsisdn = atol (pTask->sMsisdn);
+					pTask->iDispatchKey = (lMsisdn % 10) % m_ThreadNum;
+				}
+				
+				iRet = m_PublicMgr->UpdPoorStatus(pTask);
+				if (iRet != RET_OK)
+				{
+					printf("UpdPoor_Status is error %d \n",iRet);
+					continue;
+				}
+				
+				//将处理数据放入池中
+				m_Data_Poor->PutRecord(pTask);
+			}
+			
+			switch(m_type)
+			{
+				case BACKUP_TYPE_FILE:
+				{
+					for (map<string ,string>::iterator iter = m_interfaceTable.begin();iter != m_interfaceTable.end(); iter++)
+					{
+						stPubFileInfo tFileInfo;
+						
+						memset (&tFileInfo, 0, sizeof(tFileInfo));
+						
+						string fi = iter->second;
+						char buff[1024] = {0};
+						strcpy(buff ,fi.c_str());
+						strcpy (tFileInfo.fileNameHead, m_BusiName);
+						
+						strcpy (tFileInfo.fileContent, buff);
+						sprintf (tFileInfo.fileName, "%s",m_BusiName);
+						
+						App_ProDealFileBak::Instance()->WriteFile (&tFileInfo);
+					}
+					break;
+				}
+				case BACKUP_TYPE_TABLE:	
+					break;
+				default:
+				{
+					//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[backup_type<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+					
+					iFlag = THREAD_STAT_EXIT;
+					break;
+				}
+			}
+			
+			m_interfaceTable.clear();
+			return;
+		}
+		default:
+		{
+			//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[interface_type<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+			
+			return;
+		}
+	}
+}
+
+void CDealDataMgr::other_run()
+{
+	int iRet = 0;
+	stDealTask *pTask = NULL;
+	switch (m_InterfaceType)
+	{
+		case INTERFACE_TYPE_FILE:
+		{
+			iRet = m_PublicMgr->process();
+			break;
+		}
+		case INTERFACE_TYPE_TABLE:
+		{
+			iRet = m_PublicMgr->process();
+			break;
+		}
+		default:
+		{
+			//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[interface_type<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+			
+			break;
+		}
+	}
+	if (0 != iRet)
+	{
+		//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]MSG[Process return value is <%d>]\n",  __FILE__, __LINE__, iRet);
+	}
+}

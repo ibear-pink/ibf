@@ -1,0 +1,83 @@
+/**
+ *description:
+ *			专门用于处理INI数据文件-H文件
+ *others:
+ *			[文件格式]
+ *
+ *			[group1]				//组定义, 组名不能为空
+ *			key1=value1				//"key1" 域名(不能为空), "=" 分隔符(不能为空), "value1" 域值(可以为空)
+ *			key2=value2				//域定义，不能单独存在，必须在组定义区内。
+ *			[group2]				
+ *			key1=value1				
+ *			[group3]
+ *			------------------------------
+ *			[内部数据结构关系]
+ *			IniFile_File|---IniFile_Group
+ *			            |
+ *				        |---IniFile_Group|---IniFile_Key
+ *						                 |
+ *							             |---IniFile_Key
+ */
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#ifndef _INIFILE_H_
+#define _INIFILE_H_
+
+#define INIFILE_BUFFER_MAX_LEN				4096
+#define INIFILE_NAME_MAX_LEN				64
+#define INIFILE_VALUE_MAX_LEN				256
+#define INIFILE_KEY_MAX_NUMBER				100
+#define INIFILE_GROUP_MAX_NUMBER			50
+
+/*INI文件键对象结构*/
+typedef  struct
+{
+	char chName[INIFILE_NAME_MAX_LEN+1];
+	char chValue[INIFILE_VALUE_MAX_LEN+1];
+} stIniFile_Key;
+
+/*INI文件组对象结构*/
+typedef struct
+{
+	char chName[INIFILE_NAME_MAX_LEN+1];
+	int  iKeyNumber;
+	stIniFile_Key stKeyList[INIFILE_KEY_MAX_NUMBER];
+} stIniFile_Group;
+
+/*INI文件对象结构*/
+typedef struct
+{
+	int iGroupNumber;
+	stIniFile_Group stGroupList[INIFILE_GROUP_MAX_NUMBER];
+} stIniFile_File;
+
+void  IniFile_Key_SetName (stIniFile_Key *pstObj, char *chName);
+void  IniFile_Key_SetValue(stIniFile_Key *pstObj, char *chValue);
+char *IniFile_Key_GetName(stIniFile_Key *pstObj);
+char *IniFile_Key_GetValue(stIniFile_Key *pstObj);
+
+int   IniFile_Group_AppendKey(stIniFile_Group *pstObj, char *chName, char *chValue);
+void  IniFile_Group_SetName(stIniFile_Group *pstObj, char *chName);
+char *IniFile_Group_GetName(stIniFile_Group *pstObj);
+int   IniFile_Group_CountKey(stIniFile_Group *pstObj);
+int   IniFile_Group_GetKeyByIndex(stIniFile_Group *pstGroupObj, stIniFile_Key **pstKeyObj, int iIndex);
+int   IniFile_Group_GetKeyByName(stIniFile_Group *pstGroupObj, stIniFile_Key **pstKeyObj, char *chName);
+
+int IniFile_File_AppendGroup(stIniFile_File *pstObj, char *chName);
+int IniFile_File_CountGroup(stIniFile_File *pstObj);
+int IniFile_File_GetGroupByIndex(stIniFile_File *pstFileObj, stIniFile_Group **pstGroupObj, int iIndex);
+int IniFile_File_GetGroupByName(stIniFile_File *pstFileObj, stIniFile_Group **pstGroupObj, char *chName);
+
+int  IniFile_ReadFile(stIniFile_File *pstObj, char *chFilename);
+int  IniFile_WriteFile(stIniFile_File *pstObj, char *chFilename);
+void IniFile_Init(stIniFile_File *pstObj);
+
+#if defined(__cplusplus)
+}
+#endif
+
+#endif
+

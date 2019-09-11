@@ -1,0 +1,181 @@
+/*
+ * 功能描述:重写PublicMgr抽象类
+ * 创建时间:2016/3/1 14:59:14
+ * 编码人员:wangzhia
+*/
+
+#include "CPublicMgr.h"
+
+CPublicMgr::CPublicMgr()
+{
+	
+}
+
+CPublicMgr::~CPublicMgr()
+{
+	
+}
+
+int CPublicMgr::selectAppRun(char *host_id,char *app_id,char *app_ctrl,char *load_static)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	vector<string> v_row;
+	inParams.insert(pair<string,string>(string("HOST_IP"),string(host_id)));
+	inParams.insert(pair<string,string>(string("APP_ID"),string(app_id)));
+	iRet = m_Ibear->queryForObject("SEL_APP_RUN",inParams,&v_row);
+	if (iRet != 0)
+	{
+		iRet = -1;
+		sprintf(m_szErrInfo,"selectAppRun [%s %s]ERR_MSG[%s]",host_id,app_id,m_Ibear->sql_error);
+		return iRet;
+	}
+	if (v_row.size() > 0)
+	{
+		strcpy(app_ctrl,v_row[0].c_str());
+		strcpy(load_static,v_row[1].c_str());
+	}
+	else 
+	{
+		sprintf(m_szErrInfo,"selectAppRun [%s %s] values is Empty",host_id,app_id);
+		iRet = -2;
+	}
+	return iRet;
+}
+
+int CPublicMgr::updateAppRun(char *app_name)
+{
+	int iRet = 0;
+	char app_ctrl[16+1] = {0};
+	char load_static[1+1] = {0};
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("APP_NAME"),string(app_name)));
+	iRet = m_Ibear->DML("UPD_APP_RUN",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		iRet = -1;
+		sprintf(m_szErrInfo,"updateAppRun [%s] ERR_MSG[%s]",app_name,m_Ibear->sql_error);
+		return iRet;
+	}
+	//printf("updateAppRun:app_name=%s\n",app_name);
+	return 0;
+}
+
+int CPublicMgr::updateAppRunStart(char *host_id,char *app_id,char *app_name,char *app_pid)
+{
+	int iRet = 0;
+	char app_ctrl[16+1] = {0};
+	char load_static[1+1] = {0};
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("APP_PID"),string(app_pid)));
+	inParams.insert(pair<string,string>(string("APP_NAME"),string(app_name)));
+	inParams.insert(pair<string,string>(string("HOST_IP"),string(host_id)));
+	inParams.insert(pair<string,string>(string("APP_ID"),string(app_id)));
+	iRet = m_Ibear->DML("UPD_APP_RUN_START",inParams);
+	if (iRet != 0)
+	{
+		iRet = -1;
+		sprintf(m_szErrInfo,"updateAppRunStart [%s %s %s %s]ERR_MSG[%s]",host_id,app_id,app_name,app_pid,m_Ibear->sql_error);
+		return iRet;
+	}
+	//printf("updateAppRunStart:app_pid=%s app_name=%s where host_id=%s and app_id=%s\n",app_pid,app_name,host_id,app_id);
+	return iRet;
+}
+
+int CPublicMgr::updateAppRunStop(char *host_id,char *app_id)
+{
+	int iRet = 0;
+	char app_ctrl[16+1] = {0};
+	char load_static[1+1] = {0};
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("HOST_IP"),string(host_id)));
+	inParams.insert(pair<string,string>(string("APP_ID"),string(app_id)));
+	iRet = m_Ibear->DML("UPD_APP_RUN_STOP",inParams);
+	if (iRet != 0)
+	{
+		iRet = -1;
+		sprintf(m_szErrInfo,"updateAppRunStop [%s %s]ERR_MSG[%s]",host_id,app_id,m_Ibear->sql_error);
+		return iRet;
+	}
+	return iRet;
+}
+
+int CPublicMgr::appStart(ibear *br,char *host_id,char *app_id,char *app_name,char *app_pid)
+{
+	int iRet = 0;
+	m_Ibear = br;
+	m_bIsAppStart = false;
+	char app_ctrl[16+1] = {0};
+	char load_static[1+1] = {0};
+	iRet = selectAppRun(host_id,app_id,app_ctrl,load_static);
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	
+	if( 0 != strncasecmp(app_ctrl,"START",5) )
+	{
+		iRet = -3;
+		sprintf(m_szErrInfo,"%s|app_Start:[HOST_IP,APP_ID,APP_CTRL]=[%d,%s,%s]",host_id,iRet,app_id,app_ctrl);
+		return iRet;
+	}
+	iRet = updateAppRun(app_name);
+	if (iRet != 0)
+	{
+		m_Ibear->Rollback();
+		return iRet;
+	}
+	iRet = updateAppRunStart(host_id,app_id,app_name,app_pid);
+	if (iRet != 0)
+	{
+		m_Ibear->Rollback();
+		return iRet;
+	}
+	m_bIsAppStart = true;
+	m_Ibear->Commit();
+	return iRet;
+}
+
+int CPublicMgr::isAppStop(char *host_id,char *app_id)
+{
+	int iRet = 0;
+	char app_ctrl[16+1] = {0};
+	char load_static[1+1] = {0};
+	iRet = selectAppRun(host_id,app_id,app_ctrl,load_static);
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	if( 0 == strncasecmp(app_ctrl,"STOP",4))
+	{
+		iRet = 0;
+		sprintf(m_szErrInfo,"%s|is_AppStop:[HOST_IP,APP_ID,APP_CTRL]=[%d,%s,%s]",host_id,iRet,app_id,app_ctrl);
+		return iRet;
+	}
+	return 1;
+}
+
+int CPublicMgr::appStop(char *host_id,char *app_id)
+{
+	int iRet = 0;
+	if (!m_bIsAppStart)
+	{
+		iRet = -1;
+		sprintf(m_szErrInfo,"%s|app_Stop:app_Start isn't called!",iRet);
+		return iRet;
+	}
+	iRet = updateAppRunStop(host_id,app_id);
+	if (iRet != 0)
+	{
+		m_Ibear->Rollback();
+		return iRet;
+	}
+	m_bIsAppStart = false;
+	m_Ibear->Commit();
+	return iRet;
+}
+
+char *CPublicMgr::getErrInfo()
+{
+	return m_szErrInfo;
+}

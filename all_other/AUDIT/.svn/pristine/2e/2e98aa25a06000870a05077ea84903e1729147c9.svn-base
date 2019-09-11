@@ -1,0 +1,165 @@
+
+#ifndef _DSC_DB_H_
+#define _DSC_DB_H_
+
+#include <time.h>
+
+#ifdef IMDB
+#include "si_dci.h"
+#endif
+
+#ifdef DMDB
+#include "dsc.h"
+#endif
+
+#ifdef ORACLE
+#include "DB_Ora.h"
+#endif
+
+#ifdef MYSQLDB
+#include "DB_Mysql.h"
+#endif
+
+#ifdef ALTIBASE
+    #define ODBC
+#endif
+
+#ifdef TIMESTEN
+    #define ODBC
+#endif
+
+#ifdef SOLID
+    #define ODBC
+#endif
+
+#ifdef ODBC
+#include "DB_Odbc.h"
+#endif
+
+/*! @brief 数据库类型*/
+#define _T_IMDB          1
+#define _T_ORACLE        2
+#define _T_ALTIBASE      3
+#define _T_MYSQL         4
+#define _T_DMDB          5
+
+/*! @brief 内部错误编码*/
+#define _ERR_NULL         -99999  /*!< 数据库指针为空*/
+
+#define _ERR_DB_P         -99901  /*!< malloc SI_DCI 失败*/
+#define _ERR_DCI_INIT     -99902  /*!< dci_init 失败*/
+#define _ERR_SQL_P        -99903  /*!< malloc SQL 失败*/
+#define _ERR_DB_ID1       -99904  /*!< 不能根据表名获取数据库ID*/
+#define _ERR_DB_ID2       -99905  /*!< 非法数据库ID*/
+#define _ERR_INVALID_SQL  -99906  /*!< DSCI_SQL没有解析*/
+#define _ERR_SQLINFO_P    -99907  /*!< malloc SQL_INFO 失败*/
+
+/*! @brief 数据库信息*/
+typedef struct _db_info
+{
+    void *dbp;                                /*!< 对应各类数据库的连接指针*/
+    char name[8];
+    char user[32], pass[32], server[256];
+    time_t connTime;                          /*!< 连接成功的时间*/
+    char logMode[8];                          /*!< 日志模式 on 写日志，off 不写日志，sync 实时写磁盘 */
+    char type;                                /*!< 数据库类型*/
+    char cFlag;                               /*!< 是否已经连接， 0 否， 1 是*/
+    char uFlag;                               /*!< 是否修改过数据， 0 否， 1 是*/
+    char buffFlag;                            /*!< 是否缓冲模式， 0 否， 1 是*/
+    char acommitFlag;                         /*!< 是否自动提交， 0 否， 1 是*/
+}DB_INFO;
+
+/*! @brief 解析后的SQL*/
+typedef struct _sql_info
+{
+    void *psql;                               /*!< SQL解析指针*/
+    DB_INFO *db;                              /*!< 本SQL对应的数据库信息*/
+    time_t connTime;                          /*!< 连接成功的时间*/
+    char type;                                /*!< 0 select, 1 修改*/
+}SQL_INFO;
+
+/*! @brief 表信息*/
+typedef struct _tab_info
+{
+    char name[32];                            /*!< 表名*/
+    signed char dbID;                         /*!< 对应哪个库 0 开始*/
+}TAB_INFO;
+
+typedef struct _dsc_db
+{
+    char error[256];                          /*!< 错误信息 */
+    long ret_rows;                            /*!< 操作记录数 */
+    int field_count;                          /*!< select 字段个数*/
+    int eno;                                  /*!< 错误编号*/
+
+    DB_INFO *dbInfo;                          /*!< 所有数据库信息*/
+    TAB_INFO *tabInfo;                        /*!< 所有表信息*/
+    SQL_INFO *curSql;                         /*!< 当前SQL*/
+    SQL_INFO dSql;                            /*!< 本连接直接使用的SQL*/
+
+    short dbNum;                              /*!< 库个数*/
+    short tabNum;                             /*!< 表个数*/
+    short defaultDB;                          /*!< 默认数据库 */
+}DSC_DB;
+
+/*********************************   pub   **************************************/
+/*读取数据库信息*/
+extern int _DSC_GetDbInfo(char *errStr, char *dscPath, DSC_DB *pDB);
+
+/*直接生成数据库信息*/
+extern int _DSC_CreateDbInfo(char *errStr, char *dbStr, DSC_DB *pDB);
+
+/*读取表信息*/
+extern int _DSC_GetTabInfo(char *errStr, char *dscPath, DSC_DB *pDB);
+
+/*根据表名获取数据库编号*/
+extern short _DSC_GetDBNo(const char *sqlStr, DSC_DB *pDB, char *type, int dbNo);
+
+/*根据SQL查找DB, 并连接*/
+extern int _DSC_GetSqlDb(DB_INFO **db, DSC_DB *pDB, const char *sqlStr, char *sqlType, int dbNo);
+
+extern void _DSC_free_sql(DSCI_SQL *pSQL, DB_INFO *db);
+
+/*********************************   case   **************************************/
+/*连接库*/
+extern int _CDSC_ConnIMDB(char *errStr, DSC_DB *pDB, DB_INFO *db);
+
+/*直接查询*/
+extern int _CDSC_Query(DSC_DB *pDB, DB_INFO *db, const char *sqlStr);
+
+/*预解析*/
+extern int _CDSC_Prepare(DSC_DB *pDB, DB_INFO *db, SQL_INFO *mSQL, const char *sqlStr);
+
+/*绑定参数*/
+extern int _CDSC_Bind(DSC_DB *pDB, DB_INFO *db, SQL_INFO *mSQL, int param_id, char data_type, void *param);
+
+/*绑定BLOB参数*/
+extern int _CDSC_Bind_Blob(DSC_DB *pDB, DB_INFO *db, SQL_INFO *mSQL, int param_id, void *param, int size);
+
+/*绑定CLOB参数*/
+extern int _CDSC_Bind_Clob(DSC_DB *pDB, DB_INFO *db, SQL_INFO *mSQL, int param_id, void *param);
+
+/*执行预解析SQL*/
+extern int _CDSC_Query_p(DSC_DB *pDB, DB_INFO *db, SQL_INFO *mSQL);
+
+/*执行预解析SQL*/
+extern void _CDSC_FreeSql(SQL_INFO *mSQL, DB_INFO *db);
+
+/*提交*/
+extern int _CDSC_EndT(DSC_DB *pDB, DB_INFO *db, int flag);
+
+/*设置自动提交*/
+extern void _CDSC_AutoCommit(DB_INFO *db, int flag);
+
+/*设置select缓冲模式 1 是， 0 否*/
+extern void _CDSC_SetBuffFlag(DB_INFO *db, int flag);
+
+/*设置日志模式, on 写日志，off 不写日志，sync 实时写磁盘*/
+extern void _CDSC_SetLogMode(DB_INFO *db, const char *inMode);
+
+/*退出连接，释放内存*/
+extern void _CDSC_FreeDB(DB_INFO *db);
+
+extern DSCI_ROW _CDSC_Fetch(SQL_INFO *mSQL, int flag);
+
+#endif

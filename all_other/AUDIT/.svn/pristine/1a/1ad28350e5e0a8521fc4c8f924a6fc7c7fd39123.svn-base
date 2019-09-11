@@ -1,0 +1,1013 @@
+
+/*
+ * 功能描述:一致性比对、修复
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "Check_BDSMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(Check_BDSMgr)
+
+Check_BDSMgr::Check_BDSMgr()
+{
+	
+}
+
+Check_BDSMgr::~Check_BDSMgr()
+{
+	
+}
+
+int Check_BDSMgr::SplitStringBySP (const char *buff, char split_char, string key[])
+{
+	int size = 0,j = 0;
+	
+	char tmpBuf[1024];
+	char tStr[1024];
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	
+	strcpy (tmpBuf, buff);
+	
+	int len = strlen(tmpBuf);
+	if (tmpBuf[len-1] != split_char && tmpBuf[len-1] != '\n')
+	{
+		tmpBuf[len] = split_char;
+		len = len+1;
+	}
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == split_char)
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		size++;
+		
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		key[j] = string(tStr);
+		j ++;
+		begin = i;
+	}
+	
+	return j;
+}
+
+int Check_BDSMgr::getCheckCfg()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	iRet = m_Ibear->queryForList("SEL_REL_CFG",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_REL_CFG is ERROR!!!\n",m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stKeyRelas *rela = new stKeyRelas();
+		strcpy(rela->table_name,v_row[0].c_str());
+		strcpy(rela->key_id,v_row[1].c_str());
+		strcpy(rela->prkey_id,v_row[2].c_str());
+		m_KeyTableRelas.insert(pair<string,stKeyRelas*>(v_row[0],rela));
+	}
+  return iRet;
+}
+
+int Check_BDSMgr::getCheckTableMap()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	iRet = m_Ibear->queryForList("SEL_TAB_CFG",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_TAB_CFG is ERROR!!!\n",m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		string bds_tableName;//BDS 表名
+		string bds_sqlname;//BDS sql
+		string add_sqlname;//add_sql
+		string bds_keys;//BDS key
+		char check_sqlname[30] = {0};//物理库sql
+		char check_key[64] = {0};//物理库keys
+		bds_tableName = v_row[0];
+		bds_sqlname = v_row[1];
+		bds_keys = v_row[2];
+		strcpy(check_sqlname,v_row[3].c_str());
+		strcpy(check_key,v_row[4].c_str());
+		add_sqlname = v_row[5];
+
+		//获取内存库对应的物理库表（可能涉及多个物理库表）
+		map<string,stCheckMap*>::iterator tmp = m_CheckTableMaps.find(bds_tableName);
+		if (tmp != m_CheckTableMaps.end())
+		{
+			stCheckMap *checkmap = tmp->second;
+			int flag = 0;
+			for (vector<stTableKey*>::iterator it=(checkmap->checks).begin();it!=(checkmap->checks).end();it++)
+			{
+				stTableKey *tk = *it;
+				string name = tk->check_sqlname;
+				if (strcmp(name.c_str() ,check_sqlname) == 0)
+				{
+					flag = 1;
+					break;
+				}
+			}
+			if (flag == 0)
+			{
+				stTableKey *tk = new stTableKey();
+				strcpy(tk->check_sqlname,check_sqlname);
+				strcpy(tk->check_keys,check_key);
+				(checkmap->checks).push_back(tk);
+			}
+		}
+		else 
+		{
+			stCheckMap *checkmap = new stCheckMap();
+			vector<stTableKey*> tablelist;
+			stTableKey *tk = new stTableKey();
+			strcpy(tk->check_sqlname,check_sqlname);
+			strcpy(tk->check_keys,check_key);
+			tablelist.push_back(tk);
+			strcpy(checkmap->bds_sqlname,bds_sqlname.c_str());
+			strcpy(checkmap->add_sqlname,add_sqlname.c_str());
+			strcpy(checkmap->bds_keys,bds_keys.c_str());
+			checkmap->checks = tablelist;
+			m_CheckTableMaps.insert(pair<string,stCheckMap*>(bds_tableName,checkmap));
+		}
+	}
+
+	return iRet;
+}
+
+int Check_BDSMgr::getControlInfo()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<string> v_row;
+	iRet = m_Ibear->queryForObject("SEL_CON_INFO",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_CON_INFO is ERROR!!!\n",m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	m_Controls = new stControls();
+
+	if (v_row.size() > 0)
+	{
+		m_Controls->qrydb_nums = atoi(v_row[0].c_str());
+		m_Controls->check_nums = atoi(v_row[1].c_str());
+		m_Controls->repair_max = atoi(v_row[2].c_str());
+		strcpy(m_Controls->ctrl_flag,v_row[3].c_str());
+	}
+	else 
+	{
+		m_Controls->qrydb_nums = 0;
+		m_Controls->check_nums = 3;
+		m_Controls->repair_max = 0;
+		strcpy(m_Controls->ctrl_flag,"0");
+	}
+  return iRet;
+}
+
+int Check_BDSMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	int iRet = 0;
+	m_Ibear = br;
+	m_CfgInfo = pServerCfg;
+	m_logFile = m_CfgInfo->logFile;
+	//读取配置表
+	if (0 != getCheckCfg())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getCheckCfg is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	
+	if (0 != getCheckTableMap())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getCheckTableMap is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	
+	if (0 != getControlInfo())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getControlInfo is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	return iRet;
+}
+
+int Check_BDSMgr::getInterfaceDatas()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	iRet = m_Ibear->queryForList("SEL_INTER",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_INTER is ERROR!!!\n",m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stCheckData *checkdata = new stCheckData();
+		strcpy(checkdata->table_name,v_row[0].c_str());
+		strcpy(checkdata->key_id,v_row[1].c_str());
+		strcpy(checkdata->data_type,v_row[2].c_str());
+		m_CheckDatas.push_back(checkdata);
+	}
+  return iRet;
+}
+
+/*根据用户获得用户级数据（可能多条）
+ *入参:
+ *table_name:内存库表名
+ *sqlname:sql_key_id(xml中的id)
+ *bds_keys:主键在select中的位置,从0开始,多个用$分开,如:1$3
+ *key_value:唯一主键值
+*/
+int Check_BDSMgr::getDataBySigKeyValue(char *table_name,char *sqlname,char *sqlkeys,char *key_value,map<string,string> *db_datas)
+{
+	int iRet = RET_OK;
+	long num = 0,knum = 0;
+	char note[1024] = {0};
+	char key[1024] = {0};
+	char c_id2[2+1] = {0};
+	string keys[20];
+	map<string,string> datas_temp;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	stKeyRelas *rela;
+	map<string,stKeyRelas*>::iterator it = m_KeyTableRelas.find(string(table_name));
+	if (it != m_KeyTableRelas.end())
+	{
+		rela = it->second;
+	}
+	else 
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"m_KeyTableRelas is end!!!\n");
+		return RET_FAIL;
+	}
+	strncpy(c_id2,key_value + strlen(key_value)-2,2);
+	
+	inParams.insert(pair<string,string>("ID2",string(c_id2)));
+	inParams.insert(pair<string,string>(rela->key_id,string(key_value)));
+	iRet = m_Ibear->queryForList(sqlname,inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SQLNAME:%s[%s] ERR_MSG[%s]\n", sqlname,key_value,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	knum = SplitStringBySP(sqlkeys,'$',keys);
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		num = v_row.size();
+		for(int i=0;i<num;i++)
+		{
+			sprintf(note,"%s%s,",note,v_row[i].c_str());
+			for (int j = 0; j < knum; j++)
+			{
+				if(i == atoi(keys[j].c_str()))
+				{
+					sprintf(key,"%s%s,",key,v_row[i].c_str());
+				}
+			}
+		}
+		datas_temp.insert(pair<string,string>(string(key),string(note)));
+	}
+	*db_datas = datas_temp;
+	return iRet;
+}
+
+/*根据用户获得用户级数据（可能多条）
+ *入参:
+ *sqlname:sql_key_id(xml中的id)
+ *kvs:存sql中${KEY|char}以及该key的值
+ *key_value:ID_NO
+*/
+int Check_BDSMgr::getDataByAllKeyValue(char *sqlname,vector<stKeyValues*> kvs,map<string,string> *db_datas)
+{
+	int iRet = RET_OK;
+	char note[1024] = {0};
+	char key[1024] = {0};
+	map<string,string> datas_temp;
+	map<string,string> inParams;
+	vector<string> v_row;
+	for (vector<stKeyValues*>::iterator it=kvs.begin();it!=kvs.end();it++)
+	{
+		stKeyValues* kv = *it;
+		printf("kv-key=%s\n",kv->key);
+		if (strcmp(kv->key,"ID_NO") == 0)
+		{
+			char c_id2[2+1] = {0};
+			strncpy(c_id2,kv->value+strlen(kv->value)-2,2);
+			inParams.insert(pair<string,string>("ID2",string(c_id2)));
+		}
+		inParams.insert(pair<string,string>(kv->key,kv->value));
+		sprintf(key,"%s%s,",key,kv->value);
+	}
+	iRet = m_Ibear->queryForObject(sqlname,inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SQLNAME:%s ERR_MSG[%s]\n", sqlname,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+
+	for(int i = 0; i < v_row.size(); i++)
+	{
+		sprintf(note,"%s%s,",note,v_row[i].c_str());
+	}
+	
+	if (v_row.size() > 0)
+	{
+		datas_temp.insert(pair<string,string>(string(key),string(note)));
+		
+		*db_datas = datas_temp;
+	}
+	
+	return iRet;
+}
+
+int Check_BDSMgr::countCompareLog(char *key_value,char *table_name,int *count)
+{
+	int iRet = 0;
+	int temp_count = 0;
+	vector<string> v_row;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->queryForObject("SEL_COM_COUNT",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_COM_COUNT is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	for (vector<string>::iterator it=v_row.begin();it!=v_row.end();it++)
+	{
+		temp_count = atoi((*it).c_str());
+	}
+	*count = temp_count;
+	return iRet;
+}
+
+int Check_BDSMgr::deleteInterface(char *key_value,char *table_name)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->DML("DEL_INTER",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_INTER is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return 0;
+}
+
+int Check_BDSMgr::deletedateCompareLog(char *key_value,char *table_name)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->DML("DEL_COM",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_COM is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+int Check_BDSMgr::insertCompareLog(char *key_value,char *table_name,char *check_type,char *data_type)
+{
+	int iRet = 0;
+	char check_sn[20+1] = {0};
+	sprintf(check_sn,"%s",CurrSysDate(16));
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("CHECK_SN",check_sn));
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	inParams.insert(pair<string,string>("CHECK_TYPE",check_type));
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->DML("INS_COM",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_COM is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+	}
+	return iRet;
+}
+
+int Check_BDSMgr::updateCompareLog(char *key_value,char *table_name,char *check_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("CHECK_TYPE",check_type));
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->DML("UPD_COM",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"UPD_COM is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+int Check_BDSMgr::selectCompareLog()
+{
+	int iRet = 0;
+	int temp_count = 0;
+	char c_num[2] = {0};
+	vector<vector<string> > list;
+	map<string,string> inParams;
+	iRet = m_Ibear->queryForList("SEL_COM",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_COM is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	for (vector<vector<string> >::iterator it=list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stCheckData *checkdata = new stCheckData();
+		strcpy(checkdata->check_sn,v_row[0].c_str());
+		strcpy(checkdata->table_name,v_row[1].c_str());
+		strcpy(checkdata->key_id,v_row[2].c_str());
+		checkdata->times = atoi(v_row[3].c_str());
+		strcpy(checkdata->check_type,v_row[4].c_str());
+		strcpy(checkdata->data_type,v_row[5].c_str());
+		m_CheckDatas.push_back(checkdata);
+	}
+	
+	return iRet;
+}
+
+int Check_BDSMgr::insertAddLog(char *table_name,int num,string values[],char *dml_type)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	for (int i=0;i<num;i++)
+	{
+		char key[10+1] = {0};
+		sprintf(key,"VALUE%d",i);
+		inParams.insert(pair<string,string>(key,values[i]));
+	}
+	inParams.insert(pair<string,string>("DML_TYPE",dml_type));
+	iRet = m_Ibear->DML(table_name,inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DML_TYPE[%s] is ERR_MSG[%s]\n",table_name, m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	return iRet;
+}
+
+int Check_BDSMgr::insertRepairLog(char *check_sn,char *table_name,char *key_value,char *check_type,char *check_note,char *is_deal,char *data_type)
+{
+	int iRet = 0;
+	char check_result[1+1] = {0};
+	if (strcmp(check_type,"4") == 0)
+	{
+		strcpy(check_result,"N");
+		strcpy(check_note,"0");
+	}
+	else
+	{
+		strcpy(check_result,"Y");
+	}
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("CHECK_SN",check_sn));
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	inParams.insert(pair<string,string>("CHECK_TYPE",check_type));
+	inParams.insert(pair<string,string>("CHECK_RESULT",check_result));
+	inParams.insert(pair<string,string>("CHECK_NOTE",check_note));
+	inParams.insert(pair<string,string>("IS_DEAL",is_deal));
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->DML("INS_REP",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_REP is ERR_MSG[%s]\n", m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+//根据keyid获取比对数据集(用户级->记录级)
+int Check_BDSMgr::getCheckDataUser(char *table_name,char *key_value,map<string,string> *bds_datas,map<string,string> *db_datas)
+{
+	int iRet = 0;
+	char sql_name[32+1] = {0};
+	map<string,string> bds_datas_temp;
+	map<string,string> db_datas_temp;
+	
+	stCheckMap *checkmap = NULL;
+	map<string,stCheckMap*>::iterator itable = m_CheckTableMaps.find(string(table_name));
+	if (itable == m_CheckTableMaps.end())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"无对应sqlname[%s]\n", table_name);
+		printf("无对应sqlname[%s]\n",table_name);
+		return RET_FAIL;
+	}
+	checkmap = itable->second;
+	iRet = getDataBySigKeyValue(table_name,checkmap->bds_sqlname,checkmap->bds_keys,key_value,&bds_datas_temp);
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	
+	for (vector<stTableKey*>::iterator itch = (checkmap->checks).begin();itch!= (checkmap->checks).end();itch++)
+	{
+		stTableKey *tk = *itch;
+		iRet = getDataBySigKeyValue(table_name,tk->check_sqlname,tk->check_keys,key_value,&db_datas_temp);
+		if (iRet != 0)
+		{
+			return iRet;
+		}
+	}
+	*bds_datas = bds_datas_temp;
+	*db_datas = db_datas_temp;
+	return iRet;
+}
+
+//根据keyid获取比对数据集（记录级->记录级）
+int Check_BDSMgr::getCheckDataRecord(char *table_name,vector<stKeyValues*> kvs,map<string,string> *bds_datas,map<string,string> *db_datas)
+{
+	int iRet = 0;
+	char sql_name[32+1] = {0};
+	stKeyRelas *rela;
+	map<string,string> bds_datas_temp;
+	map<string,string> db_datas_temp;
+	map<string,stKeyRelas*>::iterator it = m_KeyTableRelas.find(string(table_name));
+	if (it!=m_KeyTableRelas.end())
+	{
+		rela = it->second;
+	}
+	
+	stCheckMap *checkmap = NULL;
+	map<string,stCheckMap*>::iterator itable = m_CheckTableMaps.find(string(table_name));
+	if (itable == m_CheckTableMaps.end())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"无对应sqlname[%s]\n", table_name);
+		printf("无对应sqlname[%s]\n",table_name);
+		return RET_FAIL;
+	}
+	checkmap = itable->second;
+	iRet = getDataByAllKeyValue(checkmap->bds_sqlname,kvs,&bds_datas_temp);
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	for (vector<stTableKey*>::iterator itch = (checkmap->checks).begin();itch!= (checkmap->checks).end();itch++)
+	{
+		stTableKey *tk = *itch;
+		iRet = getDataByAllKeyValue(tk->check_sqlname,kvs,&db_datas_temp);
+		if (iRet != 0)
+		{
+			return iRet;
+		}
+	}
+	*bds_datas = bds_datas_temp;
+	*db_datas = db_datas_temp;
+	return iRet;
+}
+
+//数据比对及记录操作
+int Check_BDSMgr::CheckDataByList(stCheckData *checkdata,map<string,string> bds_datas,map<string,string> db_datas)
+{
+	int iRet = 0;
+	char check_type[1+1] = {0};
+	char check_note[255+1] = {0};
+	strcpy(check_note,"0");
+	
+	//比较内容（以bds为参考）
+	for(map<string,string>::iterator it = bds_datas.begin();it!=bds_datas.end();it++)
+	{
+		string key = it->first;
+		string note = it->second;
+		map<string,string>::iterator ct=db_datas.find(key);
+		//数据存在
+		if (ct != db_datas.end())
+		{
+			string dnote = ct->second;
+			//相同
+			if (note == dnote)
+			{
+				strcpy(check_type,"4");
+				ProDealData(checkdata,check_note,check_type,2);
+			}
+			//不同
+			else 
+			{
+				strcpy(check_type,"3");
+				ProDealData(checkdata,check_note,check_type,1);
+			}
+		}
+		//不存在,bds有,物理库无
+		else 
+		{
+			strcpy(check_type,"2");
+			ProDealData(checkdata,check_note,check_type,1);
+		}
+	}
+
+	//比较内容（以物理库为参考）
+	for(map<string,string>::iterator it=db_datas.begin();it!=db_datas.end();it++)
+	{
+		string key = it->first;
+		string note = it->second;
+		map<string,string>::iterator ct=bds_datas.find(key);
+		//不存在,物理库有,bds无
+		if (ct == db_datas.end())
+		{
+			string dnote = ct->second;
+			strcpy(check_type,"1");
+			ProDealData(checkdata,check_note,check_type,1);
+		}
+	}
+	return iRet;
+}
+
+/*
+* ProDealData
+* 入参：deal_type:
+* 1:数据不相同处理方式
+* 2:数据相同处理方式
+* 3:数据修复处理方式
+*/
+int Check_BDSMgr::ProDealData(stCheckData *checkdata,char *check_note,char *check_type,int deal_type)
+{
+	int iRet = 0;
+	char is_deal[1+1] = {0};
+	printf("deal_type::%d\n",deal_type);
+	if (deal_type == 1)
+	{
+		int count = 0;
+		iRet = countCompareLog(checkdata->key_id,checkdata->table_name,&count);
+		if(iRet != 0)
+		{
+			return iRet;
+		}
+		if (count == 0)
+		{
+			iRet = insertCompareLog(checkdata->key_id,checkdata->table_name,check_type,checkdata->data_type);
+			if(iRet != 0)
+			{
+				return iRet;
+			}
+		}
+		else 
+		{
+			iRet = updateCompareLog(checkdata->key_id,checkdata->table_name,check_type);
+			if(iRet != 0)
+			{
+				return iRet;
+			}
+		}
+		return RET_OK;
+	}
+	else if(deal_type == 2)
+	{
+		strcpy(is_deal,"0");
+	}
+	else if(deal_type == 3)
+	{
+		strcpy(is_deal,"1");
+	}
+	int count = 0;
+	iRet = countCompareLog(checkdata->key_id,checkdata->table_name,&count);
+	if(iRet != 0)
+	{
+		return iRet;
+	}
+	if (count > 0)
+	{
+		iRet = deletedateCompareLog(checkdata->key_id,checkdata->table_name);
+		if(iRet != 0)
+		{
+			return iRet;
+		}
+	}
+	if (strcmp(checkdata->check_sn,"") == 0)
+		strcpy(checkdata->check_sn,"0");
+	iRet = insertRepairLog(checkdata->check_sn,checkdata->table_name,checkdata->key_id,check_type,check_note,is_deal,checkdata->data_type);
+	if(iRet != 0)
+	{
+		return iRet;
+	}
+	
+	return iRet;
+}
+//数据修复
+int Check_BDSMgr::ProRepairData(stCheckData *checkdata)
+{
+	int iRet = 0;
+	char add_sqlname[32+1] = {0};
+	char bds_sqlname[32+1] = {0};
+	char dml_type[1+1] = {0};
+	char check_note[1024] = {0};
+	//1物理库有，内存库没有
+	if (strcmp(checkdata->check_type,"1") == 0)
+	{
+		strcpy(dml_type,"I");
+	}
+	//2内存库有，物理库没有
+	else if (strcmp(checkdata->check_type,"2") == 0)
+	{
+		strcpy(dml_type,"D");
+	}
+	//3数据不一致
+	else if (strcmp(checkdata->check_type,"3") == 0)
+	{
+		strcpy(dml_type,"U");
+	}
+	else 
+	{
+		iRet = ProDealData(checkdata,check_note,checkdata->check_type,2);
+		if(iRet != 0)
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProDealData is ERROR[%s]\n");
+			return RET_FAIL;
+		}
+		return RET_OK;
+	}
+	//获得key-value对应
+	map<string,stKeyRelas*>::iterator it = m_KeyTableRelas.find(checkdata->table_name);
+	if (it==m_KeyTableRelas.end())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"m_KeyTableRelas is end\n");
+		return RET_FAIL;
+	}
+	stKeyRelas *kr = it->second;
+	vector<stKeyValues*> kvs;
+	string keys[20];
+	string values[20];
+	int keynum = SplitStringBySP(kr->prkey_id,'$',keys);
+	int valuenum = SplitStringBySP(checkdata->key_id,'$',values);
+	for (int i = 0;i < valuenum;i++)
+	{
+		stKeyValues *kv = new stKeyValues();
+		strcpy(kv->key,keys[i].c_str());
+		strcpy(kv->value,values[i].c_str());
+		kvs.push_back(kv);
+	}
+	//获取add表sqlid,bds查询sqlid
+	map<string,string> db_datas;
+	map<string,stCheckMap*>::iterator tmp = m_CheckTableMaps.find(string(checkdata->table_name));
+	if (tmp != m_CheckTableMaps.end())
+	{
+		strcpy(add_sqlname,(tmp->second)->add_sqlname);
+		for (vector<stTableKey*>::iterator it = ((tmp->second)->checks).begin();it!=((tmp->second)->checks).end();it++)
+		{
+			stTableKey *tk = *it;
+			iRet = getDataByAllKeyValue(tk->check_sqlname,kvs,&db_datas);
+			if(iRet != 0)
+			{
+				return iRet;
+			}
+		}
+	}
+	
+	int insert_num = 0;
+	string insert_values[30];
+	for(map<string,string>::iterator it = db_datas.begin();it!=db_datas.end();it++)
+	{
+		strcpy(check_note,(it->second).c_str());
+	}
+	insert_num = SplitStringBySP(check_note,',',insert_values);
+#ifdef _DEBUG_INFO_
+	printf("insert_num=%d|add_sqlname=%s\n",insert_num,add_sqlname);
+#endif
+	//区分update，delete，insert操作
+	iRet = insertAddLog(add_sqlname,insert_num,insert_values,dml_type);
+	if(iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"insertAddLog is ERROR\n");
+		return RET_FAIL;
+	}
+	iRet = ProDealData(checkdata,check_note,checkdata->check_type,3);
+	if(iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ProDealData is ERROR\n");
+		return RET_FAIL;
+	}
+	return iRet;
+}
+
+//针对差异数据比对(用户级->记录级)
+int Check_BDSMgr::ProCheckDataUserToRecord(stCheckData *checkdata)
+{
+	int iRet = 0;
+	//进行数据解析，根据表名查询物理库和内存库数据
+#ifdef _DEBUG_INFO_
+	printf("checkdata->table_name[%s]\n",checkdata->table_name);
+#endif
+	map<string,string> bds_datas;
+	map<string,string> db_datas;
+	iRet = getCheckDataUser(checkdata->table_name,checkdata->key_id,&bds_datas,&db_datas);
+	if(iRet != 0)
+	{
+		return iRet;
+	}
+	//数据比对,并记录CompairLog
+	iRet = CheckDataByList(checkdata,bds_datas,db_datas);
+	if(iRet != 0)
+	{
+		return iRet;
+	}
+	
+	return iRet;
+}
+
+//针对差异数据比对(记录级->记录级)
+int Check_BDSMgr::ProCheckDataRecord(stCheckData *checkdata)
+{
+	int iRet = 0;
+	//进行数据解析，根据表名查询物理库和内存库数据
+#ifdef _DEBUG_INFO_
+	printf("checkdata->table_name[%s]\n",checkdata->table_name);
+#endif
+	map<string,string> bds_datas;
+	map<string,string> db_datas;
+	
+	map<string,stKeyRelas*>::iterator it = m_KeyTableRelas.find(checkdata->table_name);
+	if (it==m_KeyTableRelas.end())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"m_KeyTableRelas is end\n");
+		return RET_FAIL;
+	}
+	stKeyRelas *kr = it->second;
+	vector<stKeyValues*> kvs;
+	string keys[20];
+	string values[20];
+	int keynum = SplitStringBySP(kr->prkey_id,'$',keys);
+	int valuenum = SplitStringBySP(checkdata->key_id,'$',values);
+	for (int i = 0;i < valuenum;i++)
+	{
+		stKeyValues *kv = new stKeyValues();
+		strcpy(kv->key,keys[i].c_str());
+		strcpy(kv->value,values[i].c_str());
+		printf("kv[%s][%s]\n",kv->key,kv->value);
+		kvs.push_back(kv);
+	}
+	printf("ProCheckDataRecord-getCheckDataRecord\n");
+	iRet = getCheckDataRecord(checkdata->table_name,kvs,&bds_datas,&db_datas);
+	if(iRet != 0)
+	{
+		return iRet;
+	}
+	printf("数据比对,并记录CompairLog\n");
+	//数据比对,并记录CompairLog
+	iRet = CheckDataByList(checkdata,bds_datas,db_datas);
+	if(iRet != 0)
+	{
+		return iRet;
+	}
+	
+	return iRet;
+}
+
+int Check_BDSMgr::process()
+{
+#ifdef _DEBUG_INFO_
+	printf("----------begin--------\n");
+#endif
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"----------begin--------");
+	int iRet = 0,cRet = 0;
+	//读取接口表
+	if (0 != getInterfaceDatas())
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getInterfaceDatas is ERROR\n");
+		return RET_FAIL;
+	}
+	//首次比对(data_interface--->compare_log)
+	for(vector<stCheckData*>::iterator it = m_CheckDatas.begin();it != m_CheckDatas.end();it++)
+	{
+		stCheckData *checkdata = *it;
+		iRet = ProCheckDataUserToRecord(checkdata);
+		cRet = deleteInterface(checkdata->key_id,checkdata->table_name);
+		if (iRet == 0 && cRet == 0)
+		{
+			m_Ibear->Commit();
+		}
+		else 
+		{
+			m_Ibear->Rollback();
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"[iRet=%d][cRet=%d] is ERROR\n", iRet, cRet);
+			return RET_FAIL;
+		}
+	}
+	if (m_CheckDatas.size()>0)
+		clearDataList(m_CheckDatas);
+		
+	//后续比对,针对不平的数据进行比对(compare_log--->repair_log)
+	for(int j = 0; j < m_Controls->check_nums; j++)
+	{
+		iRet = selectCompareLog();
+		if (iRet != 0)
+		{
+			return iRet;
+		}
+		for(vector<stCheckData*>::iterator it = m_CheckDatas.begin();it != m_CheckDatas.end();it++)
+		{
+			stCheckData *checkdata = *it;
+#ifdef _DEBUG_INFO_
+	printf("check_sn[%s];key_id[%s];table_name[%s];check_type[%s];data_type[%s];times[%d]\n",checkdata->check_sn,checkdata->key_id,checkdata->table_name,checkdata->check_type,checkdata->data_type,checkdata->times);
+#endif
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"check_sn[%s];key_id[%s];table_name[%s];check_type[%s];data_type[%s];times[%d]\n",checkdata->check_sn,checkdata->key_id,checkdata->table_name,checkdata->check_type,checkdata->data_type,checkdata->times);
+			if (checkdata->times >= m_Controls->check_nums-1)
+			{
+				//已到次数的进行数据修复
+				printf("已到次数[%d]的进行数据修复\n",checkdata->times);
+				m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"已到次数[%d]的进行数据修复\n",checkdata->times);
+				iRet = ProRepairData(checkdata);
+				if (iRet == 0)
+				{
+					m_Ibear->Commit();
+				}
+				else 
+				{
+					m_Ibear->Rollback();
+					return iRet;
+				}
+			}
+			else 
+			{
+				printf("未到次数[%d]的再次比对\n",checkdata->times);
+				m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"未到次数[%d]的再次比对\n",checkdata->times);
+				//未到次数的再次比对
+				iRet = ProCheckDataRecord(checkdata);
+				if (iRet == 0)
+				{
+					m_Ibear->Commit();
+				}
+				else 
+				{
+					m_Ibear->Rollback();
+					return iRet;
+				}
+			}
+		}
+		if (m_CheckDatas.size()>0)
+			clearDataList(m_CheckDatas);
+	}
+#ifdef _DEBUG_INFO_
+	printf("----------end--------\n");
+#endif
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"----------end--------");
+
+	return iRet;
+}
+
+int Check_BDSMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int Check_BDSMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}

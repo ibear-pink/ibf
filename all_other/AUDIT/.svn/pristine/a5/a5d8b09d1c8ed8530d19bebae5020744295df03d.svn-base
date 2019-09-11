@@ -1,0 +1,81 @@
+/**
+ * description:线程接口类定义
+ * author:wangzhia
+ * create date:2013-10-28
+ */
+ 
+#ifndef _THREAD_H_
+#define _THREAD_H_
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include "Define.h"
+
+using namespace std;
+
+const int THREAD_STACK_SIZE = 52428800;		//50M
+
+class Thread
+{
+private:
+//	int m_ErrCode;
+	
+	sThreadInfo m_ThreadInfo;
+protected:
+
+	static void* threadFunction (void* data);
+	
+public:
+	Thread();
+	
+	Thread (bool createSuspened, bool detach);
+	
+	virtual ~Thread();
+	
+	virtual void run (void) = 0;
+	
+	void setThreadState (UnInt32 state) {m_ThreadInfo.stat = state;};
+	
+	bool terminate (void);
+	
+	Ret start (void);
+	
+	void exit (void);
+	
+	bool wakeUp (void);
+	
+	UnInt32 getThreadState (void) {return m_ThreadInfo.stat;};
+	
+	void getThreadInfo (sThreadInfo *threadInfo);
+	
+//	int getLastError (void) {return m_ErrCode;};
+	
+//	void setThreadName (char *threadName){ strcpy( m_ThreadName, threadName ); };
+	
+//	char* getThreadName (void){ return m_ThreadName; };
+	
+	int getThreadId (void) {return m_ThreadInfo.pid;};
+	
+	bool setPriority (int priority);
+	
+	int getPriority (void);
+	
+	int getConcurrency (void);
+	
+	void setConcurrency (int num);
+	
+	int detach (void);
+	
+	int join (void);
+	
+	bool yield (void);
+	
+	pthread_t self (void);
+};
+
+#endif

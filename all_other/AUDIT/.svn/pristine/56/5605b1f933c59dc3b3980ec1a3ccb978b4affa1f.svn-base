@@ -1,0 +1,1285 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "GETKPIMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(GETKPIMgr)
+
+GETKPIMgr::GETKPIMgr()
+{
+	
+}
+
+GETKPIMgr::~GETKPIMgr()
+{
+	
+}
+
+int GETKPIMgr::getAuditKPIStatic()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	char wsseq[25] = {0};
+	char notes[1024] = {0};
+	iRet = m_Ibear->queryForList("SEL_KPI_CFG",inParams,&list);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_KPI_CFG ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPICfg *order = new stAuditKPICfg();
+		
+		strcpy(order->Parameter,v_row[0].c_str());
+		strcpy(order->Audit_type,v_row[1].c_str());
+		strcpy(order->Dismension_opp,v_row[2].c_str());
+		strcpy(order->Dismension_date,v_row[3].c_str());
+		strcpy(order->Audit_form,v_row[4].c_str());
+		
+		m_AuditKPICfgs.push_back(order);
+	}
+  return iRet;
+}
+
+int GETKPIMgr::dmlSqlYm(char *table_name,char *ym)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	iRet = m_Ibear->DML(table_name,inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]%s ERR_MSG[%s]\n", __FILE__, __LINE__,table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::dmlSql(char *table_name)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	iRet = m_Ibear->DML(table_name,inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]%s ERR_MSG[%s]\n", __FILE__, __LINE__,table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+int GETKPIMgr::insertFirstStatusHis(char *table_name,char *ym)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("YM1"),string(ym)));
+	iRet = m_Ibear->DML(table_name,inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]%s ERR_MSG[%s]\n", __FILE__, __LINE__,table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::insertKPIModel(stAuditKPICfg *kpicfg,stAuditKPIs *kpi,char *form)
+{
+	int iRet = RET_OK;
+	char records[14+1] = {0};
+	char amount[14+1] = {0};
+	sprintf(records,"%ld",kpi->records);
+	sprintf(amount,"%ld",kpi->amount);
+	
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("OPP_DISMEN"),string(kpicfg->Dismension_opp)));
+	inParams.insert(pair<string,string>(string("DATE_DISMEN"),string(kpicfg->Dismension_date)));
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(kpi->opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(kpi->date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(form)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(records)));
+	inParams.insert(pair<string,string>(string("AUDIT_AMOUNT"),string(amount)));
+	
+	iRet = m_Ibear->DML("INS_KPI_MODEL",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]INS_KPI_MODEL ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::insertKPILog(char *ym,stAuditKPICfg *kpicfg,char *opp_ins,char *date_ins,long records,long amount)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	char camount[14+1] = {0};
+	char batch_x[1+1] = {0};
+	sprintf(crecords,"%ld",records);
+	sprintf(camount,"%ld",amount);
+	
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	
+	if (strcmp(kpicfg->Dismension_opp,"BAH") == 0)
+	{
+		sprintf(batch_x,"%c",opp_ins[strlen(opp_ins)-1]);
+		inParams.insert(pair<string,string>(string("BATCH_X"),string(batch_x)));
+	}
+	else 
+	{
+		inParams.insert(pair<string,string>(string("BATCH_X"),string(" ")));
+	}
+	
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("OPP_DISMEN"),string(kpicfg->Dismension_opp)));
+	inParams.insert(pair<string,string>(string("DATE_DISMEN"),string(kpicfg->Dismension_date)));
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(kpicfg->Audit_form)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	inParams.insert(pair<string,string>(string("AUDIT_AMOUNT"),string(camount)));
+	
+	iRet = m_Ibear->DML("INS_KPI_LOG",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_KPI_CFG ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::insertKPILogTotal(char *ym,stAuditKPICfg *kpicfg,char *opp_ins,char *date_ins,long records,long amount)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	char camount[14+1] = {0};
+	sprintf(crecords,"%ld",records);
+	sprintf(camount,"%ld",amount);
+	
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("OPP_DISMEN"),string(kpicfg->Dismension_opp)));
+	inParams.insert(pair<string,string>(string("DATE_DISMEN"),string(kpicfg->Dismension_date)));
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(kpicfg->Audit_form)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	inParams.insert(pair<string,string>(string("AUDIT_AMOUNT"),string(camount)));
+	
+	iRet = m_Ibear->DML("INS_KPI_LOG_TO",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_KPI_CFG ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::insertKPIHis(char *ym,stAuditKPICfg *kpicfg,long records,long amount,char *opp_ins,char *date_ins)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	char camount[14+1] = {0};
+	sprintf(crecords,"%ld",records);
+	sprintf(camount,"%ld",amount);
+	
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("OPP_DISMEN"),string(kpicfg->Dismension_opp)));
+	inParams.insert(pair<string,string>(string("DATE_DISMEN"),string(kpicfg->Dismension_date)));
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(kpicfg->Audit_form)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	inParams.insert(pair<string,string>(string("AUDIT_AMOUNT"),string(camount)));
+	
+	iRet = m_Ibear->DML("INS_KPI_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]INS_KPI_HIS ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::updateKPIModelFlag(char *form,char *opp_ins,char *date_ins)
+{
+	int iRet = RET_OK;
+	char records[14+1] = {0};
+	char amount[14+1] = {0};
+	sprintf(records,"%ld",records);
+	sprintf(amount,"%ld",amount);
+	
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(form)));
+	
+	iRet = m_Ibear->DML("UPD_KPI_MODEL_F",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]UPD_KPI_MODEL ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::updateKPIModel(long records,long amount,char *form,char *opp_ins,char *date_ins)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	char camount[14+1] = {0};
+	sprintf(crecords,"%ld",records);
+	sprintf(camount,"%ld",amount);
+	
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(form)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	inParams.insert(pair<string,string>(string("AUDIT_AMOUNT"),string(camount)));
+	
+	iRet = m_Ibear->DML("UPD_KPI_MODEL",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		printf ("FILE[%s]LINE[%d]UPD_KPI_MODEL ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+  return 0;
+}
+
+int GETKPIMgr::getFristAudit(char *ym, char *merge_type, char *audit_id)
+{
+	int iRet = RET_OK;
+	string merges[20];
+	char sql_note[1024] = {0};
+	int i = 3,j = 0;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	
+	strcpy(sql_note,"select sum(records),sum(amount),batchsn from AUDIT_MERGE_OFAC_#YM# where rec_attr='1' ");
+
+	if (strcmp(merge_type,"") != 0)
+	{
+		j = SplitStringBySP(merge_type,',',merges);
+		if (j == 1)
+		{
+			if (strcmp(sql_note,"") == 0)
+			{
+				strcpy(sql_note,"where merge_type=${MERGE_TYPE|char} ");
+			}
+			else 
+			{
+				sprintf(sql_note,"%s and merge_type=${MERGE_TYPE|char} ",sql_note);
+			}
+		}
+		else if(j > 1)
+		{
+			if (strcmp(sql_note,"") == 0)
+			{
+				strcpy(sql_note,"where merge_type in(");
+			}
+			else 
+			{
+				sprintf(sql_note,"%s and merge_type in(",sql_note);
+			}
+			for(int z = 0; z < j; z++)
+			{
+				char key[20] = {0};
+				sprintf(key,"MERGE_TYPE%d",z);
+				if (z<j-1)
+				{
+					sprintf(sql_note,"%s${%s|char},",sql_note,key);
+				}
+				else 
+				{
+					sprintf(sql_note,"%s${%s|char}) ",sql_note,key);
+				}
+			}
+		}
+	}
+	if (strcmp(audit_id,"") != 0)
+	{
+		if (strcmp(sql_note,"") == 0)
+		{
+			strcpy(sql_note,"where audit_id=${AUDIT_ID|char} ");
+		}
+		else 
+		{
+			sprintf(sql_note,"%s and audit_id=${AUDIT_ID|char}  ",sql_note);
+		}
+	}
+	//group by
+	sprintf(sql_note,"%s group by batchsn",sql_note);
+	
+	stSqlMap *sqlmap = new stSqlMap();
+	if (sqlmap == NULL)
+	{
+		printf("mem is ERROR\n");
+		return RET_FAIL;
+	}
+	
+	strcpy(sqlmap->db_no,"0");
+	sprintf(sqlmap->res_num,"%d",i);
+	strcpy(sqlmap->sql,sql_note);
+
+#ifdef _DEBUG_INFO_
+	printf("sql[%s]\n%s,%s\n",sql_note,merge_type,audit_id);
+#endif
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	if (strcmp(merge_type,"") != 0)
+	{
+		if (j <= 1)
+		{
+			inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge_type)));
+		}
+		else
+		{
+			for(int z = 0; z < j; z++)
+			{
+				char key[20] = {0};
+				sprintf(key,"MERGE_TYPE%d",z);
+				inParams.insert(pair<string,string>(string(key),merges[z]));
+				printf("key[%s][%s]\n",key,merges[z].c_str());
+			}
+		}
+	}
+	if (strcmp(audit_id,"") != 0)
+	{
+		inParams.insert(pair<string,string>(string("AUDIT_ID"),string(audit_id)));
+	}
+	
+	iRet = m_Ibear->queryForListBySQL(sqlmap,inParams,&list);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_FIRST ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPIs *order = new stAuditKPIs();
+		
+		order->records = atol(v_row[0].c_str());
+		order->amount = atol(v_row[1].c_str());
+		strcpy(order->opp_ins,v_row[2].c_str());
+		strcpy(order->date_ins,"0");
+		
+		m_AuditKPIs.push_back(order);
+	}
+  return iRet;
+}
+
+int GETKPIMgr::getSecondAudit(char *ym, bool day_billcycl,char *merge_type, bool region_code,char *audit_id)
+{
+	int iRet = RET_OK;
+	char sql_note[1024] = {0};
+	char sql_head[128] = {0};
+	char sql_model[1024] = {0};
+	char sql_where[512] = {0};
+	char sql_end[128] = {0};
+	string merges[20];
+	int i = 2,j = 0;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+
+	strcpy(sql_model," from AUDIT_TOTAL_LOG_#YM# ");
+	//TRUE:按日；FALSE:按月
+	if (day_billcycl)
+	{
+		i++;
+		//select
+		if (strcmp(sql_head,"") == 0)
+		{
+			sprintf(sql_head,"select sum(records),sum(amount),day_billcycl",sql_head);
+		}
+		else 
+		{
+			sprintf(sql_head,"%s,day_billcycl",sql_head);
+		}
+		//printf("sql_head1:%s\n",sql_head);
+		//group by
+		if (strcmp(sql_end,"") == 0)
+		{
+			sprintf(sql_end,"group by day_billcycl",sql_end);
+		}
+		else 
+		{
+			sprintf(sql_end,"%s,day_billcycl",sql_end);
+		}
+	}
+	//TRUE:按地市；FALSE:按省份
+	if (region_code)
+	{
+		i++;
+		//select
+		if (strcmp(sql_head,"") == 0)
+		{
+			sprintf(sql_head,"select sum(records),sum(amount),region_code",sql_head);
+		}
+		else 
+		{
+			sprintf(sql_head,"%s,region_code",sql_head);
+		}
+		//printf("sql_head2:%s\n",sql_head);
+		//group by
+		if (strcmp(sql_end,"") == 0)
+		{
+			sprintf(sql_end,"group by region_code",sql_end);
+		}
+		else 
+		{
+			sprintf(sql_end,"%s,region_code",sql_end);
+		}
+	}
+	if (strcmp(merge_type,"") != 0)
+	{
+		j = SplitStringBySP(merge_type,',',merges);
+		if (j == 1)
+		{
+			if (strcmp(sql_where,"") == 0)
+			{
+				strcpy(sql_where,"where merge_type=${MERGE_TYPE|char} ");
+			}
+			else 
+			{
+				sprintf(sql_where,"%s and merge_type=${MERGE_TYPE|char} ",sql_where);
+			}
+		}
+		else if(j > 1)
+		{
+			if (strcmp(sql_where,"") == 0)
+			{
+				strcpy(sql_where,"where merge_type in(");
+			}
+			else 
+			{
+				sprintf(sql_where,"%s and merge_type in(",sql_where);
+			}
+			for(int z = 0; z < j; z++)
+			{
+				char key[20] = {0};
+				sprintf(key,"MERGE_TYPE%d",z);
+				if (z<j-1)
+				{
+					sprintf(sql_where,"%s${%s|char},",sql_where,key);
+				}
+				else 
+				{
+					sprintf(sql_where,"%s${%s|char}) ",sql_where,key);
+				}
+			}
+		}
+	}
+	if (strcmp(audit_id,"") != 0)
+	{
+		if (strcmp(sql_where,"") == 0)
+		{
+			strcpy(sql_where,"where audit_id=${AUDIT_ID|char} ");
+		}
+		else 
+		{
+			sprintf(sql_where,"%s and audit_id=${AUDIT_ID|char}  ",sql_where);
+		}
+	}
+	
+	sprintf(sql_note,"%s%s%s%s",sql_head,sql_model,sql_where,sql_end);
+	
+	stSqlMap *sqlmap = new stSqlMap();
+	if (sqlmap == NULL)
+	{
+		printf("mem is ERROR\n");
+		return RET_FAIL;
+	}
+	strcpy(sqlmap->db_no,"0");
+	sprintf(sqlmap->res_num,"%d",i);
+	strcpy(sqlmap->sql,sql_note);
+
+#ifdef _DEBUG_INFO_
+	printf("sql[%s]\n%s,%s\n",sql_note,merge_type,audit_id);
+#endif
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	if (strcmp(merge_type,"") != 0)
+	{
+		if (j <= 1)
+		{
+			inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge_type)));
+		}
+		else
+		{
+			for(int z = 0; z < j; z++)
+			{
+				char key[20] = {0};
+				sprintf(key,"MERGE_TYPE%d",z);
+				inParams.insert(pair<string,string>(string(key),merges[z]));
+				printf("key[%s][%s]\n",key,merges[z].c_str());
+			}
+		}
+	}
+	if (strcmp(audit_id,"") != 0)
+	{
+		inParams.insert(pair<string,string>(string("AUDIT_ID"),string(audit_id)));
+	}
+	
+	iRet = m_Ibear->queryForListBySQL(sqlmap,inParams,&list);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_SECOND ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPIs *order = new stAuditKPIs();
+		
+		order->records = atol(v_row[0].c_str());
+		order->amount = atol(v_row[1].c_str());
+		if (day_billcycl && region_code)
+		{
+			strcpy(order->date_ins,v_row[2].c_str());
+			strcpy(order->opp_ins,v_row[3].c_str());
+		}
+		else if(!day_billcycl && region_code)
+		{
+			strcpy(order->opp_ins,v_row[2].c_str());
+			strcpy(order->date_ins,"0");
+		}
+		else if(day_billcycl && !region_code)
+		{
+			strcpy(order->date_ins,v_row[2].c_str());
+			strcpy(order->opp_ins,"ALL");
+		}
+		
+		m_AuditKPIs.push_back(order);
+	}
+  return iRet;
+}
+
+#if 0
+int GETKPIMgr::getSecondAudit(char *ym, bool day_billcycl,char *merge_type, bool region_code,char *audit_id)
+{
+	int iRet = RET_OK;
+	char table_name[100] = {0};
+	map<string,string> inParams;
+	vector<vector<string> > list;
+
+	if (day_billcycl && region_code)
+	{
+		strcpy(table_name,"SEL_SEC_DR");
+	}
+	else if (day_billcycl && !region_code)
+	{
+		strcpy(table_name,"SEL_SEC_D");
+	}
+	else if (region_code && !day_billcycl)
+	{
+		strcpy(table_name,"SEL_SEC_R");
+	}
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge_type)));
+	inParams.insert(pair<string,string>(string("AUDIT_ID"),string(audit_id)));
+	
+	iRet = m_Ibear->queryForList(table_name,inParams,&list);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_SECOND ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPIs *order = new stAuditKPIs();
+		
+		order->records = atol(v_row[0].c_str());
+		order->amount = atol(v_row[1].c_str());
+		if (day_billcycl && region_code)
+		{
+			strcpy(order->date_ins,v_row[2].c_str());
+			strcpy(order->opp_ins,v_row[3].c_str());
+		}
+		else if(!day_billcycl && region_code)
+		{
+			strcpy(order->opp_ins,v_row[2].c_str());
+			strcpy(order->date_ins,"0");
+		}
+		else if(day_billcycl && !region_code)
+		{
+			strcpy(order->date_ins,v_row[2].c_str());
+			strcpy(order->opp_ins,"ALL");
+		}
+		
+		m_AuditKPIs.push_back(order);
+	}
+  return iRet;
+}
+#endif
+
+int GETKPIMgr::getKPICount(char *ym,stAuditKPIs *kpi,char *form,int *count)
+{
+	int iRet = RET_OK;
+	vector<string> row; 
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("OPP_INS"),string(kpi->opp_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(kpi->date_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_FORM"),string(form)));
+	iRet = m_Ibear->queryForObject("SEL_KPI_COUNT",inParams,&row);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_KPI_COUNT ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	*count = atoi(row[0].c_str());
+	
+  return 0;
+}
+
+
+int GETKPIMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	int iRet = 0;
+	memset(in_data,0,sizeof(in_data));
+	memset(ym,0,sizeof(ym));
+
+	memset(seltable_name,0,sizeof(seltable_name));
+	memset(updtable_name,0,sizeof(updtable_name));
+	memset(deltable_name,0,sizeof(deltable_name));
+	memset(instable_name,0,sizeof(instable_name));
+	
+	memset(delkpi_second,0,sizeof(delkpi_second));
+	memset(deltable_model,0,sizeof(deltable_model));
+	
+	strcpy(in_data,"OFAC");
+	strcpy(ym,"201606");
+	
+	strcpy(delkpi_second,"DEL_KPI_LOG");
+	strcpy(deltable_model,"DEL_KPI_MODEL");
+	
+	if (strcmp(in_data,"OFRM") == 0)//固费计算
+	{
+		strcpy(seltable_name,"SEL_OFRM");
+		strcpy(updtable_name,"UPD_OFRM");
+		strcpy(deltable_name,"DEL_OFRM");
+		strcpy(instable_name,"INS_OFRM_HIS");
+	}
+	else if (strcmp(in_data,"OFAC") == 0)//出账计算
+	{
+		strcpy(seltable_name,"SEL_OFAC");
+		strcpy(updtable_name,"UPD_OFAC");
+		strcpy(deltable_name,"DEL_OFAC");
+		strcpy(instable_name,"INS_OFAC_HIS");
+	}
+	else if (strcmp(in_data,"RAMP") == 0)//账单销账
+	{
+		strcpy(seltable_name,"SEL_RAMP");
+		strcpy(updtable_name,"UPD_RAMP");
+		strcpy(deltable_name,"DEL_RAMP");
+		strcpy(instable_name,"INS_RAMP_HIS");
+	}
+	else if (strcmp(in_data,"CDWS") == 0)//信控处理
+	{
+		strcpy(seltable_name,"SEL_CDWS");
+		strcpy(updtable_name,"UPD_CDWS");
+		strcpy(deltable_name,"DEL_CDWS");
+		strcpy(instable_name,"INS_CDWS_HIS");
+	}
+	else if (strcmp(in_data,"CDSP") == 0)//信控分拣
+	{
+		strcpy(seltable_name,"SEL_CDSP");
+		strcpy(updtable_name,"UPD_CDSP");
+		strcpy(deltable_name,"DEL_CDSP");
+		strcpy(instable_name,"INS_CDSP_HIS");
+	}
+	else if (strcmp(in_data,"SNMP") == 0)//缴费销账
+	{
+		strcpy(seltable_name,"SEL_SNMP");
+		strcpy(updtable_name,"UPD_SNMP");
+		strcpy(deltable_name,"DEL_SNMP");
+		strcpy(instable_name,"INS_SNMP_HIS");
+	}
+	else 
+	{
+		printf("[%s]无对应！\n",in_data);
+		return RET_FAIL;
+	}
+	
+	m_Ibear = br;
+	
+	if (m_AuditKPICfgs.size() != 0)
+	{
+		clearDataList(m_AuditKPICfgs);
+	}
+	if (0 != getAuditKPIStatic())
+	{
+		printf("getAuditKPIStatic is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	return iRet;
+}
+
+int GETKPIMgr::SplitString (const char *buff,vector<string> *operation,vector<vector<string> > *values)
+{
+	int j = 0;
+	char tmpBuf[1024];
+	char tStr[1024];
+	vector<string> operation_tmp;
+	vector<vector<string> > values_tmp;
+	int i = 0, end = 0, begin = 0;
+	vector<string> value;
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	strcpy (tmpBuf, buff);
+	int len = strlen(tmpBuf);
+	//printf("len=%d\n",len);
+	while (i <= len)
+	{
+		//printf("%c %d\n",tmpBuf[i],i);
+		if (tmpBuf[i] == '|' || i == len)
+		{
+			end = i;
+			i++;
+		}
+		else if (tmpBuf[i] == '+' || tmpBuf[i] == '-')
+		{
+			char op[1+1] = {0};
+			op[0] = tmpBuf[i];
+			operation_tmp.push_back(string(op));
+			//printf("OP：%s,%d\n",op,j);
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		//printf("%d,%d\n",begin,end);
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		begin = i;
+		printf("tStr：%s,%d\n",tStr,j);
+		value.push_back(string(tStr));
+		
+		if (tmpBuf[i-1] == '+' || tmpBuf[i-1] == '-' || i == len+1)
+		{
+			values_tmp.push_back(value);
+			value.clear();
+			j++;
+		}
+	}
+	
+	*values = values_tmp;
+	*operation = operation_tmp;
+	
+	return 0;
+}
+
+int GETKPIMgr::SplitStringBySP (const char *buff, char split_char, string key[])
+{
+	int size = 0,j = 0;
+	
+	char tmpBuf[1024];
+	char tStr[1024];
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	
+	strcpy (tmpBuf, buff);
+	
+	int len = strlen(tmpBuf);
+	if (tmpBuf[len-1] != split_char && tmpBuf[len-1] != '\n')
+	{
+		tmpBuf[len] = split_char;
+		len = len+1;
+	}
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == split_char)
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		size++;
+		
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		key[j] = string(tStr);
+		j ++;
+		begin = i;
+	}
+	
+	return j;
+}
+
+int GETKPIMgr::process()
+{
+	int iRet = 0;
+	char merge_type[100] = {0};
+	char audit_id[10] = {0};
+	bool day_billcycl;
+	bool region_code;
+	bool batch_sn;
+	
+	//锁住当前处理的数据
+	if (0 != dmlSqlYm(updtable_name,ym))
+	{
+		printf("%s,is ERROR\n",updtable_name);
+		m_Ibear->Rollback();
+		return RET_FAIL;
+	}
+	//删除综合KPI表，重新统计
+	if (0 != dmlSqlYm(delkpi_second,ym))
+	{
+		printf("%s,is ERROR\n",updtable_name);
+		m_Ibear->Rollback();
+		return RET_FAIL;
+	}
+	m_Ibear->Commit();
+
+	//根据配置表为基准进行KPI生成
+	for (vector<stAuditKPICfg*>::iterator it = m_AuditKPICfgs.begin();it!=m_AuditKPICfgs.end();it++)
+	{
+		stAuditKPICfg *kpicfg = *it;
+	#ifdef _DEBUG_INFO_
+		printf("%s,公式[%s],维度[%s]\n",kpicfg->Audit_type,kpicfg->Audit_form,kpicfg->Dismension_opp,kpicfg->Dismension_date);
+	#endif
+		//生成KPI类型，批次类，还是综合类；综合类包含哪些维度
+		//判断时间维度
+		if (strcmp(kpicfg->Dismension_date,"MON") == 0)
+		{
+			day_billcycl = true;
+		}
+		else 
+		{
+			day_billcycl = false;
+		}
+		//判断地市级，批次级维度
+		if (strcmp(kpicfg->Dismension_opp,"ORG") == 0)
+		{
+			region_code = true;
+			batch_sn = false;
+		}
+		else if (strcmp(kpicfg->Dismension_opp,"BAH") == 0)
+		{
+			region_code = false;
+			batch_sn = true;
+		}
+		else
+		{
+			region_code = false;
+			batch_sn = false;
+		}
+		
+		vector<string> operation;//公式运算符
+		vector<vector<string> > values;//公式元素
+		
+		//解析公式
+		if (0 != SplitString (kpicfg->Audit_form,&operation,&values))
+		{
+			return RET_FAIL;
+		}
+		int op_num = operation.size();
+#ifdef _DEBUG_INFO_
+		printf("values:%ld,op_num=%ld\n",values.size(),op_num);
+		for(vector<string>::iterator it = operation.begin();it!= operation.end();it++)
+		{
+			string val = *it;
+			printf("%s\n",val.c_str());
+		}
+#endif
+		int knum = 0;
+		//KPI子值生成
+		vector<vector<stAuditKPIs*> > kpi_values;
+		for(vector<vector<string> >::iterator it = values.begin();it!= values.end();it++)
+		{
+			vector<string> value = *it;
+			char audit_form[64] = {0};
+			strcpy(audit_id,value[0].c_str());
+			strcpy(merge_type,value[1].c_str());
+#ifdef _DEBUG_INFO_
+	printf("audit_id:%s,merge_type:%s\n",audit_id,merge_type);
+#endif
+			sprintf(audit_form,"%s|%s",audit_id,merge_type);
+			//处理批次类型的KPI
+			if (batch_sn)
+			{
+				if (0!=getFristAudit(ym,merge_type,audit_id))
+				{
+					printf("getFristAudit is ERROR\n");
+					iRet = RET_FAIL;
+					break;
+				}
+				//根据解析后的公式，获得KPI基础数据
+				printf("批次个数:%ld\n",m_AuditKPIs.size());
+				//kpi元素集
+				for (vector<stAuditKPIs*>::iterator it = m_AuditKPIs.begin();it!=m_AuditKPIs.end();it++ )
+				{
+					stAuditKPIs *kpis = *it;
+					int pnum = 0;
+					printf("%ld,%ld,%s,%s\n",kpis->records,kpis->amount,kpis->opp_ins,kpis->date_ins);
+					//判断在中间表中是否已经存在
+					int count = 0;
+					if (0 != getKPICount(ym,kpis,audit_form,&count))
+					{
+						printf("getKPICount is ERROR\n");
+						iRet = RET_FAIL;
+						break;
+					}
+					//不存在insert中间表
+					if (count == 0)
+					{
+						printf("insert 数据\n");
+						//将基础数据入库
+						if (0 != insertKPIModel(kpicfg,kpis,audit_form))
+						{
+							printf("frist_insertKPI_Log is ERROR\n");
+							iRet = RET_FAIL;
+							break;
+						}
+					}
+					//已存在，update中间表数据
+					else 
+					{
+						printf("update 数据\n");
+						if (0 != updateKPIModel(kpis->records,kpis->amount,audit_form,kpis->opp_ins,kpis->date_ins))
+						{
+							printf("updateKPIModel 1 is ERROR\n");
+							iRet = RET_FAIL;
+							break;
+						}
+					}
+					stAuditKPIs *kpis_tmp = new stAuditKPIs();
+					kpis_tmp->records = kpis->records;
+					kpis_tmp->amount = kpis->amount;
+					strcpy(kpis_tmp->opp_ins,kpis->opp_ins);
+					strcpy(kpis_tmp->date_ins,kpis->date_ins);
+					if (knum == 0)
+					{
+						vector<stAuditKPIs*> kpi_value;//元素
+						kpi_value.push_back(kpis_tmp);
+						kpi_values.push_back(kpi_value);
+					}
+					else 
+					{
+						kpi_values[pnum].push_back(kpis_tmp);
+					}
+					pnum++;
+					m_Ibear->Commit();
+				}
+				knum ++;
+			}
+			//处理综合类型的KPI
+			else 
+			{
+				if (0!=getSecondAudit(ym,day_billcycl,merge_type,region_code,audit_id))
+				{
+					printf("getSecondAudit is ERROR\n");
+					iRet = RET_FAIL;
+					break;
+				}
+				//根据解析后的公式，获得KPI基础数据
+				printf("综合个数:%ld\n",m_AuditKPIs.size());
+				//kpi元素集
+				for (vector<stAuditKPIs*>::iterator it = m_AuditKPIs.begin();it!=m_AuditKPIs.end();it++ )
+				{
+					stAuditKPIs *kpis = *it;
+					int pnum = 0;
+					printf("%ld,%ld,%s,%s\n",kpis->records,kpis->amount,kpis->opp_ins,kpis->date_ins);
+					//判断在中间表中是否已经存在
+					int count = 0;
+					if (0 != getKPICount(ym,kpis,audit_form,&count))
+					{
+						printf("getKPICount is ERROR\n");
+						iRet = RET_FAIL;
+						break;
+					}
+					//不存在insert中间表
+					if (count == 0)
+					{
+						printf("insert 数据\n");
+						//将基础数据入库
+						if (0 != insertKPIModel(kpicfg,kpis,audit_form))
+						{
+							printf("frist_insertKPI_Log is ERROR\n");
+							iRet = RET_FAIL;
+							break;
+						}
+					}
+					//已存在，update中间表数据
+					else 
+					{
+						printf("update 数据\n");
+						if (0 != updateKPIModel(kpis->records,kpis->amount,audit_form,kpis->opp_ins,kpis->date_ins))
+						{
+							printf("updateKPIModel 1 is ERROR\n");
+							iRet = RET_FAIL;
+							break;
+						}
+					}
+					stAuditKPIs *kpis_tmp = new stAuditKPIs();
+					kpis_tmp->records = kpis->records;
+					kpis_tmp->amount = kpis->amount;
+					strcpy(kpis_tmp->opp_ins,kpis->opp_ins);
+					strcpy(kpis_tmp->date_ins,kpis->date_ins);
+					if (knum == 0)
+					{
+						vector<stAuditKPIs*> kpi_value;//元素
+						kpi_value.push_back(kpis_tmp);
+						kpi_values.push_back(kpi_value);
+					}
+					else 
+					{
+						kpi_values[pnum].push_back(kpis_tmp);
+					}
+					pnum++;
+					m_Ibear->Commit();
+				}
+				knum ++;
+			}
+			
+			if (iRet != 0)
+			{
+				m_Ibear->Rollback();
+			}
+			if (m_AuditKPIs.size() != 0)
+			{
+				clearDataList(m_AuditKPIs);
+			}
+		}
+		//计算KPI结果
+		int num = 0,left_records = 0,left_mount = 0;//过程数
+		long res_records = 0,res_amount = 0;//结果
+		for(vector<vector<stAuditKPIs*> >::iterator it = kpi_values.begin();it!= kpi_values.end();it++)
+		{
+			vector<stAuditKPIs*> lvalues = *it;
+			char opp_ins[100] = {0};
+			char date_ins[20] = {0};
+			printf("lvalues.size=%ld\n",lvalues.size());
+			for(vector<stAuditKPIs*>::iterator it = lvalues.begin();it!= lvalues.end();it++)
+			{
+				stAuditKPIs* lval = *it;
+				left_records = lval->records;
+				left_mount = lval->amount;
+			printf("[%s]left_records=%ld,left_mount=%ld\n",lval->opp_ins,left_records,left_mount);
+				strcpy(opp_ins,lval->opp_ins);
+				strcpy(date_ins,lval->date_ins);
+				if (num == 0)
+				{
+					res_records = left_records;
+					res_amount = left_mount;
+				}
+				else 
+				{
+					char opt[1+1] = {0};
+					strcpy(opt,operation[num-1].c_str());
+					if (strcmp(opt,"+") == 0)
+					{
+						res_records += left_records;
+						res_amount += left_mount;
+					}
+					else if (strcmp(opt,"-") == 0)
+					{
+						res_records -= left_records;
+						res_amount -= left_mount;
+					}
+					else 
+					{
+						iRet = RET_FAIL;
+						break;
+					}
+				}
+				printf("num=%d|",num);
+				printf("res_records=%ld|",res_records);
+				printf("res_amount=%ld\n",res_amount);
+				num ++;
+			}
+			bool is_ok = true;
+			//解析数学公式，获得KPI结果
+			if (strcmp(kpicfg->Audit_type,"A") == 0)
+			{
+				printf("res_records=%ld\n",res_records);
+				if (res_records != 0)
+				{
+					is_ok = false;
+				}
+			}
+			else if (strcmp(kpicfg->Audit_type,"B") == 0)
+			{
+				printf("res_amount=%ld\n",res_amount);
+				if (left_mount != 0)
+				{
+					is_ok = false;
+				}
+			}
+			else if (strcmp(kpicfg->Audit_type,"C") == 0)
+			{
+				printf("res_records=%ld\n",res_records);
+				printf("res_amount=%ld\n",res_amount);
+				if (res_records != 0 || res_amount != 0)
+				{
+					is_ok = false;
+				}
+			}
+			//KPI稽核未平衡
+			if (!is_ok)
+			{
+				//INSERT KPI
+				if (batch_sn)
+				{
+					if (0 != insertKPILog(ym,kpicfg,opp_ins,date_ins,res_records,res_amount))
+					{
+						printf("first_insertKPI_Log is ERROR\n");
+						iRet = RET_FAIL;
+						break;
+					}
+				}
+				else 
+				{
+					if (0 != insertKPILogTotal(ym,kpicfg,opp_ins,date_ins,res_records,res_amount))
+					{
+						printf("second_insertKPI_Log is ERROR\n");
+						iRet = RET_FAIL;
+						break;
+					}
+				}
+				//update 中间表audit_attr=2，表示未平衡的KPI元素，需要保留
+				char flag[1+1] = {0};
+				for(vector<vector<string> >::iterator it = values.begin();it!= values.end();it++)
+				{
+					vector<string> value = *it;
+					char audit_form[64] = {0};
+					strcpy(audit_id,value[0].c_str());
+					strcpy(merge_type,value[1].c_str());
+					sprintf(audit_form,"%s|%s",audit_id,merge_type);
+					if (0 != updateKPIModelFlag(audit_form,opp_ins,date_ins))
+					{
+						printf("updateKPIModelFlag 2 is ERROR\n");
+						iRet = RET_FAIL;
+						break;
+					}
+				}
+			}
+			//insert KPI_HIS
+			if (0 != insertKPIHis(ym,kpicfg,res_records,res_amount,opp_ins,date_ins))
+			{
+				printf("insertKPIHis is ERROR[%s]\n",instable_name);
+				iRet = RET_FAIL;
+				break;
+			}
+		}
+		//一次稽核结果入his
+		if (0 != insertFirstStatusHis(instable_name,ym))
+		{
+			printf("insertFirstStatusHis is ERROR[%s]\n",instable_name);
+			iRet = RET_FAIL;
+			break;
+		}
+		if (0 != dmlSqlYm(deltable_name,ym))
+		{
+			printf("deleteFirstStatus is ERROR[%s]\n",deltable_name);
+			iRet = RET_FAIL;
+		}
+		//清理内存
+		if (values.size() != 0)
+		{
+			for(vector<vector<string> >::iterator it = values.begin();it!= values.end();it++)
+			{
+				vector<string> value = *it;
+				//printf("value.size()=%ld\n",value.size());
+				value.clear();
+			}
+		}
+		if (kpi_values.size() != 0)
+		{
+			for(vector<vector<stAuditKPIs*> >::iterator it = kpi_values.begin();it!= kpi_values.end();it++)
+			{
+				vector<stAuditKPIs*> value = *it;
+				printf("kpivalue.size()=%ld\n",value.size());
+				clearDataList(value);
+				printf("22222\n");
+			}
+		}
+		operation.clear();
+		printf("33333\n");
+	}
+	
+	//删除中间表中audit_attr=1的
+	if (0 != dmlSql(deltable_model))
+	{
+		printf("deleteModel is ERROR[%s]\n",deltable_model);
+		iRet = RET_FAIL;
+	}
+	if (iRet != 0)
+	{
+		m_Ibear->Rollback();
+	}
+	else 
+	{
+		m_Ibear->Commit();
+	}
+	return iRet;
+}
+
+int GETKPIMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int GETKPIMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

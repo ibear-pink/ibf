@@ -1,0 +1,834 @@
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "IniFile.h"
+
+#ifdef DEBUG
+#define AUTOCALL_DEBUG printf("DEBUG->FILE[%s]LINE[%d]ERRNO[%d]ERRMSG[%s]\n", __FILE__, __LINE__, errno, strerror(errno));fflush(stdout);
+#else
+#define AUTOCALL_DEBUG ;
+#endif
+
+/*
+function:		IniFile__RTrim()
+description:	内部函数，删除字符串左边无效字符
+Input:      	chBuffer:字符串
+Output:		
+Return:		修正后的字符串
+others: 
+*/
+char *IniFile__RTrim(char *chBuffer)
+{
+	char *pchBuffer;
+
+	if(*chBuffer == '\0')
+	{
+		return chBuffer;
+	}
+
+	pchBuffer = chBuffer;
+	while(*pchBuffer == ' ' || *pchBuffer == '\t' || *pchBuffer == '\r' || *pchBuffer == '\n')
+	{
+		pchBuffer++;
+	}
+	strcpy(chBuffer, pchBuffer);
+	return chBuffer;
+}
+
+/*
+function:		IniFile__LTrim()
+description:	内部函数，删除字符串右边无效字符
+Input:		chBuffer:字符串
+Output:		
+Return:		修正后的字符串
+others: 
+*/
+char* IniFile__LTrim(char *chBuffer)
+{
+	int iLen;
+
+	if(*chBuffer == '\0')
+	{
+		return chBuffer;
+	}
+
+	iLen = strlen(chBuffer);
+	while(chBuffer[iLen-1] == ' ' || chBuffer[iLen-1] == '\t' || chBuffer[iLen-1] == '\r' || chBuffer[iLen-1] == '\n')
+	{
+		iLen--;
+	}
+	chBuffer[iLen] = '\0';
+	return chBuffer;
+}
+
+/*
+function:		IniFile__Trim()
+description:	内部函数，删除字符串两边无效字符
+Input:		chBuffer:字符串
+Output:		
+Return:		修正后的字符串
+others: 
+*/
+char* IniFile__Trim(char *chBuffer)
+{
+	IniFile__LTrim(chBuffer);
+	return IniFile__RTrim(chBuffer);
+}
+
+/*
+function:		IniFile__Analyze1()
+description:	内部函数，分析GROUP内容
+Input:      
+			chBuffer:原始信息
+			chResult:分析后组信息
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int IniFile__Analyze1(char *chBuffer, char *chResult)
+{
+	char chTemp[INIFILE_BUFFER_MAX_LEN+1];
+	char *pchBuffer;
+	int  iLen;
+	
+	if(*chBuffer != '[')
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	if(strlen(chBuffer) < 3)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	strcpy(chTemp, chBuffer+1);
+	IniFile__Trim(chTemp);
+	if(strlen(chTemp) == 0)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+
+	pchBuffer = chTemp + strlen(chTemp) - 1;
+	if(*pchBuffer != ']')
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	*pchBuffer = '\0';
+	IniFile__Trim(chTemp);
+	
+	iLen = strlen(chTemp);
+	if(iLen < 1 || iLen > INIFILE_NAME_MAX_LEN)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	if(strchr(chTemp, '[') != NULL)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	if(strchr(chTemp, ']') != NULL)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	strcpy(chResult, chTemp);
+	
+	return 0;
+}
+
+static int get_env_value (const char *pSrcPath, char *szDstPath)
+{
+	char *pEnvHead = NULL, *pEnvTail = NULL;
+	char szDealTmp[1024],szEnvName[1024],szEnvValue[1024];
+	char *p_env_abm = NULL;
+	
+	char szSrcPath[1024];
+	
+	if (pSrcPath == NULL)
+	{
+		printf("szSrcPath is NULL\n");		
+		return 1;
+	}
+	
+	memset(szSrcPath, 0, sizeof(szSrcPath));
+	strcpy(szSrcPath, pSrcPath);
+
+	/*例如 ${ABM_HOME}/cfg/abm_cfg.xml */	
+	while (1)
+	{
+		if((pEnvHead = strstr(szSrcPath,"${")) != NULL)
+		{
+        	
+			if ((pEnvTail = strchr(szSrcPath, '}')) != NULL)
+			{
+				*pEnvHead='\0';
+				memset(szEnvName,0,sizeof(szEnvName));
+				strncpy(szEnvName,pEnvHead+2,pEnvTail-(pEnvHead+2));  
+				IniFile__Trim(szEnvName);
+				p_env_abm = getenv(szEnvName); /*取系统环境变量*/
+				if( NULL == p_env_abm)
+				{
+					printf("[%s] [%s] [%d]getenv([%s]) error\n",__FILE__, __FUNCTION__,__LINE__,szEnvName);
+					return 1;
+				}
+				else
+				{
+					sprintf(szDstPath,"%s%s%s",pEnvHead,p_env_abm,pEnvTail+1);
+					memset(szSrcPath,0,sizeof(szSrcPath));
+					sprintf(szSrcPath,szDstPath);
+				}
+			}
+			else
+			{
+				printf("[%s] [%s] [%d]getenv([%s]) error\n",__FILE__, __FUNCTION__,__LINE__,szEnvName);
+				return 1;
+			}	
+		}	
+		else
+		{
+			/*例如 $ABM_HOME/cfg/abm_cfg.xml */
+			if ((pEnvHead = strstr(szSrcPath,"$")) != NULL)
+			{
+				*pEnvHead='\0';
+				if((pEnvTail = strstr(szSrcPath,"/")) != NULL)
+				{
+					memset(szEnvName,0,sizeof(szEnvName));
+					strncpy(szEnvName,pEnvHead+1,pEnvTail-(pEnvHead+1));
+					IniFile__Trim(szEnvName);
+					p_env_abm = getenv(szEnvName); /*取系统环境变量*/
+					if( NULL == p_env_abm)
+					{
+						printf("[%s] [%s] [%d]getenv([%s]) error\n",__FILE__, __FUNCTION__,__LINE__,szEnvName);
+						return 1;
+					}
+					else
+					{
+						sprintf(szDstPath,"%s%s%s",pEnvHead,p_env_abm,pEnvTail);  
+						memset(szSrcPath,0,sizeof(szSrcPath));
+						sprintf(szSrcPath,szDstPath);
+					}
+				}
+				else if((pEnvTail=strstr(szSrcPath,"$"))!=NULL)
+				{
+					memset(szEnvName,0,sizeof(szEnvName));
+					strncpy(szEnvName,pEnvHead+1,pEnvTail-(pEnvHead+1));
+					IniFile__Trim(szEnvName);
+					p_env_abm = getenv(szEnvName); /*取系统环境变量*/
+					if( NULL == p_env_abm)
+					{
+						printf("[%s] [%s] [%d]getenv([%s]) error\n",__FILE__, __FUNCTION__,__LINE__,szEnvName);
+						return 1;
+					}
+					else
+					{
+						sprintf(szDstPath,"%s%s%s",pEnvHead,p_env_abm,pEnvTail);  
+						memset(szSrcPath,0,sizeof(szSrcPath)); 
+        				sprintf(szSrcPath,szDstPath);
+					}
+				}
+				else
+				{ 
+ 					memset(szEnvName,0,sizeof(szEnvName));
+					strcpy(szEnvName,pEnvHead+1);
+					IniFile__Trim(szEnvName);
+					p_env_abm = getenv(szEnvName); /*取系统环境变量*/
+					if( NULL == p_env_abm)
+					{
+						printf("[%s] [%s] [%d]getenv([%s]) error\n",__FILE__, __FUNCTION__,__LINE__,szEnvName);
+						return 1;
+					}
+					
+					sprintf(szDstPath,"%s",p_env_abm);  
+        	
+					break;
+				}
+			}
+			else
+			{
+				sprintf(szDstPath,"%s",szSrcPath);			
+				break;			
+			}	
+		}
+	}
+	
+	return 0;
+}
+
+/*
+function:		IniFile__Analyze2()
+description:	内部函数，分析KEY内容
+Input:		chBuffer:原始信息
+			chResult1:分析后键名信息
+			chResult2:分析后键值信息			
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int IniFile__Analyze2(char *chBuffer, char *chResult1, char *chResult2)
+{
+	int iLen;
+	char *pchBuffer;
+	char chTemp[INIFILE_BUFFER_MAX_LEN];
+	
+	strcpy(chTemp, chBuffer);
+	pchBuffer = strchr(chTemp, '=');
+	if(pchBuffer == NULL)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	*pchBuffer = '\0';
+	IniFile__Trim(chTemp);
+	
+	iLen = strlen(chTemp);
+	if(iLen < 1 || iLen > INIFILE_NAME_MAX_LEN)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	strcpy(chResult1, chTemp);
+	
+	pchBuffer = strchr(chBuffer, '=');
+	pchBuffer ++;
+	strcpy(chTemp, pchBuffer);
+	IniFile__Trim(chTemp);
+	
+	iLen = strlen(chTemp);
+	if(iLen > INIFILE_VALUE_MAX_LEN)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+		
+	if(strchr(chTemp,'/') != NULL)
+	{
+		if (get_env_value (chTemp, chResult2))
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		strcpy(chResult2, chTemp);
+	}
+	
+	return 0;
+}
+
+/*
+function:		IniFile_Key_SetName()
+description:	设置KEY的名称
+Input:      
+			pstObj:key对象
+			chName:key's name
+Output:		
+Return:     
+others: 
+*/
+void  IniFile_Key_SetName (stIniFile_Key *pstObj, char *chName)
+{
+	strcpy(pstObj->chName, chName);
+}
+
+/*
+function:		IniFile_Key_SetValue()
+description:
+			设置KEY的值
+Input:      
+			pstObj:key对象
+			chValue:key's value
+Output:		
+Return:     
+others: 
+*/
+void  IniFile_Key_SetValue(stIniFile_Key *pstObj, char *chValue)
+{
+	strcpy(pstObj->chValue, chValue);
+}
+
+/*
+function:			IniFile_Key_GetName()
+description:
+				取KEY的名称
+Input:      
+				pstObj:key对象
+Output:		
+Return:			key's name
+others: 
+*/
+char *IniFile_Key_GetName(stIniFile_Key *pstObj)
+{
+	return pstObj->chName;
+}
+
+/*
+function:		IniFile_Key_GetValue()
+description:
+			取KEY的值
+Input:      
+			pstObj:key对象
+Output:		
+Return:		key's value
+others: 
+*/
+char *IniFile_Key_GetValue(stIniFile_Key *pstObj)
+{
+	return pstObj->chValue;
+}
+
+/*
+function:		IniFile_Group_AppendKey()
+description:
+			向GROUP里增加KEY
+Input:      
+			pstObj:group对象
+			chName:key's name
+			chValue:key's value
+Output:		
+Return:		0:成功,!0:失败
+others: 
+*/
+int   IniFile_Group_AppendKey(stIniFile_Group *pstObj, char *chName, char *chValue)
+{
+	stIniFile_Key *pstNewKey;
+
+	if(pstObj->iKeyNumber+1 >= INIFILE_KEY_MAX_NUMBER)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	pstNewKey = &(pstObj->stKeyList[pstObj->iKeyNumber]);
+	strcpy(pstNewKey->chName, chName);
+	strcpy(pstNewKey->chValue, chValue);
+	pstObj->iKeyNumber++;
+	
+	return 0;
+}
+
+/*
+function:		IniFile_Group_SetName()
+description:
+ 			设置GROUP的名称
+Input:      
+			pstObj:group对象
+			chName:group's name
+Output:		
+Return:     
+others: 
+*/
+void  IniFile_Group_SetName(stIniFile_Group *pstObj, char *chName)
+{
+	strcpy(pstObj->chName, chName);
+}
+
+/*
+function:		IniFile_Group_GetName()
+description:
+			取GROUP的名称
+Input:      
+			pstObj:group对象
+Output:		
+Return:		group's name 
+others: 
+*/
+char *IniFile_Group_GetName(stIniFile_Group *pstObj)
+{
+	return pstObj->chName;
+}
+
+/*
+function:		IniFile_Group_CountKey()
+description:
+			取GROUP下KEY的总和
+Input:      
+			pstObj:group对象
+Output:		
+Return:		key的个数
+others: 
+*/
+int   IniFile_Group_CountKey(stIniFile_Group *pstObj)
+{
+	return pstObj->iKeyNumber;
+}
+
+/*
+function:		IniFile_Group_GetKeyByIndex()
+description:
+			按索引号在GROUP中取KEY
+Input:      
+			pstGroupObj:group对象
+			pstKeyObj:key对象的引用			
+			iIndex:索引
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int   IniFile_Group_GetKeyByIndex(stIniFile_Group *pstGroupObj, stIniFile_Key **pstKeyObj, int iIndex)
+{
+	if(iIndex < 0)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	if(iIndex > pstGroupObj->iKeyNumber-1)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	*pstKeyObj = &(pstGroupObj->stKeyList[iIndex]);
+	
+	return 0;
+}
+
+/*
+function:		IniFile_Group_GetKeyByName()
+description:
+			按名称在GROUP中取KEY
+Input:      
+			pstGroupObj:group对象
+			pstKeyObj:key对象的引用			
+			chName:key's name
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int IniFile_Group_GetKeyByName(stIniFile_Group *pstGroupObj, stIniFile_Key **pstKeyObj, char *chName)
+{
+	int n;
+	stIniFile_Key *pstNewKey;
+	
+	for(n = 0; n < pstGroupObj->iKeyNumber; n++)
+	{
+		pstNewKey = &(pstGroupObj->stKeyList[n]);
+		if(strcasecmp(pstNewKey->chName, chName) == 0)
+		{
+			*pstKeyObj = pstNewKey;
+			return 0;
+		}
+	}
+	
+	return -1;
+}
+
+/*
+function:		IniFile_File_AppendGroup()
+description:
+			向FILE中增加GROUP
+Input:      
+			pstObj:file对象
+			chName:name's name
+Output:		
+Return:     0:成功,!0失败
+others: 
+*/
+int IniFile_File_AppendGroup(stIniFile_File *pstObj, char *chName)
+{
+	stIniFile_Group *pstNewGroup;
+	if(pstObj->iGroupNumber+1 >= INIFILE_GROUP_MAX_NUMBER)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	pstNewGroup = &(pstObj->stGroupList[pstObj->iGroupNumber]);
+	strcpy(pstNewGroup->chName, chName);
+	pstObj->iGroupNumber++;
+
+	return 0;
+}
+
+/*
+function:		IniFile_ReadFile()
+description:
+			读INI文件数据到一个FILE中
+Input:      
+			pstObj:file对象
+			chFilenane:文件名
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int IniFile_ReadFile(stIniFile_File *pstObj, char *chFilenane)
+{
+	stIniFile_Group *pstCurrentGroup;
+	int iRcode;
+	FILE *fpFILE;
+	char chBuffer[INIFILE_BUFFER_MAX_LEN+1];
+	char chName[INIFILE_NAME_MAX_LEN+1];
+	char chValue[INIFILE_VALUE_MAX_LEN+1];
+	pstCurrentGroup = NULL;
+	
+	/*
+	char *env=NULL;
+	env = getenv("STOP_HOME");
+	
+	if(strlen(env) < 2)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}*/
+	
+	fpFILE = fopen(chFilenane, "r");
+	if(fpFILE == NULL)
+	{
+		AUTOCALL_DEBUG;
+		return -2;
+	}
+	
+	memset(chBuffer, 0, sizeof(chBuffer));
+	fgets(chBuffer, INIFILE_BUFFER_MAX_LEN, fpFILE);
+	
+	while(!feof(fpFILE))
+	{
+		switch(*chBuffer)
+		{
+			/* 注释 */
+			case '#' :
+				break;
+			/* 空行 */
+			case ' ' :
+			case '\t':
+			case '\r':
+			case '\n':
+				
+				if(strcmp(IniFile__Trim(chBuffer), "") != 0)
+				{
+					AUTOCALL_DEBUG;
+					return -3;
+				}
+				break;
+			/* GROUP元素 */
+			case '[' :
+				
+				iRcode = IniFile__Analyze1(chBuffer, chName);
+				if(iRcode)
+				{
+					AUTOCALL_DEBUG;
+					return -4;
+				}
+				iRcode = IniFile_File_AppendGroup(pstObj, chName);
+				if(iRcode)
+				{
+					AUTOCALL_DEBUG;
+					return -5;
+				}
+				iRcode = IniFile_File_GetGroupByIndex(pstObj, &pstCurrentGroup, pstObj->iGroupNumber-1);
+				if(iRcode)
+				{
+					AUTOCALL_DEBUG;
+					return -6;
+				}
+				break;
+			/* KEY元素 */
+			default:
+				
+				iRcode = IniFile__Analyze2(chBuffer, chName, chValue);
+				if(iRcode)
+				{
+					AUTOCALL_DEBUG;
+					return -7;
+				}
+				if(pstCurrentGroup == NULL)
+				{
+					AUTOCALL_DEBUG;
+					return -8;
+				}
+				iRcode = IniFile_Group_AppendKey(pstCurrentGroup, chName, chValue);
+				if(iRcode)
+				{
+					AUTOCALL_DEBUG;
+					return -9;
+				}
+				break;
+		}
+		
+		memset(chBuffer, 0, sizeof(chBuffer));
+		fgets(chBuffer, INIFILE_BUFFER_MAX_LEN, fpFILE);
+	}
+	
+	if(fclose(fpFILE) == EOF)
+	{
+		AUTOCALL_DEBUG;
+		return -10;
+	}
+
+	return 0;
+}
+
+/*
+function:		IniFile_WriteFile()
+description:
+			写FILE中的数据到INI文件中
+Input:      
+			pstObj:file对象
+			chFilenane:文件名
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int IniFile_WriteFile(stIniFile_File *pstObj, char *chFilenane)
+{
+	FILE *fpFILE;
+	stIniFile_Group *pstGroupObj;
+	stIniFile_Key *pstKeyObj;
+	int iGroupCount, iGroupLoop, iKeyCount, iKeyLoop;
+	int iRcode;
+	char chBuffer[INIFILE_BUFFER_MAX_LEN+1];
+
+	fpFILE = fopen(chFilenane, "w");
+	if(fpFILE == NULL)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+
+	iGroupCount = IniFile_File_CountGroup(pstObj);
+	for(iGroupLoop = 0; iGroupLoop < iGroupCount; iGroupLoop++)
+	{
+		iRcode = IniFile_File_GetGroupByIndex(pstObj, &pstGroupObj, iGroupLoop);
+		if(iRcode)
+		{
+			AUTOCALL_DEBUG;
+			fclose(fpFILE);
+			return -1;
+		}
+
+		sprintf(chBuffer, "[%s]\n", pstGroupObj->chName);
+		if(fputs(chBuffer, fpFILE) == EOF)
+		{
+			AUTOCALL_DEBUG;
+			fclose(fpFILE);
+			return -1;
+		}
+
+		iKeyCount= IniFile_Group_CountKey(pstGroupObj);
+		for(iKeyLoop = 0; iKeyLoop < iKeyCount; iKeyLoop++)
+		{
+			iRcode = IniFile_Group_GetKeyByIndex(pstGroupObj, &pstKeyObj, iKeyLoop);
+			if(iRcode)
+			{
+				AUTOCALL_DEBUG;
+				fclose(fpFILE);
+				return -1;
+			}
+
+			sprintf(chBuffer, "%s=%s\n", pstKeyObj->chName, pstKeyObj->chValue);
+			if(fputs(chBuffer, fpFILE) == EOF)
+			{
+				AUTOCALL_DEBUG;
+				fclose(fpFILE);
+				return -1;
+			}	
+		}
+	}
+
+	if(fclose(fpFILE) == EOF)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	return 0;
+}
+
+/*
+function:		IniFile_File_CountGroup()
+description:
+			 取FILE下GROUP的总和
+Input:      
+			pstObj:file对象
+Output:		
+Return:		group的个数
+others: 
+*/
+int IniFile_File_CountGroup(stIniFile_File *pstObj)
+{
+	return pstObj->iGroupNumber;
+}
+
+/*
+function:		IniFile_File_GetGroupByIndex()
+description:
+			按索引号在FILE中取GROUP
+Input:      
+			file_obj:file对象
+			group_obj:group对象的引用			
+			n:索引
+Output:		
+Return: 		0:成功,!0失败
+others: 
+*/
+int IniFile_File_GetGroupByIndex(stIniFile_File *pstFileObj, stIniFile_Group **pstGroupObj, int iIndex)
+{
+	if(iIndex < 0)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	if(iIndex > pstFileObj->iGroupNumber-1)
+	{
+		AUTOCALL_DEBUG;
+		return -1;
+	}
+	
+	*pstGroupObj = &(pstFileObj->stGroupList[iIndex]);
+	return 0;
+}
+
+/*
+function:		IniFile_File_GetGroupByName()
+description:
+			按名称在FILE中取GROUP
+Input:      
+			pstFileObj:file对象
+			pstGroupObj:group对象的引用
+			chName:group's name
+Output:		
+Return:		0:成功,!0失败
+others: 
+*/
+int IniFile_File_GetGroupByName(stIniFile_File *pstFileObj, stIniFile_Group **pstGroupObj, char *chName)
+{
+	int n;
+	stIniFile_Group *pstNewGroup;
+
+	for(n = 0; n < pstFileObj->iGroupNumber; n++)
+	{
+		pstNewGroup = &(pstFileObj->stGroupList[n]);
+		if(strcasecmp(pstNewGroup->chName, chName) == 0)
+		{
+			*pstGroupObj = pstNewGroup;
+
+			return 0;
+		}
+	}
+	
+	return -1;
+}
+
+/*
+function:		IniFile_Init()
+description:
+			初始化FILE内部数据结构（必需）
+Input:      
+			pstObj:file对象
+Output:		
+Return:     
+others: 
+*/
+void IniFile_Init(stIniFile_File *pstObj)
+{
+	memset(pstObj, 0, sizeof(stIniFile_File));
+}

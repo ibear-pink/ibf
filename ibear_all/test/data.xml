@@ -1,0 +1,63 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SELECT_TEST" parameterClass="Map" db_no="3" memType="false">
+		select contract_no from ur_user_info $E[where id_no =${ID_NO|long}] $E[and phone_no=${PHONE_NO|char}]
+	</select>
+	<select id="SELECT_TEST_LIST" parameterClass="Map" db_no="0">
+		select id_no from ur_user_info where rownum @lt 10
+	</select>
+	<insert id="INSERT_ABC" parameterClass="Map" db_no="1">
+		insert into abc(a,b,c) values(${A|char},${B|long},${C|date})
+	</insert>
+	<insert id="INSERT_BLOB" parameterClass="Map" db_no="1">
+		insert into abc(a,b,c,d,e) values(${A|char},${B|long},${C|date},${D|blob|128},${E|clob|200})
+	</insert>
+	<select id="SELECT_BLOB_FETCH" parameterClass="Map" db_no="1">
+		<param name="d" type="blob" />
+		<param name="e" type="clob" />
+		select a,b,c,d,e from abc
+	</select>
+	<select id="SELECT_BLOB" parameterClass="Map" db_no="1">
+		<param name="d" type="blob" />
+		<param name="e" type="clob" />
+		select a,b,c,d,e from abc where a=${A|char} and c=${C|char}
+	</select>
+	<select id="SELECT_ABC_DMDB" parameterClass="Map" db_no="1">
+		select a,b,c from abc where a=${A|char}
+	</select>
+	<select id="SELECT_ABC_OBJ" parameterClass="Map" resultNum="0">
+		select a,b,c,d from abc where a=${A|char} and rownum @lt 2
+	</select>
+	<select id="SELECT_ABC_OBJ1" parameterClass="Map">
+		select a,b,c,d from abc where a=${A|char} and rownum @lt 2
+	</select>
+	<select id="SELECT_ABC_OBJ2" parameterClass="Map" resultNum="4">
+		select a,b,c,d from abc where a=${A|char} and rownum @lt 2
+	</select>
+	<select id="SELECT_ABC_LIST" parameterClass="Map" db_no="0">
+		select a,b,c,d from abc where a=${A|char} and rownum @lt 10
+	</select>
+	<select id="SELECT_ABC_MEM" parameterClass="Map" db_no="0">
+		select a,c from abc where a=${A|char} and rownum @lt 2
+	</select>
+	<select id="SELECT_ABC_MEM1" parameterClass="Map" db_no="0">
+		select a,b from abc where a=${A|char} and rownum @lt 2
+	</select>
+	<select id="SELECT_COMPLEX_T1" parameterClass="Map" db_no="0" memType="forever">
+		select a.phone_no,b.run_code from ur_user_info a,cs_userdetail_info b where a.id_no=b.id_no and a.id_no=${ID_NO|long}
+	</select>
+	<select id="qUserRel" parameterClass="Map" db_no="2">
+		select master_id, master_phone ,slave_id,slave_phone,relation_code from ur_user_rel
+		where sysdate between eff_date and exp_date $E[and slave_id = ${SLAVE_ID|long}] $E[and master_phone=${master_phone|char}] $E[and master_id = ${MASTER_ID|long}] and rel_status = 'Y' and relation_code in ($L[RELATION])
+	</select>
+	<select id="SELECT_TEST_DMDB" parameterClass="Map" db_no="3">
+		select balance_id, contract_no, pay_type, cur_balance, wrtoff_balance, begin_time, end_time, is_print
+		from ac_cashbook
+		where contract_no=${CONTRACT_NO|long}
+	</select>
+	<select id="selbillplan" parameterClass="Map" db_no="0">
+		SELECT FEEPLANSTR,SUBBILLPRCID,ATTR,EFF_DATE,EXP_DATE FROM T_PP_SUBPRCPLAN_test
+	</select>
+</sqlMap>
+

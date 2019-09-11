@@ -1,0 +1,7 @@
+export STOP_HOME=/ocsapp/account/pkg/src/cpp/AUDIT/GETKPI
+export IBEAR_HOME=/ocsapp/account/pkg/src/cpp/AUDIT/GETKPI
+export DSCI_PATH=/ocsapp/account/pkg/src/cpp/AUDIT/DSCI
+export LD_LIBRARY_PATH=$DSCI_PATH/lib:$LD_LIBRARY_PATH
+
+./GETKPI -c ${STOP_HOME}/test.conf
+

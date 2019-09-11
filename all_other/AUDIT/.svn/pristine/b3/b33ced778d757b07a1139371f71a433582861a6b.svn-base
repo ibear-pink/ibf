@@ -1,0 +1,2 @@
+#/account/cx00/pkg/bin/KPITG_cx00 -s start -p ALL=10,PNUM=1,MODEL=OFAC
+/account/cx00/pkg/bin/KPITG_x001_cx00 cx00

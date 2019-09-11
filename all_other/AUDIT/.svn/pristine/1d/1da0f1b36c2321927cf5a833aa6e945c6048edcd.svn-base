@@ -1,0 +1,27 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _GETKPI_TL_H_
+#define _GETKPI_TL_H_
+
+#include "CPublicDeal.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class GETKPI_TLDeal : public CPublicDeal,public Object
+{
+	DECLARE_CLASS(GETKPI_TLDeal)
+public:
+
+	GETKPI_TLDeal();
+	~GETKPI_TLDeal();
+	int Process(stSTOPMessage *stopMsg);
+	int InitStopCfgInfo(stSTOPMessage *stopMsg);
+};
+
+#endif
+

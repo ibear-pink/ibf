@@ -1,0 +1,83 @@
+/**
+ * describe:SDFS文件接口类定义
+ * create date:2016/5/19 11:52:10
+ * author wangzhia
+ */
+#ifndef _SDFS_GDF_FILE_H_
+#define _SDFS_GDF_FILE_H_
+
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <vector>
+#include "sdfs.h"
+#include "Define.h"
+
+using namespace std;
+class SDFS_GDF_FILE
+{
+public:
+	SDFS_GDF_FILE (void);
+	
+	SDFS_GDF_FILE (const char *szFilePath, const char *szFileName);
+	
+	virtual ~SDFS_GDF_FILE (void);
+	
+	Ret Open (const char *szMode);
+	
+	Ret Close (void);
+	
+	Ret Rename (const char *destFile);
+	
+	Ret Remove (void);
+	
+	size_t Write (const char *buffer, size_t size, size_t count);
+	
+	size_t Read (void *p, size_t size, size_t count);
+	
+	Int32 Fflush (void);
+	
+	void MakeFullName (char *szFullName);
+	
+	char *GetFileName () {return m_FileName;}
+	
+	char *GetFullFileName () {return m_FullFileName;}
+	
+	bool IsFileExist (void);
+	
+	bool IsFilePointerNull (void);
+	
+	void SetFileStartTime () {m_StartTime = time(NULL);}
+	
+	time_t GetFileStartTime () {return m_StartTime;}
+			
+	Ret getFileList(char *indir);
+	
+	bool is_dir(mode_t t){return SS_ISDIR(t);}
+	
+	bool is_reg(mode_t t){return SS_ISREG(t);}
+
+	Ret Copy(const char *src_file, const char *des_file);
+	
+	Ret Move(const char *src_file, const char *des_file);
+
+public:
+	vector<stFileInfo *> mFileList;
+	
+private:
+	SFILE* m_Fp;
+	
+	SDFS sp;
+	
+	char m_FileName[512];
+	
+	char m_FilePath[512];
+	
+	char m_FullFileName[1024];
+	
+	time_t m_StartTime;
+	
+};
+
+#endif

@@ -1,0 +1,242 @@
+/**************************
+* 服务名称:rtStopPub
+* 功能描述:公共头文件
+* 程序版本:V1.0
+* 编码日期:2014/10/20 11:23:53
+* 编码人员:
+**************************/
+#ifndef _PUB_FUNC_H_
+#define _PUB_FUNC_H_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <stdarg.h>
+#include <map>
+#include <iconv.h>
+#include <iostream>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <strings.h>
+
+#include "Define.h"
+#include "jni.h"
+#include "cJSON.h"
+#include "httpclient.h"
+#include "stop_com_type.h"
+#include "cfgfile.h"
+#include "stop_error.h"
+
+#ifdef _SDFS_DEAL_FILE_
+#include "SDFS_FILE.h"
+#else
+#include "FILE.h"
+#endif
+
+using namespace std;
+
+/*标识*/
+#define DIRNAME 128
+#define INTER_MAX_REGEX_LEN 1024
+#define BEST_BUF			8192		/*文件系统最佳缓存大小*/
+#define STATUS 83
+#define random(x) (rand()%x)
+
+//文件处理函数
+extern int getFileSize(char *filename);
+#ifdef _SDFS_DEAL_FILE_
+extern int move_file(const char *src_file, const char *des_file,SDFS *file);
+extern int copy_file(const char *src_file, const char *des_file,SDFS *file);
+#else
+extern int move_file(const char *src_file, const char *des_file);
+extern int copy_file(const char *src_file, const char *des_file);
+#endif
+char * delN(char * a);
+
+//字符串处理函数
+extern char *subStrCpy(char *,char *,int,int);/*字符串截断拷贝*/
+extern int char_replace(char* fstr, const char target, const char rp);
+extern int SplitString (const char *buff, char *tStr1, char *tStr2);
+extern int SplitString (const char *buff, string key[]);
+extern int SplitString (const char *buff, char split_char, string key[]);	
+extern int SplitString (char * dstr,char * sstr,char t,int fn);
+extern int SplitString (const char *buff,vector<string> *operation,vector<vector<string> > *values);
+extern int SplitStringBySP (const char *buff, char split_char, string key[]);
+extern void del_char(char *str,char ch);
+extern char *Trim(char *S);
+extern char *Rtrim(char * str);
+extern char *Ltrim(char * str);
+extern int isInStr(char *tmpStr,char *lValue);
+extern char *sms_strrep(char *pInput, char *pOutput, char *pSrc, char *pDst);
+extern int BytesToUtf8(char* src, char* dst, int* nout);
+extern int strrpl(char *in, char *out, int outlen, const char *src, char *dst);
+extern int sms_build(char *tpl_content,char *smscontent,int args, ... );
+extern void replaceParam(char *strbuf,char *param_id,char *param_value);
+extern int payReplaceParam(char *strbuf,char *pBusiTemplate,char *pXMLFinal);
+extern int get_ascii_value_by_pos (char *buff, int pos, char *value);
+extern char *str_strrep(char *pInput,char *pOutput,char *pSrc,char *pDst);
+extern char *str_lower(char *str);
+extern int getBinNameByPath(char *fileName,char *binName);
+extern int getDateByBatch(char *batchsn,char *date);
+
+//时间处理函数
+extern char * getEndDate(char * endDate,char * startDate,int s);
+extern int addMonths(char *src,char *desc,int added_mon);
+extern int AddMonth(int yearmonth,int addmonth);
+extern int check_valid_date(int year,int mon,int day);
+extern time_t getSec2(char *);/* 根据14位日期计算从1970年00:00:00以来的秒数 */
+extern time_t getSec2(char *,char *);/* 根据14位日期计算从1970年00:00:00以来的秒数 */
+extern int get_month_day(const int year, const int month);
+extern void addDays (char *src, int days, char *des);
+extern int getCurDate();
+extern char *GetSysTime();
+extern double getDiffDates(char * endDate,char * startDate,char *type);
+extern char* CurrSysDate(int oper);
+extern void getCurDateTime (char *sDateTime);
+extern void getCurDate (char *sDateTime);
+extern long getUTime();
+extern void getCurUTime( char *sDateTime );
+extern void getCurDateTime( char *sDateTime, const char *pattern );
+extern void getSysDatetoStr (char *sysDate);
+
+//sql处理函数
+extern int build_sql(map<string,string> m_objectSql,char *tpl_content,char *smscontent);
+/*extern int build_sql(map<string,string> m_objectSql,char *tpl_content,char *smscontent,vector<stSQLParam*> *bindParams);
+extern int build_sql(vector<vstSQLParam*> m_objectSql,char *tpl_content,char *smscontent,vector<stSQLParam*> *bindParams);
+extern int build_sql(map<string,string> m_objectSql,char *tpl_content,char *smscontent,vector<stSQLParam*> *bindParams,map<string,int> m_objectSql_order);
+extern int changeVector(map<int ,string> mResult,char *table_name,vector<stSQLParam*> *bindParams,char **sqlTemp,vector<stSQLParam*> *seleParams);
+*/
+extern int checkType(char *key);
+extern int checkSQLType(char *sql_param,int num,char *type);
+extern int checkSQLParamType(char *param,char *type);
+extern int checkTableParamType(char *table_name, char **types,char **sqlTemp);
+
+//字符串集合处理函数
+extern int split_vector(char *result_value, map<int ,string> *mResult);
+extern int spliteCal(char *stop_ref_object,vector<stStopCal *> *m_StopObjects);
+
+//业务函数
+extern int getInDBLabel(long user_id,int db_num,char *op_code,char *in_db_label);
+extern int getUserRegionLogin(char *region_id,char *login_no);
+extern int getArea (char *user, char *area);
+extern int getStrucMemberValue(map<string,string>& m_UserIO,char *name,string& value);
+extern int initStructMemberValue(map<string,string>& m_UserIO,void *p,char *className);
+
+//工单，服开，处理函数
+extern int InitMapInfoOrder(map<int ,string> *mResult,stUserInfo *pUser,char *string_data,long sys_accept,char *order_id,char *op_code,char *run_code,char *owner,char *open,char *serv_flag,char *db_laber);
+extern int UnBillQueryDown(long id_no,long contract_no,const char *ip,const long port,char *op_type);
+extern int InitStopObjectInfo(stUserInfo *pUser,stContractInfo *pCon,map<string,string> *stObjectSql);
+extern int PublicEsb(string url,string post,char *flag_out);
+extern int createJavaVM();
+extern int dealJavaInter(map<int,string> mResult,char* serv_flag);
+extern int dealJavaInter_LOG(map<int,string> mResult,char* serv_flag,int m_ThreadNum);
+
+//其他函数
+extern int getMinValue(int values[] , int num);
+extern void PrintDataStream(const unsigned char *pBuf, UnInt32 nLen);
+extern int dealCal(char *l_values,char *l_value,char *opr);
+
+//清除数据内存
+template<class D> extern void clearDataList (vector<D*> &vList);
+template<class K, class V> extern void clearDataList (map<K, V*> &mList);
+template<class K, class V> extern void clearDataList (multimap<K, V*> &mList);
+template<class K, class V> extern void clearDataList (map<K, vector<V*> > &mList);
+
+template<class D>
+void clearDataList (vector<D*> &vList)
+{
+	if (vList.size() == 0)
+	{
+		return;
+	}
+	
+	typename vector<D*>::iterator iter;
+	for (iter = vList.begin(); iter != vList.end(); iter++)
+	{
+		D *pData = *iter;
+		delete pData;
+		pData = NULL;
+	}
+	
+	vList.clear ();
+	
+	return;
+}
+
+template<typename K, typename V>
+void clearDataList (map<K, V*> &mList)
+{
+	if (mList.size() == 0)
+	{
+		return;
+	}
+	
+	typename map<K, V*>::iterator iter;
+	for (iter = mList.begin(); iter != mList.end(); iter++)
+	{
+		V *pData = iter->second;
+		delete pData;
+		pData = NULL;
+	}
+	
+	mList.clear ();
+}
+
+template<typename K, typename V>
+void clearDataList (multimap<K, V*> &mList)
+{
+	if (mList.size() == 0)
+	{
+		return;
+	}
+	
+	typename multimap<K, V*>::iterator iter;
+	for (iter = mList.begin(); iter != mList.end(); iter++)
+	{
+		V *pData = iter->second;
+		delete pData;
+		pData = NULL;
+	}
+	
+	mList.clear ();
+}
+
+template<typename K, typename V> 
+void clearDataList (map<K, vector<V*> > &mList)
+{
+	if (mList.size() == 0)
+	{
+		return;
+	}
+
+	vector<V*> vList;
+	typename vector<V*>::iterator vIter;
+	typename map<K, vector<V*> >::iterator iter;
+
+	//内存释放
+	for (iter = mList.begin(); iter != mList.end(); iter++)
+	{
+		vList = iter->second;
+
+		for (vIter = vList.begin(); vIter != vList.end(); vIter++)
+		{
+			V *pNode = *vIter;
+			delete pNode;
+			pNode = NULL;
+		}
+		
+		vList.clear();
+	}
+		
+	mList.clear();
+}
+
+#endif

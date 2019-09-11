@@ -1,0 +1,133 @@
+
+/*
+ * 功能描述:生成增量比对数据
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "inDataExpMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(inDataExpMgr)
+
+inDataExpMgr::inDataExpMgr()
+{
+	
+}
+
+inDataExpMgr::~inDataExpMgr()
+{
+	
+}
+
+int inDataExpMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	int iRet = 0;
+	int i = 0;
+	m_Ibear = br;
+	m_logFile = pServerCfg->logFile;
+	map<string,stSqlMap*> sqlconfs = m_Ibear->m_Sqlconfs;
+	for (map<string,stSqlMap*>::iterator it = sqlconfs.begin();it!=sqlconfs.end();it++)
+	{
+		string key_id = it->first;
+		stSqlMap *map = it->second;
+		if (strcmp(map->res_num ,"1") != 0)
+			continue;
+		table_names[i] = key_id;
+		i++;
+	}
+	count = i;
+	printf("加载的sql数量为:%d\n",i);
+	
+	return iRet;
+}
+
+int inDataExpMgr::getBDSData(const char *table_name)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	iRet = m_Ibear->queryForList(table_name,inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s is ERROR,ERRNO[%s]ERRMSG[%s]",table_name,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		vector<string>::iterator i_key = find( m_Keys.begin( ), m_Keys.end( ), v_row[0] );
+		if (i_key == m_Keys.end())
+		{
+			m_Keys.push_back(v_row[0]);
+		}
+	}
+	return iRet;
+}
+
+int inDataExpMgr::insertInterface(string key,string table_name)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("KEY_VALUE",key));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->DML("INS_DATA",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_DATA is ERROR,ERRNO[%s]ERRMSG[%s]",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+int inDataExpMgr::process()
+{
+	int iRet = 0;
+	
+	for (int i=0;i<count;i++)
+	{
+		string table_name = table_names[i];
+		printf("%s\n",table_name.c_str());
+		iRet = getBDSData(table_name.c_str());
+		if (iRet != 0)
+		{
+			return iRet;
+		}
+		
+		for (vector<string>::iterator it = m_Keys.begin();it != m_Keys.end();it++)
+		{
+			string key = *it;
+			iRet = insertInterface(key,table_name);
+			if (iRet != 0)
+			{
+				m_Ibear->Rollback();
+				break;
+			}
+			else 
+			{
+				m_Ibear->Commit();
+			}
+		}
+		m_Keys.clear();
+		
+	}
+	
+	return iRet;
+}
+
+int inDataExpMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int inDataExpMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

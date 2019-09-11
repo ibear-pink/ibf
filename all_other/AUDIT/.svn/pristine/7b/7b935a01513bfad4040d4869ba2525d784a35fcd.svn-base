@@ -1,0 +1,8 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_ALLMERGE_CFG" parameterClass="Map" resultNum="2" db_no="0">select mergehead,mergetype from AUDIT_MERGE_TYPE</select>
+	<insert id="INS_FRIST" parameterClass="Map" db_no="0">insert into AUDIT_MERGE_#TYPE#_#YM#(BATCHSN,MERGE_TYPE,DAY_BILLCYCL,REGION_CODE,AUDIT_ID,RECORDS,AMOUNT,REC_ATTR,REC_TIME,KPI_PASS,KPI_TIME) values(${BATCHSN|char},${MERGE_TYPE|char},${DAY_BILLCYCL|char},${REGION_CODE|char},${AUDIT_ID|char},${RECORD|long},${AMOUNT|long},${REC_ATTR|char},sysdate,0,sysdate)</insert>
+	<select id="SEL_AUDIT_CFG" parameterClass="Map" resultNum="3" db_no="0">select AUDIT_ID,AUDIT_NAME,DEALCODE_TYPE from AUDIT_TYPE_CFG where sysdate between eff_date and exp_date</select>
+</sqlMap>
+

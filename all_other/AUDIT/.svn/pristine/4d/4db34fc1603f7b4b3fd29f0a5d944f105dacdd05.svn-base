@@ -1,0 +1,10 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_KPI_CFG" parameterClass="Map" resultNum="5" db_no="0">select Parameter,Audit_type,OPP_DISMEN,DATE_DISMEN,Audit_Form from AUDIT_KPI_STATIC</select>
+	<delete id="DEL_KPI_LOG" parameterClass="Map" db_no="0">delete from AUDIT_KPI_LOG_#YM#</delete>
+	<insert id="INS_KPI_LOG" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_#YM#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+	<insert id="INS_KPI_HIS" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_HIS_#YM#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+
+</sqlMap>
+

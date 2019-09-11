@@ -1,0 +1,178 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+ 
+#ifndef _BUSI_CFGFILE_H_
+#define _BUSI_CFGFILE_H_
+
+#include <stdio.h>
+#include <iostream>
+#include "IniFile.h"
+#include "Define.h"
+#include "stop_com_type.h"
+#include "ComLogFile.h"
+#include "ComMonitor.h"
+
+using namespace std;
+
+typedef struct
+{
+	char sMdbPath[1024+1];
+	
+	char user[64];
+	char password[64];
+	char server[64];
+} stAppCfg_DB_Info;
+
+typedef struct
+{
+	char program_name[32+1];
+	char mach_code[20+1];
+	int db_num;
+	int db_id[MAX_DB_NUM];
+	stAppCfg_DB_Info db_info[6];
+	char ibear_name[512+1];
+	char stop_common[512+1];
+	char parse_file[512+1];
+	char ipAddress[64];//zk注册后ip
+	char procUnikey[64];//zk注册后信息
+}stAppCfg_System;
+
+struct log_file_info
+{
+	int log_type;
+	int log_interval;
+	int log_backup_size;
+	int log_procmode;
+	int log_backup_type;
+};
+
+struct log_server
+{
+	char log_path[512+1];
+	char log_name[32+1];
+	int log_file_num;
+	int log_thread_num;
+	struct log_file_info logfile_info[6];
+};
+
+typedef struct
+{
+	char data_path[1024];
+	char indir[1024];
+	char errdir[1024];
+	char runlog[1024];
+} stAppCfg_File_Inter_Info;
+
+typedef struct
+{
+	char outdir[1024+1];
+	char tmpdir[1024+1];
+	int backupType;
+	int writeMode;
+	int interval;
+	int backupSize;
+} stAppCfg_Out_File_Info;
+
+typedef struct
+{
+	char bakdir[1024+1];
+	char tmpdir[1024+1];
+	int tab_type;
+	int tab_backuptype;
+	int tab_writemode;
+	int tab_interval;
+	int tab_backupsize;
+} stAppCfg_Bak_File_Info;
+
+typedef struct
+{
+	int deal_type;
+	int interface_type;
+	int is_give;
+	int server_type;
+	int thread_num;
+	int java_vm;
+	char server_name[32+1];
+	char fresh_time[6];
+	stAppCfg_Bak_File_Info bak_cfg_info;
+	stAppCfg_File_Inter_Info file_cfg_info;
+	stAppCfg_Out_File_Info out_cfg_info;
+	int pid_num;
+	DC_AxLogFile *logFile;//临时字段-日志实例
+	ComMonitor *logMon;//临时字段-性能日志实例
+}stAppCfg_Proc_Server;
+
+typedef struct
+{
+	int server_num;
+	stAppCfg_Proc_Server server_info[STOP_TASKNUM];
+}stAppCfg_Server;
+
+typedef struct
+{
+	int log_num;
+	char log_path[512+1];
+
+	struct log_server log_mgr[MAX_LOG_SERVER_NUM];
+}stAppCfg_LogServer;
+
+typedef struct
+{
+	int size;
+	int file_type;
+	int main_field;
+	int seq_field;
+	char file_code[4+1];
+	char field[MAX_PARSE_FIEL_NUM][64];
+} stParse_Field;
+
+typedef struct
+{
+	int size;
+	stParse_Field data[MAX_PARSE_FILE_NUM];
+} stAppCfg_ParseFile;
+
+typedef struct
+{
+	int log_interval;
+} stAppCfg_SupServer;
+
+typedef struct
+{
+	bool use_zk;
+	char zk_cluster[20+1];
+	char zk_attr[32+1];
+	char zk_service[32+1];
+	char zk_type[2+1];
+} stAppCfg_ZK_Info;
+
+typedef struct
+{
+	char chCfgFile[256];
+	char host_id[32];
+	
+	stAppCfg_System stSystem;
+	stAppCfg_Server stServer;
+	stAppCfg_LogServer stLogServer;
+	stAppCfg_ZK_Info stZKServer;
+	stAppCfg_ParseFile parse_info;
+}stAppCfg;
+
+void BUSI_CFG_ERRLOG(char *chGroupName, char *chKeyName);
+
+int busi_cfgfile_read(stAppCfg *pAppCfg);
+int busi_cfgfile_check(stIniFile_File *pstObj, stAppCfg *pAppCfg);
+int busi_cfgfile_check_System(stIniFile_Group *pstObj, stAppCfg *pAppCfg);
+int busi_cfgfile_check_Server(char *chGroupName, stIniFile_Group *pstObj, stAppCfg_Proc_Server *pServer);
+int busi_cfgfile_check_LogServer(char *chGroupName, stIniFile_Group *pstObj, struct log_server *pServer);
+int busi_cfgfile_check_ZKServer(char *chGroupName,stIniFile_Group *pstObj, stAppCfg_ZK_Info *pServer);
+int load_parse_file_cfgfile (stAppCfg_ParseFile *parse_info, char *parse_file);
+
+int strupper(char *);
+int cf_file_ifdir(const char *fn);
+
+#endif
+

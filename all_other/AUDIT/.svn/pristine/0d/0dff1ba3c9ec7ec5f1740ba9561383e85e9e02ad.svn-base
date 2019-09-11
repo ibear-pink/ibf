@@ -1,0 +1,78 @@
+/**
+ * description:任务对象类定义
+ * author:wangzhia
+ * create date:2013-10-28
+ */
+#ifndef _CTASK_H_
+#define _CTASK_H_
+
+#include <stdlib.h>
+#include <cstring>
+#include <iostream>
+#include "Define.h"
+
+using namespace std;
+
+class Task
+{
+public:
+	Task();
+	
+	~Task();
+	
+	Task & operator = (Task &other);
+	
+	void InitBuf (const char *buf, UnInt32 len)
+	{
+		m_length = len;
+	
+		memcpy (m_buffer, buf, len);
+		
+		m_buffer[m_length] = '\0';
+	}
+	
+	void SetDispatchKey (UnInt32 tKey) {m_DispatchKey = tKey;}
+	
+	UnInt32 GetDispatchKey () {return m_DispatchKey;}
+	
+	void SetRequestBody (void *data) {m_RequetBody = data;}
+	
+	void *GetRequestBody () {return m_RequetBody;}
+	
+	UnInt32 GetBufLength () {return m_length;}
+	
+	unsigned char *GetBuffer () {return m_buffer;}
+
+	void SetFileHead (const char *sFileHead) {strcpy (m_FileHead, sFileHead);};
+
+	char *GetFileHead () {return m_FileHead;};
+	
+	char *GetMsisdn () {return m_Msisdn;};
+	
+	void SetMsisdn (const char *tMsisdn) {strcpy (m_Msisdn, tMsisdn);};
+	
+	void SetBusiType (int iType) {m_BusiType = iType;};
+	
+	int GetBusiType () {return m_BusiType;};
+	
+public:
+	UnInt32 m_length;
+	
+	unsigned char m_buffer[MAX_BUFLEN+1];
+	
+	UnInt32 m_DispatchKey;
+	
+	char m_FileName[512];
+	
+	void *m_RequetBody;
+	
+	char m_FileHead[32];
+	
+	char m_Msisdn[30];
+	
+	int m_BusiType;
+	
+	bool m_IsFileEnd;
+};
+
+#endif

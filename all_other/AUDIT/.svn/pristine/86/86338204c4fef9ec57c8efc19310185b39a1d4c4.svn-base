@@ -1,0 +1,170 @@
+/*
+CREATE TABLE T_LOB(
+AA      NUMERIC(9),
+BB      LOB(50),
+CC      VARCHAR(10),
+DD      LOB(70),
+PRIMARY KEY(AA)
+);
+CREATE INDEX IND1 ON T_LOB(AA);
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "dsci.h"
+
+typedef struct
+{
+    char  name[32];
+    long  idNo;             /*用户id*/
+}LOB_TEST1;
+
+typedef struct
+{  
+    long  idNo;             /*用户id*/
+    char  name[40];
+}LOB_TEST2;
+
+int main(int argc, char *argv[])
+{
+    int g_i=1, g_s=1, g_u=1;
+    
+    int i, j, k, n, col, col1, rowNum, len;
+    char errStr[256], str[512];
+    DSCI myDSC=NULL, *pD;
+    DSCI_ROW row;
+    DSCI_SQL ss1;
+    LOB_TEST1 b1;
+    LOB_TEST2 b2;
+
+    /*连接初始化*/
+    pD = &myDSC;
+    if(0 != DSCI_init(errStr, pD))
+    {
+        printf("%s\n", errStr);
+        return 0;
+    }
+    DSCI_set_Buffer_flag(pD, (argc==2)?atoi(argv[1]):0);  /*设为缓冲模式*/
+    memset(&ss1, 0, sizeof(ss1));
+    
+/******************************  插入  ********************************/      
+    if(1==g_i)
+    {
+        DSCI_query(pD, "truncate table t_lob");    
+        DSCI_prepare_sql(pD, &ss1, "insert into t_lob(aa,bb,cc,dd) values(?, ?, ?, ?)");
+        
+        DSCI_bind_param(     pD, &ss1, 0, DSCI_TYPE_INT,  &i);
+        DSCI_bind_blob_param(pD, &ss1, 1,                &b1, sizeof(LOB_TEST1)); 
+        DSCI_bind_param(     pD, &ss1, 2, DSCI_TYPE_CHAR, str); 
+        DSCI_bind_blob_param(pD, &ss1, 3,                &b2, sizeof(LOB_TEST2));             
+        
+        for( i = 0; i < 3; i++ )
+        {
+            sprintf(b1.name, "^^^^^^^%d", i);
+            b1.idNo = i+10;
+            
+            sprintf(b2.name, "aaaaa%d", i);
+            b2.idNo = i+100;
+
+            sprintf( str, "!!!%d", i);        
+            
+            if( 0 != DSCI_query_p(pD, &ss1) )
+            {
+                printf("%d, %s\n", DSCI_ecode(pD), DSCI_error(pD));
+                DSCI_quit(pD);
+                return 0;
+            }
+            printf("%ld rows inserted\n", DSCI_num_rows(pD));
+        }
+        DSCI_end_trans(pD, 0);
+        printf("**********************************************************\n\n");
+    }
+  
+/*****************查询************************************************************************/
+    if(g_s == 1)
+    { 
+        DSCI_query(pD, "select * from t_lob");  
+        printf("%ld rows selected\n", DSCI_num_rows(pD));  
+        col = DSCI_num_fields(pD);    
+        rowNum = 0;    
+        while(NULL != (row = DSCI_fetch_row(pD)) )
+        {
+            printf("*%s*\t*%s*\t", row[0], row[2]);
+            
+            len = DSCI_lob_get(&b1, row[1]); 
+            if(len==0)
+                memset(&b1, 0, sizeof(b1));
+            printf("LOB1= [len=%d, %ld,**%s**]\t", len, b1.idNo, b1.name);
+            
+            len = DSCI_lob_get(&b2, row[3]);
+            if(len==0)
+                memset(&b2, 0, sizeof(b2));
+            printf("LOB2= [len=%d, %ld,**%s**]\n", len, b2.idNo, b2.name);
+            
+            rowNum++;
+        }
+        printf("%d rows selected\n", rowNum);
+    }
+
+/******************************  更新  ********************************/      
+    if(1==g_u)
+    {
+        DSCI_prepare_sql(pD, &ss1, "update t_lob set cc = ?, bb=? where aa = ?");
+        
+        DSCI_bind_param(     pD, &ss1, 0, DSCI_TYPE_CHAR, str); 
+        DSCI_bind_blob_param(pD, &ss1, 1,                &b1, sizeof(LOB_TEST1));    
+        DSCI_bind_param(     pD, &ss1, 2, DSCI_TYPE_INT, &i);    
+        
+        for( i = 0; i < 3; i++ )
+        {
+            sprintf( str, "sddd%d", i);
+            sprintf(b1.name, "NNN%d", i);
+            b1.idNo = i+50;
+            
+            if( 0 != DSCI_query_p(pD, &ss1) )
+            {
+                printf("%d, %s\n", DSCI_ecode(pD), DSCI_error(pD));
+                DSCI_quit(pD);
+                return 0;
+            }
+            printf("%ld rows updated\n", DSCI_num_rows(pD));
+        }
+        DSCI_end_trans(pD, 0);
+        printf("**********************************************************\n\n");
+    }
+
+/*****************查询************************************************************************/
+    if(g_s == 1)
+    { 
+        DSCI_prepare_sql(pD, &ss1, "select * from t_lob");
+        DSCI_query_p(pD, &ss1);
+        printf("%ld rows selected\n", DSCI_num_rows(pD));
+        col = DSCI_num_fields(pD);    
+        rowNum = 0;    
+        while(NULL != (row = DSCI_fetch_row_s(pD, &ss1)) )
+        {
+            printf("*%s*\t*%s*\t", row[0], row[2]);
+            
+            len = DSCI_lob_get(&b1, row[1]); 
+            if(len==0)
+                memset(&b1, 0, sizeof(b1));
+            printf("LOB1= [len=%d, %ld,**%s**]\t", len, b1.idNo, b1.name);
+            
+            len = DSCI_lob_get(&b2, row[3]);
+            if(len==0)
+                memset(&b2, 0, sizeof(b2));
+            printf("LOB2= [len=%d, %ld,**%s**]\n", len, b2.idNo, b2.name);
+            
+            rowNum++;
+        }
+        printf("%d rows selected\n", rowNum);
+    }
+    
+    /*退出*/
+    printf("\n退出数据库\n");
+    DSCI_free_sql(&ss1);
+
+    DSCI_quit(pD);
+    return 0;
+}

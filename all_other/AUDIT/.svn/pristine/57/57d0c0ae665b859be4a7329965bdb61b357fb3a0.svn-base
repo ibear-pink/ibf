@@ -1,0 +1,32 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _GETKPIDATA_DATA_H_
+#define _GETKPIDATA_DATA_H_
+
+#include "CPublicData.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class GetKPIDataData:public CPublicData,public Object
+{
+	DECLARE_CLASS(GetKPIDataData)
+public:
+
+	GetKPIDataData();
+	~GetKPIDataData();
+	int init(char *serverName, int serverType,CPublicDeal *stopDeal);
+	
+	int process(ibear *br,char *busiName,char *serverName,stAppCfg_System *pSystemInfo,stDealTask *pTask,stParseField *parseField,stSTOPMessage *stopMsg);
+	
+public:
+	
+};
+
+#endif
+
+

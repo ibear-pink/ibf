@@ -1,0 +1,4 @@
+export DSCI_PATH=/account/plat/dsci
+#/account/cx00/pkg/bin/getpwd 0 /account/plat/newkey/billing_data_acctopr.login
+#/account/cx00/pkg/bin/getpwd 0 /account/plat/newkey/billing_data_bdsopr.login YES
+/account/cx00/pkg/bin/getpwd 1 BILLCOLLDEV_DBACCOPR

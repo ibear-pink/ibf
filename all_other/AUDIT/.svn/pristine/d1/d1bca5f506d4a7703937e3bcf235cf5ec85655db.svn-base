@@ -1,0 +1,24 @@
+
+include ../make_os
+
+INCLUDE=-I${DSC_PATH}/include 
+LIB= -lpthread -L./ -L${DSC_PATH}/lib/  -ldscpp
+CFLAG1= -g -lnsl -lm
+CC=cc
+
+OBJ=demo.o
+
+all:mytest  clean
+mytest:$(OBJ)
+	@echo "©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­"
+	@${CC}  -o  $@ ${OBJ}  ${CFLAG} ${CFLAG1} ${INCLUDE}  ${LIB} 
+	@echo "	    object ¡¾$@¡¿ Loaded         "
+	@echo "©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­©­"
+
+.cpp.o:
+	@echo .........Compiling $*.c ...........
+	@${CC}  -c demo.cpp  ${CFLAG} ${INCLUDE}
+
+clean:
+	rm -f core *.o
+

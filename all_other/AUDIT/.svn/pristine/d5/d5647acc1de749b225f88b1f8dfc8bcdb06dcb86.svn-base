@@ -1,0 +1,134 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _CHECK_BDS_MANAGER_H_
+#define _CHECK_BDS_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+//BDS对应的用户级key，记录级key（多个key组合）
+typedef struct{
+	char table_name[30];
+	char key_id[64];
+	char dbno_key[64];
+	char prkey_id[128];
+	char dbno_prkeys[128];
+} stKeyRelas;
+
+typedef struct{
+	char key[64];
+	char value[64];
+} stKeyValues;
+
+//控制开关格式
+typedef struct{
+	int qrydb_nums;
+	int check_nums;
+	int repair_max;
+	char ctrl_flag[1+1];
+} stControls;
+
+//入口数据格式
+typedef struct{
+	char check_sn[128+1];
+	char key_id[128+1];
+	char table_name[30+1];
+	char check_type[2+1];
+	char data_type[2+1];
+	int times;
+	char file_type[1+1];
+} stCheckData;
+
+//checks,物理库表名对应的key(多个)
+typedef struct{
+	char check_sqlname[30];
+	char check_keys[64];
+} stTableKey;
+
+//数据修复
+typedef struct{
+	string note;
+	char dml_type[1+1];
+	char check_type[1+1];
+} stOptNote;
+
+//比对的BDS库与物理sqlname的对应关系
+typedef struct{
+	char bds_sqlname[32+1];
+	char bds_keys[32+1];
+	char add_sqlname[32+1];
+	vector<stTableKey*> checks;
+} stCheckMap;
+
+class Check_BDSMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(Check_BDSMgr)
+public:
+	
+	Check_BDSMgr();
+	~Check_BDSMgr();
+    
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+	
+	int ProInterface(map<string,string> *values);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+	
+	int getCheckTableMap();
+	int getCheckCfg();
+	int getControlInfo();
+	
+	int selectCompareLog(char *table_name);
+	int getInterfaceDatas(char *table_name);
+	int SplitStringBySP (const char *buff, char split_char, string key[]);
+	int deleteInterface(char *key_value,char *table_name);
+	int countCompareLog(char *key_value,char *table_name,int *count);
+	int insertCompareLog(char *key_value,char *table_name,char *check_type,char *data_type);
+	int updateCompareLog(char *key_value,char *table_name,char *check_type);
+	int deletedateCompareLog(char *key_value,char *table_name);
+	int insertAddLog(char *table_name,int num,string values[],char *dml_type,vector<stKeyValues*> kvs,char *dbno_key);
+	int insertRepairLog(char *check_sn,char *table_name,char *key_value,char *check_type,char *check_note,char *is_deal,char *data_type,char *file_type);
+	int insertCompareLogErr(char *key_value,char *table_name,char *ErrMsg);
+	
+	int getCheckDataRecord(char *table_name,vector<stKeyValues*> kvs,map<string,string> *bds_datas,map<string,string> *db_datas);
+	int getDataByAllKeyValue(char *sqlname,vector<stKeyValues*> kvs,map<string,string> *db_datas,const int db_type,char *dbno_key);
+	int getDataBySigKeyValue(char *table_name,char *sqlname,char *sqlkeys,char *key_value,map<string,string> *db_datas,const int db_type);
+	int ProCheckDataRecord(stCheckData *checkdata,char *check_type);
+	int ProCheckDataUserToRecord(stCheckData *checkdata);
+	int ProRepairData(stCheckData *checkdata);
+	int getCheckDataUser(char *table_name,char *key_value,map<string,string> *bds_datas,map<string,string> *db_datas);
+	int CheckDataByList(stCheckData *checkdata,map<string,string> bds_datas,map<string,string> db_datas,char *check_type);
+	//int ProDealData(stCheckData *checkdata,char *check_note,char *check_type,int deal_type);
+	int ProDealData(char *key_id,char *table_name,char *data_type,char *check_sn,char *check_note,char *check_type,int deal_type,char *file_type);
+	int getDbNoByRegion(char *region_code,char *dbnum_type);
+	int getRepairCount(char *check_table,char *count);
+	int getRepairCountHis(char *check_table,char *ym,char *count);
+public:
+	stControls *m_Controls;
+	ibear *m_Ibear;
+	map<string,stKeyRelas*> m_KeyTableRelas;//稽核表主键类型
+	vector<stCheckData*> m_CheckDatas;//入口数据集
+	map<string,stCheckMap*> m_CheckTableMaps;//表对应关系
+	stAppCfg_Proc_Server *m_CfgInfo;
+	DC_AxLogFile *m_logFile;
+	stAppCfg_System *m_ProInfo;
+	ComMonitor *m_logMon;
+	StrInData m_szInData;
+	char m_tableName[256];
+	map<string,stSqlMap*> sqlconfs;
+	int m_Count;
+	char m_YMD[8+1];
+	char m_ErrNo[20];
+	char m_ErrMsg[64];
+};
+#endif
+
+

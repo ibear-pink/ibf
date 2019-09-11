@@ -1,0 +1,33 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "RTOB_MERGERData.h"
+#include "DynBase.h"
+
+IMPLEMENT_CLASS(RTOB_MERGERData)
+
+RTOB_MERGERData::RTOB_MERGERData()
+{
+	
+}
+
+RTOB_MERGERData::~RTOB_MERGERData()
+{
+	
+}
+
+int RTOB_MERGERData::init(char *serverName,int serverType,CPublicDeal *stopDeal)
+{
+	return RET_OK;
+}
+
+int RTOB_MERGERData::process(ibear *br,char *busiName,char *serverName,stAppCfg_System *pSystemInfo,stDealTask *pTask,stParseField *parseField,stSTOPMessage *stopMsg)
+{
+	int iRet = 0,cRet = 0;
+	return iRet;
+}
+
+

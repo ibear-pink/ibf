@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "RTOB_MERGERDeal.h"
+
+IMPLEMENT_CLASS(RTOB_MERGERDeal)
+
+RTOB_MERGERDeal::RTOB_MERGERDeal()
+{
+	
+}
+
+RTOB_MERGERDeal::~RTOB_MERGERDeal()
+{
+
+}
+
+int RTOB_MERGERDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int RTOB_MERGERDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

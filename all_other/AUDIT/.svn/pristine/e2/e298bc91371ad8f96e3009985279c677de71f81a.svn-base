@@ -1,0 +1,8 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_REPAIR"  parameterClass="Map" resultNum="7" db_no="0">select CHECK_SN,KEY_VALUE,CHECK_TABLE,CHECK_TYPE,CHECK_RESULT,IS_DEAL,DEAL_TIME from CHECK_REPAIR_LOG where DATA_TYPE=${DATA_TYPE|char} order by CHECK_SN</select>
+	<delete id="DEL_REPAIR"  parameterClass="Map" db_no="0">delete from CHECK_REPAIR_LOG where CHECK_TABLE=${CHECK_TABLE|char} and KEY_VALUE=${KEY_VALUE|char}</delete>
+	<insert id="INS_REPAIR_HIS"  parameterClass="Map" db_no="0">insert into CHECK_REPAIR_LOG_HIS_#YM# select CHECK_SN,KEY_VALUE,CHECK_TABLE,CHECK_TYPE,CHECK_RESULT,CHECK_NOTE,IS_DEAL,DEAL_TIME,DATA_TYPE from CHECK_REPAIR_LOG where CHECK_TABLE=${CHECK_TABLE|char} and KEY_VALUE=${KEY_VALUE|char}</insert>
+</sqlMap>
+

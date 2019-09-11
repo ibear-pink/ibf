@@ -1,0 +1,13 @@
+/**
+ * describe:
+ * create date:2014/9/17 17:30:50
+ * author:wangzhia
+ */
+
+#ifndef _STOP_VERSION_H_
+#define _STOP_VERSION_H_
+
+#define PROGRAMMING_NAME 	"remind and stop"
+#define STOP_VERSION 		"2.0.0"
+
+#endif

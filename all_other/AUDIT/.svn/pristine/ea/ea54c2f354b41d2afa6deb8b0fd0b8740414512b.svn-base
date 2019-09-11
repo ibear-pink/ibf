@@ -1,0 +1,53 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/3/31 9:43:55
+ * 编码人员:wangzhia
+*/
+
+#ifndef _CIBEAR_H_
+#define _CIBEAR_H_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "ibearpub.h"
+#include "ibear_com_type.h"
+#include "ibear_db_conn.h"
+#include "ibear_err_define.h"
+
+typedef struct
+{
+	int db_id[MAX_IBEAR_DB_NUM];
+}bear_db;
+
+using namespace std;
+
+class ibear
+{
+public:
+	ibear(bear_db *pInfo,map<string,stSqlMap*> sqlconfs,stSettings *set);
+	ibear(char *fileName,bear_db *pInfo);
+	~ibear();
+	int queryForList(const char *sql_key,map<string,string> inParams,vector<vector<string> > *list);
+	int queryForObject(const char *sql_key,map<string,string> inParams,vector<string> *object);
+	int DML(const char *sql_key,map<string,string> inParams);
+	int queryForListBySQL(stSqlMap *sqlmap,map<string,string> inParams,vector<vector<string> > *list);
+	int queryForObjectBySQL(stSqlMap *sqlmap,map<string,string> inParams,vector<string> *object);
+	int DMLBySQL(stSqlMap *sqlmap,map<string,string> inParams);
+	int Commit();
+	int Rollback();
+	void Quit();
+	
+public:
+	DB_INFO m_dbDsc;
+	char sql_error[1024];
+	char no_error[128];
+	int error_code;
+	map<string,stSqlMap*> m_Sqlconfs;
+	
+private:
+	int *dsc_Nums;
+	
+};
+
+#endif

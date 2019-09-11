@@ -1,0 +1,24 @@
+// 工厂类的基类
+class ObjectFactory {
+ public:
+  virtual Any NewInstance() {
+    return Any();
+  }
+};
+ 
+map<string, ObjectFactory*>& object_factory_map();
+Any GetInstanceByName(const string& name);
+ 
+#define REFLECTOR(name) \
+class ObjectFactory##name : public ObjectFactory { \
+ public: \
+  Any NewInstance() { \
+    return Any(new name); \
+  } \
+}; \
+void register_factory_##name() { \
+    if (object_factory_map().find(#name) == object_factory_map().end()) { \
+      object_factory_map()[#name] = new ObjectFactory##name(); \
+    } \
+} \
+__attribute__(constructor)void register_factory##name()

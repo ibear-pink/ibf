@@ -1,0 +1,28 @@
+#!/usr/sh
+# FOR HP 64 BIT SYSTEM
+#CFLAGS = +DA2.0W +DS2.0 -O2
+#CFLAGS = -m64 -fpic -O2 -D_REENTRANT -DSS_64BIT_SERVER -DLINUX
+CFLAGS = -m64 -fpic -g -D_REENTRANT -DSS_64BIT_SERVER -DLINUX
+include ${ACCMGR_HOME}/src/include/makedebug
+
+
+# FOR HP 64 BIT SYSTEM
+AR_CMD=ar -rv
+CC=cc
+DEFINE=-DSS_64BIT_SERVER -D_REENTRANT
+IFLAGS=-I. -I ${ACCMGR_HOME}/public/xml2/include 
+LIBXMLLFLAGS=  -L${ACCMGR_HOME}/lib  -lxml2
+FEDXLFLAGS= -lm -L. -L${FEDX_HOME}/lib -lfedx  ${LIBXMLLFLAGS}
+
+COMPILE = ${CC} ${CFLAGS} ${IFLAGS} ${DEFINE} 
+MAKEEXE = ${COMPILE}
+LIBXMLOBJ=QField.o QList.o QString.o QXmlIO.o QXmlParser.o QXml.o libxml.o
+all:    libxml2.a  clean
+libxml2.a:${LIBXMLOBJ}
+	${AR_CMD} $@ ${LIBXMLOBJ}
+	mv -f $@ ${DCC_HOME}/lib/libxml
+	@echo "### $@ loaded ###\n"
+.c.o:
+	${COMPILE} -c $<
+clean:
+	rm -f  *.o

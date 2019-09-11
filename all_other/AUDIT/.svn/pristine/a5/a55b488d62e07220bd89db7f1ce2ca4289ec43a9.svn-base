@@ -1,0 +1,64 @@
+#ifndef _IBEAR_COM_TYPE_
+#define _IBEAR_COM_TYPE_
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <vector>
+#include <map>
+#include <list>
+#include <string>
+
+using namespace std;
+
+#define MAX_MAP_NUMS 				100/*sqlMapConfig.conf支持的最大文件数*/
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+struct stSQLParam
+{
+	int num;
+	int name_type;//0,param_value; 1,table_name
+	char key[40];
+	char type[10];
+	char value[64];
+	int isEmpty;//0不可为空，1可为空，2为空
+};
+
+typedef struct 
+{
+	int autoCommit;
+	char cacheModelsEnabled[10];
+	char lazyLoadingEnabled[10];
+	char errorTracingEnabled[10];
+	char maxRequests[10];
+	char maxSessions[10];
+	char maxTransactions[10];
+	char useStatementNamespaces[10];
+} stSettings;
+
+typedef struct
+{
+	stSettings set;
+	int map_num;
+	char sqlsrc_map[MAX_MAP_NUMS][1024];
+} stSqlMapConfig;
+
+typedef struct
+{
+	char sql[1024];
+	char new_sql[1024];
+	char id[1024];
+	char param[64];
+	char res_num[2+1];
+	char db_no[5];
+	map<string,stSQLParam*> inParams;
+} stSqlMap;
+
+#if defined(__cplusplus)
+}
+#endif
+
+#endif
+

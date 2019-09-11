@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "QYFBDeal.h"
+
+IMPLEMENT_CLASS(QYFBDeal)
+
+QYFBDeal::QYFBDeal()
+{
+	
+}
+
+QYFBDeal::~QYFBDeal()
+{
+
+}
+
+int QYFBDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int QYFBDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

@@ -1,0 +1,17 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_KPI_CFG" parameterClass="Map" resultNum="5" db_no="0">select Parameter,Audit_type,OPP_DISMEN,DATE_DISMEN,Audit_Form from AUDIT_KPI_STATIC</select>
+	<select id="SEL_KPI_PROCWS" parameterClass="Map" resultNum="1" db_no="0">select BATCHSN from AUDIT_PROCWS_C#REGION_CODE#01 where status='0' and mod(DISPSEQ,#P_COUNT#)=${NUM|int}</select>
+	<delete id="DEL_KPI_PROCWS" parameterClass="Map" db_no="0">delete from AUDIT_PROCWS_C#REGION_CODE#01 where batchsn=${BATCHSN|char}</delete>
+	<insert id="INS_PROCWS_HIS" parameterClass="Map" db_no="0">insert into AUDIT_PROCWS_HIS_C#REGION_CODE#01_#YM# select BATCHSN,WSSEQ,DISPSEQ,'#STATUS#',GEN_TIME,sysdate,'0' from AUDIT_PROCWS_C#REGION_CODE1#01 where batchsn=${BATCHSN|char}</insert>
+	<delete id="DEL_FRIST" parameterClass="Map" db_no="0">delete from AUDIT_MERGE_#TYPE#_#YM# where batchsn=${BATCHSN|char} and rec_attr='1'</delete>
+	<insert id="INS_FRIST_HIS" parameterClass="Map" db_no="0">insert into AUDIT_MERGE_#TYPE#_HIS_#YM# select batchsn,merge_type,day_billcycl,region_code,audit_id,records,amount,rec_attr,rec_time,KPI_PASS,KPI_TIME from AUDIT_MERGE_#TYPE1#_#YM1# where batchsn=${BATCHSN|char} and rec_attr='1'</insert>
+	<select id="SEL_KPI_BATCH" parameterClass="Map" resultNum="1" db_no="0">select AUDIT_BATCH from AUDIT_KPI_LOG_#YM#_#BATCH_X# where OPP_INS=${OPP_INS|char} and AUDIT_FORM=${AUDIT_FORM|char}</selete>
+	<delete id="DEL_KPI_LOG" parameterClass="Map" db_no="0">delete from AUDIT_KPI_LOG_#YM#_#BATCH_X# where AUDIT_BATCH=${AUDIT_BATCH|char}</delete>
+	<insert id="INS_KPI_LOG" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_#YM#_#BATCH_X#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+	<insert id="INS_KPI_HIS" parameterClass="Map" db_no="0">insert into AUDIT_KPI_LOG_HIS_#YM#(Audit_Batch,Parameter,OPP_DISMEN,DATE_DISMEN,OPP_INS,DATE_INS,AUDIT_FORM,Audit_RECORDS,Audit_amount,Audit_ATTR,Audit_time) values(kpi_seq.nextval,${PARAMETER|char},${OPP_DISMEN|char},${DATE_DISMEN|char},${OPP_INS|char},${DATE_INS|char},${AUDIT_FORM|char},${AUDIT_RECORDS|long},${AUDIT_AMOUNT|long},'0',sysdate)</insert>
+	<update id="UPD_FRIST_LOCK" parameterClass="Map" db_no="0">update AUDIT_MERGE_#TYPE#_#YM# set rec_attr='1' where batchsn in(select BATCHSN from AUDIT_PROCWS_C#REGION_CODE#01 where status='0' and mod(DISPSEQ,#P_COUNT#)=${NUM|int}) and rec_attr='0' and KPI_PASS @lt 3 and kpi_time @lt sysdate</update>
+	<select id="SEL_FRIST" parameterClass="Map" resultNum="6" db_no="0">select batchsn,merge_type,audit_id,records,amount,day_billcycl from AUDIT_MERGE_#TYPE#_#YM# where rec_attr='1'</select>
+	<update id="UPD_FRIST" parameterClass="Map" db_no="0">update AUDIT_MERGE_#TYPE#_#YM# set rec_attr='0',KPI_PASS=KPI_PASS+1,kpi_time=sysdate+1/(24*4) where batchsn=${BATCHSN|char} and rec_attr='1'</update>
+</sqlMap>

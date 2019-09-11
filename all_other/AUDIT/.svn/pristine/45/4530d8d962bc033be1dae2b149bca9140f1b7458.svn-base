@@ -1,0 +1,49 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/4/27 9:37:05
+ * 编码人员:wangzhia
+*/
+
+#ifndef _CPUBLIC_TOOL_H_
+#define _CPUBLIC_TOOL_H_
+
+#include <algorithm>
+#include <signal.h>
+#include <iostream>
+#include <vector>
+#include <map>
+#include <set>
+#include <cstring>
+#include <string.h>
+#include <dirent.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <unistd.h>
+#include <time.h>
+#include <pthread.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/msg.h>
+#include <sys/types.h>
+#include <errno.h>
+
+#include "ibear.h"
+#include "stop_com_type.h"
+
+using namespace std;
+
+class CPublicTool
+{
+public:
+	CPublicTool();
+	~CPublicTool();
+	virtual int init(ibear *br,stSTOPMessage *stopMsg,char *serverName)=0;
+
+};
+
+#endif

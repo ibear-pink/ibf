@@ -1,0 +1,12 @@
+[SYS]
+DEFAULT_DB = DB01
+
+[DB01]
+login = ${DSCI_PATH}/cfg/billcolldev.login
+Server=billcolldev
+Type=Oracle
+
+[DB02]
+login = ${DSCI_PATH}/cfg/login.mdb
+Server=10.243.29.114:22801
+Type=dmdb

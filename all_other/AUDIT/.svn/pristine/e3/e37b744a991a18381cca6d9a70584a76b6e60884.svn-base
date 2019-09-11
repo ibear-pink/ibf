@@ -1,0 +1,50 @@
+#!/bin/ksh
+
+ACCT_BIN=/account/cx00/pkg/bin
+AUDIT_HOME=/account/c000/pkg/src/cpp/AUDIT
+IBEAR_PATH=${AUDIT_HOME}/ibear
+DSCI_PATH=/account/plat/dsci
+PUBOBJDIR=${ACCTPKG_HOME}/obj/cpp/public/sysmgr
+
+DCI_INCLUDE=-I${DSCI_PATH}/include
+DCI_LIB=-L${DSCI_PATH}/lib/ -ldsci
+
+PUB_LIB=-L${AUDIT_HOME}/public/lib -lbgpublic
+
+XML_INCLUDE=-I${AUDIT_HOME}/xml2/include
+XML_LIB=-L${AUDIT_HOME}/xml2/lib -lxml2
+
+IBEAR_INCLUDE=-I${IBEAR_PATH}/src
+IBEAR_LIB=-L${IBEAR_PATH}/lib -libear
+
+JAVA_INCLUDE=-I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux
+JAVA_LIB=-L${JAVA_HOME}/jre/lib/amd64/server -ljvm
+
+#SDFS_INCLUDE=-I${SDFS_HOME}/include -I${DSC_PATH}/include
+#SDFS_LIB=-L${SDFS_HOME}/lib -lsdfs -L${DSC_PATH}/lib/ -ldsc
+
+ACCTMGR_INCLUCDE=-I${AUDIT_HOME}/include -I${AUDIT_HOME}/public/src
+
+FM_INCLUDE=-I ${FRAMEWORK_HOME}/include
+FM_LIB=-L ${FRAMEWORK_HOME}/lib -lframe
+ZK_INCLUDE=-I ${ZKCLIENT_HOME}/include
+ZK_LIB=-L ${ZKCLIENT_HOME}/lib -lzookeeper_mt
+DCC_INCLUDE=-I ${DCC_HOME}/include
+DCC_LIB=-L${DCC_HOME}/lib -ldcc
+PUBINCL=-I ${ACCTPKG_HOME}/include/cpp/sysmgr
+
+IFLAGS=-DSS_64BIT_SERVER -D_REENTRANT -D_DSCI_ -D_DEBUG_INFO_# -D_TIME_LOG_ -D_THREAD_LOG_ 
+
+INCLUDE=-I. ${DCI_INCLUDE} ${SDFS_INCLUDE} ${ACCTMGR_INCLUCDE} ${IBEAR_INCLUDE} ${XML_INCLUDE} ${JAVA_INCLUDE} ${FM_INCLUDE} ${ZK_INCLUDE} ${DCC_INCLUDE} ${PUBINCL}
+
+LIB=-L. ${PUB_LIB} ${IBEAR_LIB} ${DCI_LIB} ${XML_LIB} ${SDFS_LIB} ${FM_LIB} ${ZK_LIB} ${DCC_LIB}
+
+LIBORA=$(ORACLE_HOME)/lib -lpthread -lclntsh
+
+.SUFFIXES:.cpp .o
+
+CFLAGS = ${IFLAGS} ${INCLUDE}
+
+#CC=aCC -AA +DD64 -mt -lm -g -D_LARGEFILE64_SOURCE  -D_XOPEN_SOURCE_EXTENDED -Wl,+s -Wl,+n +DSblended +z +p +inst_implicit_include 
+CC=g++ -m64 -g  -lpthread  -ldl -O0 -fpermissive
+

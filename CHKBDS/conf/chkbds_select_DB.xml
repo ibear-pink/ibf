@@ -1,0 +1,6 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="data">
+	<select id="SEL_USER_DB" parameterClass="Map" db_no="1">select ID_NO,CONTRACT_NO,PHONE_NO,GROUP_FLAG,MASTER_SERV_ID,NVL(OLD_RUN,'A'),RUN_CODE,to_char(RUN_TIME,'yyyymmddhh24miss'),to_char(CREATE_DATE,'yyyymmddhh24miss'),to_char(OPEN_TIME,'yyyymmddhh24miss'),nvl(to_char(first_usedate, 'yyyymmddhh24miss'),'20991231235959'),to_char(COMPLETED_DATE,'yyyymmddhh24miss'),nvl(to_char(bill_start_time, 'yyyymmddhh24miss'),'20991231235959'),OWNER_TYPE from UR_USER_INFO where PHONE_NO=${PHONE_NO|char} $E[and ID_NO=${ID_NO|long}] and run_code != 'b'
+	</select>
+</sqlMap>

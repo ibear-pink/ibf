@@ -1,0 +1,27 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _RTOB_H_
+#define _RTOB_H_
+
+#include "CPublicDeal.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class RTOBDeal : public CPublicDeal,public Object
+{
+	DECLARE_CLASS(RTOBDeal)
+public:
+
+	RTOBDeal();
+	~RTOBDeal();
+	int Process(stSTOPMessage *stopMsg);
+	int InitStopCfgInfo(stSTOPMessage *stopMsg);
+};
+
+#endif
+

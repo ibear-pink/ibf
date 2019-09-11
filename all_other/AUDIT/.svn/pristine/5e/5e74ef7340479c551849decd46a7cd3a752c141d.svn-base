@@ -1,0 +1,1006 @@
+/**
+ * function:xml处理类
+ * date		:2016/3/28 16:51:36
+ * author	:wangzhia
+ */
+
+#include "ibear.h"
+
+
+ibear::ibear(bear_db *pInfo,map<string,stSqlMap*> sqlconfs,stSettings *set)
+{
+	memset (&m_dbDsc, 0, sizeof(DB_INFO));
+	
+	dsc_Nums = pInfo->db_id;
+	m_Sqlconfs = sqlconfs;
+	memset(sql_error,0,sizeof(sql_error));
+	printf("ibear共加载%ld个sql语句\n",m_Sqlconfs.size());
+	
+	if (0 != ibear_db_init (&(m_dbDsc.db_connect),set,sql_error))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[ibear_db_init is failed.]\n", __FILE__, __LINE__);
+		strcpy(no_error,DB_CONNECT_ERROR);
+		return;
+	}
+}
+
+ibear::ibear(char *fileName,bear_db *pInfo)
+{
+	map<string,stSqlMap*> m_Sqlconfs;
+	stSettings *set = new stSettings();
+	if (0 != init_XxmlFile(fileName,&m_Sqlconfs,set))
+	{
+		printf("init_XxmlFile is error \n");
+		exit(0);
+	}
+	memset (&m_dbDsc, 0, sizeof(DB_INFO));
+	
+	dsc_Nums = pInfo->db_id;
+	memset(sql_error,0,sizeof(sql_error));
+	printf("ibear共加载%ld个sql语句\n",m_Sqlconfs.size());
+	
+	if (0 != ibear_db_init (&(m_dbDsc.db_connect),set,sql_error))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[ibear_db_init is failed.]", __FILE__, __LINE__);
+		strcpy(no_error,DB_CONNECT_ERROR);
+		return;
+	}
+}
+
+ibear::~ibear()
+{
+}
+
+void ibear::Commit()
+{
+	#ifdef _DSCI_
+	IBEAR_commit (&(m_dbDsc.db_connect));
+	#else
+	#endif
+}
+
+void ibear::Rollback()
+{
+	#ifdef _DSCI_
+	IBEAR_rollback (&(m_dbDsc.db_connect));
+	#else
+	#endif
+}
+
+void ibear::Quit()
+{
+	#ifdef _DSCI_
+	ibear_db_quit (&(m_dbDsc.db_connect));
+	#else
+	#endif
+}
+
+
+
+int ibear::queryForList(const char *sql_key,map<string,string> inParams,vector<vector<string> > *list)
+{
+	int iRet = 0;
+	int db_no = 0;
+	int db_id = 0;
+	char sql_out[1024] = {0};
+	int res_num = 0;
+	stSqlMap *sqlmap = NULL;
+
+	map<string,stSQLParam*> bindParams;
+	vector<vector<string> > list_tmp;
+	//根据key找到相应的sql及相关信息
+	map<string,stSqlMap*>::iterator dataIter = m_Sqlconfs.find(string(sql_key));
+	if (dataIter != m_Sqlconfs.end())
+	{
+		sqlmap = dataIter->second;
+		bindParams = sqlmap->inParams;
+	}
+	else
+	{
+		printf("sql_key %s 不存在\n",sql_key);
+		sprintf(sql_error,"sql_key %s 不存在\n",sql_key);
+		strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+		return -1;
+	}
+	
+	//给sql入参进行赋值
+	for (map<string,stSQLParam*>::iterator iter = bindParams.begin(); iter != bindParams.end(); iter++)
+	{
+		stSQLParam *pmap = iter->second;
+		map<string,string>::iterator it = inParams.find(string(pmap->key));
+		if (it != inParams.end())
+		{
+			if (pmap->isEmpty != 0)
+			{
+				pmap->isEmpty = 1;
+			}
+			strcpy(pmap->value,(it->second).c_str());
+		}
+		else 
+		{
+			if (pmap->isEmpty == 0)
+			{
+				printf("[%s]未找到相应key\n",pmap->key);
+				sprintf(sql_error,"[%s]未找到相应key\n",pmap->key);
+				strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+				return -1;
+			}
+			else 
+			{
+				strcpy(pmap->value,"");
+				pmap->isEmpty = 2;
+			}
+		}
+	}
+#ifdef _DEBUG_INFO_
+	printf("new_sql=%s[%ld]\n",sqlmap->new_sql,bindParams.size());
+#endif
+	if (0 != replaceSql(sqlmap->new_sql,bindParams,sql_out))
+	{
+		printf("[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		sprintf(sql_error,"[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		strcpy(no_error,DB_BINDPARAM_ERROR);
+		return -1;
+	}
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+	
+	//判断是内存库，还是物理库
+  db_no=dsc_Nums[db_id];
+	
+#ifdef _DEBUG_INFO_
+	printf("[%d]sql_out=%s\n",db_no,sql_out);
+#endif
+	IBEAR_DbConner *pDb = IBEAR_get_db_instance (&m_dbDsc, db_no);
+	IBEAR_row v_row;
+	IBEAR_sql *p_sql = NULL;
+	IBEAR *p_db = pDb->mpDSC;
+	PRESQL *preSqls = IBEAR_get_presql (pDb, db_no);
+
+	if (NULL == (p_sql = db_PrepareSql(p_db, preSqls, sql_out, db_no)))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s][%s][%d]\n", __FILE__, __LINE__, IBEAR_error(p_db),sql_out,db_no);
+		sprintf(sql_error,"ERR_MSG[%s][%s][%d]\n",IBEAR_error(p_db),sql_out,db_no);
+		strcpy(no_error,DB_PREPARESQL_ERROR);
+    iRet = -1;
+		return iRet;
+	}
+
+	//对入参进行排序
+	stSQLParam *para_list[20];
+	int userd_num = 0;
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		if (param->name_type == 1 || param->value == NULL || strcmp(param->value,"") == 0)
+			continue;
+		para_list[param->num] = param;
+		userd_num++;
+	}
+	
+	//参数赋值
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+		//等于1为tablename,不能用做参数赋值
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+	#ifdef _DEBUG_INFO_
+		printf("[%d][%d]%s\n",param->num,val,param->type);
+	#endif
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_INT, &(val));
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+	#ifdef _DEBUG_INFO_
+		printf("[%d][%ld]%s\n",param->num,val,param->type);
+	#endif
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_LONG, &val);
+		}
+		else if (strcasecmp(param->type,"char") == 0)
+		{
+	#ifdef _DEBUG_INFO_
+		printf("[%d][%s]%s\n",param->num,param->value,param->type);
+	#endif
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_CHAR, param->value);
+		}
+	}
+
+	if (IBEAR_exec_p(p_db, p_sql) != 0)
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_EXECSQL_ERROR);
+		error_code = IBEAR_ecode(p_db);
+    iRet = -1;
+		return iRet;
+	}
+
+	while (NULL != (v_row = IBEAR_fetch_row_s(p_db, p_sql)))
+	{
+		vector<string> params;
+		for (int j = 0; j < res_num; j++)
+		{
+			string si_param = string(v_row[j]);
+			params.push_back(si_param);
+		}
+		list_tmp.push_back(params);
+	}
+	*list = list_tmp;
+  return 0;
+}
+
+int ibear::queryForObject(const char *sql_key,map<string,string> inParams,vector<string> *object)
+{
+	int iRet = 0;
+	int db_no = 0;
+	int db_id = 0;
+	char sql_out[1024] = {0};
+	int res_num = 0;
+	stSqlMap *sqlmap = NULL;
+
+	map<string,stSQLParam*> bindParams;
+	vector<string> object_tmp;
+	
+	//根据key找到相应的sql及相关信息
+	map<string,stSqlMap*>::iterator dataIter = m_Sqlconfs.find(string(sql_key));
+	if (dataIter != m_Sqlconfs.end())
+	{
+		sqlmap = dataIter->second;
+		bindParams = sqlmap->inParams;
+	}
+	else
+	{
+		printf("sql_key %s 不存在\n",sql_key);
+		sprintf(sql_error,"sql_key %s 不存在\n",sql_key);
+		strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+		return -1;
+	}
+	
+	//给sql入参进行赋值
+	for (map<string,stSQLParam*>::iterator iter = bindParams.begin(); iter != bindParams.end(); iter++)
+	{
+		stSQLParam *pmap = iter->second;
+		map<string,string>::iterator it = inParams.find(string(pmap->key));
+		if (it != inParams.end())
+		{
+			if (pmap->isEmpty != 0)
+			{
+				pmap->isEmpty = 1;
+			}
+			strcpy(pmap->value,(it->second).c_str());
+		}
+		else 
+		{
+			if (pmap->isEmpty == 0)
+			{
+				printf("[%s]未找到相应key\n",pmap->key);
+				sprintf(sql_error,"[%s]未找到相应key\n",pmap->key);
+				strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+				return -1;
+			}
+			else 
+			{
+				strcpy(pmap->value,"");
+				pmap->isEmpty = 2;
+			}
+		}
+	}
+
+#ifdef _DEBUG_INFO_
+	printf("new_sql=%s\n",sqlmap->new_sql);
+#endif
+	if (0 != replaceSql(sqlmap->new_sql,bindParams,sql_out))
+	{
+		printf("[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		sprintf(sql_error,"[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		strcpy(no_error,DB_BINDPARAM_ERROR);
+		return -1;
+	}
+#ifdef _DEBUG_INFO_
+	printf("sql_out=%s\n",sql_out);
+#endif
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+	
+	//判断是内存库，还是物理库
+  db_no=dsc_Nums[db_id];
+	
+	IBEAR_DbConner *pDb = IBEAR_get_db_instance (&m_dbDsc, db_no);
+	IBEAR_row v_row;
+	IBEAR_sql *p_sql = NULL;
+	IBEAR *p_db = pDb->mpDSC;
+	PRESQL *preSqls = IBEAR_get_presql (pDb, db_no);
+	
+	//预解析
+	if (NULL == (p_sql = db_PrepareSql(p_db, preSqls, sql_out, db_no)))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_PREPARESQL_ERROR);
+    iRet = -1;
+		return iRet;
+	}
+	
+	//对入参进行排序
+	stSQLParam *para_list[20];
+	int userd_num = 0;
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		if (param->name_type == 1 || param->value == NULL || strcmp(param->value,"") == 0)
+			continue;
+		para_list[param->num] = param;
+		userd_num++;
+	}
+	
+	//参数赋值
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+		//等于1为tablename,不能用做参数赋值
+	#ifdef _DEBUG_INFO_
+		printf("%d,%s,%s,%d\n",param->name_type,param->type,param->value,param->num);
+	#endif
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_INT, &(val));
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_LONG, &val);
+		}
+		else if (strcasecmp(param->type,"char") == 0)
+		{
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_CHAR, param->value);
+		}
+	}
+
+	if (IBEAR_exec_p(p_db, p_sql) != 0)
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_EXECSQL_ERROR);
+		error_code = IBEAR_ecode(p_db);
+    iRet = -1;
+		return iRet;
+	}
+
+	if (NULL != (v_row = IBEAR_fetch_row_s(p_db, p_sql)))
+	{
+		for (int j = 0; j < res_num; j++)
+		{
+			string si_param = string(v_row[j]);
+			object_tmp.push_back(si_param);
+		}
+	}
+	
+	*object = object_tmp;
+  return 0;
+}
+
+int ibear::DML (const char *sql_key,map<string,string> inParams)
+{
+	int iRet = 0;
+	int db_no = 0;
+	int db_id = 0;
+	char sql_out[1024] = {0};
+	int res_num = 0;
+	stSqlMap *sqlmap = NULL;
+
+	map<string,stSQLParam*> bindParams;
+	
+	//根据key找到相应的sql及相关信息
+	map<string,stSqlMap*>::iterator dataIter = m_Sqlconfs.find(string(sql_key));
+	if (dataIter != m_Sqlconfs.end())
+	{
+		sqlmap = dataIter->second;
+		bindParams = sqlmap->inParams;
+	}
+	else
+	{
+		printf("sql_key %s 不存在\n",sql_key);
+		sprintf(sql_error,"sql_key %s 不存在\n",sql_key);
+		strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+		return -1;
+	}
+	
+	//给sql入参进行赋值
+	for (map<string,stSQLParam*>::iterator iter = bindParams.begin(); iter != bindParams.end(); iter++)
+	{
+		stSQLParam *pmap = iter->second;
+		map<string,string>::iterator it = inParams.find(string(pmap->key));
+		if (it != inParams.end())
+		{
+			if (pmap->isEmpty != 0)
+			{
+				pmap->isEmpty = 1;
+			}
+			strcpy(pmap->value,(it->second).c_str());
+			//printf("%s[%s]\n",pmap->key,pmap->value);
+		}
+		else 
+		{
+			if (pmap->isEmpty == 0)
+			{
+				printf("[%s]未找到相应key\n",pmap->key);
+				sprintf(sql_error,"[%s]未找到相应key\n",pmap->key);
+				strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+				return -1;
+			}
+			else 
+			{
+				strcpy(pmap->value,"");
+				pmap->isEmpty = 2;
+			}
+		}
+	}
+#ifdef _DEBUG_INFO_
+	printf("new_sql=%s\n",sqlmap->new_sql);
+#endif
+	if (0 != replaceSql(sqlmap->new_sql,bindParams,sql_out))
+	{
+		printf("[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		sprintf(sql_error,"[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		strcpy(no_error,DB_BINDPARAM_ERROR);
+		return -1;
+	}
+	db_id = atoi(sqlmap->db_no);
+	
+	//判断是内存库，还是物理库
+  db_no=dsc_Nums[db_id];
+	
+	IBEAR_DbConner *pDb = IBEAR_get_db_instance (&m_dbDsc, db_no);
+	IBEAR_row v_row;
+	IBEAR_sql *p_sql = NULL;
+	IBEAR *p_db = pDb->mpDSC;
+	PRESQL *preSqls = IBEAR_get_presql (pDb, db_no);
+	
+#ifdef _DEBUG_INFO_
+	printf("sql_out=%s\n",sql_out);
+#endif
+	//预解析
+	if (NULL == (p_sql = db_PrepareSql(p_db, preSqls, sql_out, db_no)))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_PREPARESQL_ERROR);
+    iRet = -1;
+		return iRet;
+	}
+	
+	//对入参进行排序
+	int userd_num = 0;
+	stSQLParam *para_list[20];
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		//等于1为tablename,不能用做参数赋值
+		if (param->name_type == 1)
+		{
+			continue;
+		}
+		para_list[param->num] = param;
+		userd_num++;
+#ifdef _DEBUG_INFO_
+		//printf("para_list[%d]=%s\n",param->num,para_list[param->num]->value);
+#endif
+	}
+	
+	long lvalues[20];
+	int ivalues[20];
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			ivalues[i] = val;
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			lvalues[i] = val;
+		}
+	}
+	//参数赋值
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+#ifdef _DEBUG_INFO_
+	printf("[%d][%s][%s]\n",param->num,param->type,param->value);
+#endif
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_INT, &ivalues[i]);
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_LONG, &lvalues[i]);
+		}
+		else if (strcasecmp(param->type,"char") == 0)
+		{
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_CHAR, param->value);
+		}
+	}
+
+	if (IBEAR_exec_p(p_db, p_sql) != 0)
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_EXECSQL_ERROR);
+		error_code = IBEAR_ecode(p_db);
+    iRet = -1;
+		return iRet;
+	}
+	
+	if (IBEAR_num_rows(p_db) <= 0)
+	{
+		strcpy(sql_error,"exe num is NULL");
+		//printf ("FILE[%s]LINE[%d]exe num is 0\n", __FILE__, __LINE__);
+		iRet = 1;
+		return iRet;
+	}
+	return 0;
+}
+
+int ibear::queryForListBySQL(stSqlMap *sqlmap,map<string,string> inParams,vector<vector<string> > *list)
+{
+	int iRet = 0;
+	int db_no = 0;
+	int db_id = 0;
+	char sql_out[1024] = {0};
+	int res_num = 0;
+	
+	
+	map<string,stSQLParam*> bindParams;
+	vector<vector<string> > list_tmp;
+	
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+#ifdef _DEBUG_INFO_
+	printf("sqlmap->sql=%s\n",sqlmap->sql);
+#endif
+	if (0 != xmlbuild_sql(sqlmap->sql,sqlmap->new_sql,&bindParams))
+	{
+		printf("xmlbuild_sql is ERROR[%s]\n",sqlmap->sql);
+		sprintf(sql_error,"xmlbuild_sql is ERROR[%s]\n",sqlmap->sql);
+		strcpy(no_error,DB_XMLBUILDSQL_ERROR);
+		return -1;
+	}
+#ifdef _DEBUG_INFO_
+	printf("sqlmap->new_sql=%s\n",sqlmap->new_sql);
+#endif
+	//给sql入参进行赋值
+	for (map<string,stSQLParam*>::iterator iter = bindParams.begin(); iter != bindParams.end(); iter++)
+	{
+		stSQLParam *pmap = iter->second;
+		map<string,string>::iterator it = inParams.find(string(pmap->key));
+		if (it != inParams.end())
+		{
+			if (pmap->isEmpty != 0)
+			{
+				pmap->isEmpty = 1;
+			}
+			strcpy(pmap->value,(it->second).c_str());
+		}
+		else 
+		{
+			if (pmap->isEmpty == 0)
+			{
+				printf("[%s]未找到相应key\n",pmap->key);
+				sprintf(sql_error,"[%s]未找到相应key\n",pmap->key);
+				strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+				return -1;
+			}
+			else 
+			{
+				strcpy(pmap->value,"");
+				pmap->isEmpty = 2;
+			}
+		}
+#ifdef _DEBUG_INFO_
+		//printf("para_list[%d]=%s\n",pmap->num,pmap->value);
+#endif
+	}
+
+#ifdef _DEBUG_INFO_
+	printf("new_sql=%s\n",sqlmap->new_sql);
+#endif
+	if (0 != replaceSql(sqlmap->new_sql,bindParams,sql_out))
+	{
+		printf("[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		sprintf(sql_error,"[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		strcpy(no_error,DB_BINDPARAM_ERROR);
+		return -1;
+	}
+#ifdef _DEBUG_INFO_
+	printf("sql_out=%s\n",sql_out);
+#endif
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+	
+	//判断是内存库，还是物理库
+  db_no=dsc_Nums[db_id];
+	
+	IBEAR_DbConner *pDb = IBEAR_get_db_instance (&m_dbDsc, db_no);
+	IBEAR_row v_row;
+	IBEAR_sql *p_sql = NULL;
+	IBEAR *p_db = pDb->mpDSC;
+	PRESQL *preSqls = IBEAR_get_presql (pDb, db_no);
+	
+	//预解析
+	if (NULL == (p_sql = db_PrepareSql(p_db, preSqls, sql_out, db_no)))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s][%s][%d]\n", __FILE__, __LINE__, IBEAR_error(p_db),sql_out,db_no);
+		sprintf(sql_error,"ERR_MSG[%s][%s][%d]\n",IBEAR_error(p_db),sql_out,db_no);
+		strcpy(no_error,DB_PREPARESQL_ERROR);
+    iRet = -1;
+		return iRet;
+	}
+	
+	//对入参进行排序
+	stSQLParam *para_list[20];
+	int userd_num = 0;
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		if (param->name_type == 1 || param->value == NULL || strcmp(param->value,"") == 0)
+			continue;
+		para_list[param->num] = param;
+		userd_num++;
+	}
+	
+	//参数赋值
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+		//等于1为tablename,不能用做参数赋值
+	#ifdef _DEBUG_INFO_
+		printf("[%d][%s]%s\n",param->num,param->value,param->type);
+	#endif
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_INT, &(val));
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_LONG, &val);
+		}
+		else if (strcasecmp(param->type,"char") == 0)
+		{
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_CHAR, param->value);
+		}
+	}
+
+	if (IBEAR_exec_p(p_db, p_sql) != 0)
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_EXECSQL_ERROR);
+		error_code = IBEAR_ecode(p_db);
+    iRet = -1;
+		return iRet;
+	}
+	while (NULL != (v_row = IBEAR_fetch_row_s(p_db, p_sql)))
+	{
+		vector<string> params;
+		for (int j = 0; j < res_num; j++)
+		{
+			string si_param = string(v_row[j]);
+			params.push_back(si_param);
+		}
+		list_tmp.push_back(params);
+	}
+	*list = list_tmp;
+  return 0;
+}
+
+int ibear::queryForObjectBySQL(stSqlMap *sqlmap,map<string,string> inParams,vector<string> *object)
+{
+	int iRet = 0;
+	int db_no = 0;
+	int db_id = 0;
+	int res_num = 0;
+	char sql_out[1024] = {0};
+	map<string,stSQLParam*> bindParams;
+	vector<string> object_tmp;
+	
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+	if (0 != xmlbuild_sql(sqlmap->sql,sqlmap->new_sql,&bindParams))
+	{
+		printf("xmlbuild_sql is ERROR[%s]\n",sqlmap->sql);
+		sprintf(sql_error,"xmlbuild_sql is ERROR[%s]\n",sqlmap->sql);
+		strcpy(no_error,DB_XMLBUILDSQL_ERROR);
+		return -1;
+	}
+	//给sql入参进行赋值
+	for (map<string,stSQLParam*>::iterator iter = bindParams.begin(); iter != bindParams.end(); iter++)
+	{
+		stSQLParam *pmap = iter->second;
+		map<string,string>::iterator it = inParams.find(string(pmap->key));
+		if (it != inParams.end())
+		{
+			if (pmap->isEmpty != 0)
+			{
+				pmap->isEmpty = 1;
+			}
+			strcpy(pmap->value,(it->second).c_str());
+		}
+		else 
+		{
+			if (pmap->isEmpty == 0)
+			{
+				printf("[%s]未找到相应key\n",pmap->key);
+				sprintf(sql_error,"[%s]未找到相应key\n",pmap->key);
+				strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+				return -1;
+			}
+			else 
+			{
+				strcpy(pmap->value,"");
+				pmap->isEmpty = 2;
+			}
+		}
+	}
+#ifdef _DEBUG_INFO_
+	printf("new_sql=%s\n",sqlmap->new_sql);
+#endif
+	if (0 != replaceSql(sqlmap->new_sql,bindParams,sql_out))
+	{
+		printf("[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		sprintf(sql_error,"[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		strcpy(no_error,DB_BINDPARAM_ERROR);
+		return -1;
+	}
+#ifdef _DEBUG_INFO_
+	printf("sql_out=%s\n",sql_out);
+#endif
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+	
+	//判断是内存库，还是物理库
+  db_no=dsc_Nums[db_id];
+	
+	IBEAR_DbConner *pDb = IBEAR_get_db_instance (&m_dbDsc, db_no);
+	IBEAR_row v_row;
+	IBEAR_sql *p_sql = NULL;
+	IBEAR *p_db = pDb->mpDSC;
+	PRESQL *preSqls = IBEAR_get_presql (pDb, db_no);
+	
+#ifdef _DEBUG_INFO_
+	printf("[%d]%s\n",db_no,sql_out);
+#endif
+	//预解析
+	if (NULL == (p_sql = db_PrepareSql(p_db, preSqls, sql_out, db_no)))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_PREPARESQL_ERROR);
+    iRet = -1;
+		return iRet;
+	}
+	
+	//对入参进行排序
+	stSQLParam *para_list[20];
+	int userd_num = 0;
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		if (param->name_type == 1 || param->value == NULL || strcmp(param->value,"") == 0)
+			continue;
+		para_list[param->num] = param;
+		userd_num++;
+	}
+	
+	//参数赋值
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+		//等于1为tablename,不能用做参数赋值
+	#ifdef _DEBUG_INFO_
+		printf("%d,%s,%s,%d\n",param->name_type,param->type,param->value,param->num);
+	#endif
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_INT, &(val));
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_LONG, &val);
+		}
+		else if (strcasecmp(param->type,"char") == 0)
+		{
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_CHAR, param->value);
+		}
+	}
+	
+	if (IBEAR_exec_p(p_db, p_sql) != 0)
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_EXECSQL_ERROR);
+		error_code = IBEAR_ecode(p_db);
+    iRet = -1;
+		return iRet;
+	}
+	if (NULL != (v_row = IBEAR_fetch_row_s(p_db, p_sql)))
+	{
+		for (int j = 0; j < res_num; j++)
+		{
+			string si_param = string(v_row[j]);
+			object_tmp.push_back(si_param);
+		}
+	}
+	*object = object_tmp;
+  return 0;
+}
+
+int ibear::DMLBySQL (stSqlMap *sqlmap,map<string,string> inParams)
+{
+	int iRet = 0;
+	int db_no = 0;
+	int db_id = 0;
+	int res_num = 0;
+	char sql_out[1024] = {0};
+	map<string,stSQLParam*> bindParams;
+	
+	db_id = atoi(sqlmap->db_no);
+	res_num = atoi(sqlmap->res_num);
+	if (0 != xmlbuild_sql(sqlmap->sql,sqlmap->new_sql,&bindParams))
+	{
+		printf("xmlbuild_sql is ERROR[%s]\n",sqlmap->sql);
+		sprintf(sql_error,"xmlbuild_sql is ERROR[%s]\n",sqlmap->sql);
+		strcpy(no_error,DB_XMLBUILDSQL_ERROR);
+		return -1;
+	}
+	//给sql入参进行赋值
+	for (map<string,stSQLParam*>::iterator iter = bindParams.begin(); iter != bindParams.end(); iter++)
+	{
+		stSQLParam *pmap = iter->second;
+		map<string,string>::iterator it = inParams.find(string(pmap->key));
+		if (it != inParams.end())
+		{
+			if (pmap->isEmpty != 0)
+			{
+				pmap->isEmpty = 1;
+			}
+			strcpy(pmap->value,(it->second).c_str());
+		}
+		else 
+		{
+			if (pmap->isEmpty == 0)
+			{
+				printf("[%s]未找到相应key\n",pmap->key);
+				sprintf(sql_error,"[%s]未找到相应key\n",pmap->key);
+				strcpy(no_error,DB_SQLKEYNOTFOUND_ERROR);
+				return -1;
+			}
+			else 
+			{
+				strcpy(pmap->value,"");
+				pmap->isEmpty = 2;
+			}
+		}
+	}
+#ifdef _DEBUG_INFO_
+	printf("new_sql=%s\n",sqlmap->new_sql);
+#endif
+	if (0 != replaceSql(sqlmap->new_sql,bindParams,sql_out))
+	{
+		printf("[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		sprintf(sql_error,"[%s]replaceSql is ERR[bindParams.size=%ld]\n",sqlmap->new_sql,bindParams.size());
+		strcpy(no_error,DB_BINDPARAM_ERROR);
+		return -1;
+	}
+	db_id = atoi(sqlmap->db_no);
+	
+	//判断是内存库，还是物理库
+  db_no=dsc_Nums[db_id];
+	
+	IBEAR_DbConner *pDb = IBEAR_get_db_instance (&m_dbDsc, db_no);
+	IBEAR_row v_row;
+	IBEAR_sql *p_sql = NULL;
+	IBEAR *p_db = pDb->mpDSC;
+	PRESQL *preSqls = IBEAR_get_presql (pDb, db_no);
+	
+#ifdef _DEBUG_INFO_
+	printf("sql_out=%s\n",sql_out);
+#endif
+	//预解析
+	if (NULL == (p_sql = db_PrepareSql(p_db, preSqls, sql_out, db_no)))
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_PREPARESQL_ERROR);
+    iRet = -1;
+		return iRet;
+	}
+	
+	//对入参进行排序
+	int userd_num = 0;
+	stSQLParam *para_list[20];
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		//等于1为tablename,不能用做参数赋值
+		if (param->name_type == 1)
+		{
+			continue;
+		}
+		para_list[param->num] = param;
+		userd_num++;
+#ifdef _DEBUG_INFO_
+		printf("para_list[%d]=%s\n",param->num,para_list[param->num]->value);
+#endif
+	}
+	
+	long lvalues[20];
+	int ivalues[20];
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			ivalues[i] = val;
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			lvalues[i] = val;
+		}
+	}
+	//参数赋值
+	for (int i = 0; i < userd_num; i++)
+	{
+		stSQLParam *param = para_list[i];
+#ifdef _DEBUG_INFO_
+	printf("[%d][%s][%s]\n",param->num,param->type,param->value);
+#endif
+		if (strcasecmp(param->type,"int") == 0)
+		{
+			int val = atoi(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_INT, &ivalues[i]);
+		}
+		else if (strcasecmp(param->type,"long") == 0)
+		{
+			long val = atol(param->value);
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_LONG, &lvalues[i]);
+		}
+		else if (strcasecmp(param->type,"char") == 0)
+		{
+			IBEAR_bind_param (p_db, p_sql, param->num, DSCI_TYPE_CHAR, param->value);
+		}
+	}
+	
+	if (IBEAR_exec_p(p_db, p_sql) != 0)
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[%s]\n", __FILE__, __LINE__, IBEAR_error(p_db));
+		sprintf(sql_error,"ERR_MSG[%s]\n",IBEAR_error(p_db));
+		strcpy(no_error,DB_EXECSQL_ERROR);
+		error_code = IBEAR_ecode(p_db);
+    iRet = -1;
+		return iRet;
+	}
+	
+	if (IBEAR_num_rows(p_db) <= 0)
+	{
+		strcpy(sql_error,"exe num is NULL");
+		//printf ("FILE[%s]LINE[%d]exe num is 0\n", __FILE__, __LINE__);
+		iRet = 1;
+		return iRet;
+	}
+	return 0;
+}

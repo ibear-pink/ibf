@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "inDataExpDeal.h"
+
+IMPLEMENT_CLASS(inDataExpDeal)
+
+inDataExpDeal::inDataExpDeal()
+{
+	
+}
+
+inDataExpDeal::~inDataExpDeal()
+{
+
+}
+
+int inDataExpDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int inDataExpDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

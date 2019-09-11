@@ -1,0 +1,6 @@
+#/account/c000/pkg/src/cpp/AUDIT/Getpwd/getpwd 0 /account/plat/newkey/billing_data_acctopr.login YES
+#/account/cx00/pkg/bin/RTOF -c /account/cx00/pkg/cfg/accaudit/rtof.conf -p CDSP
+#/account/cx00/pkg/bin/RTOF -c /account/cx00/pkg/cfg/accaudit/rtof.conf -p OFAC
+#/account/cx00/pkg/bin/RTOF_cf01 -s start -p MODEL=OFAC,IN_PWS=acctadm.MD_APP_PROCWS_OFAC_HIS_CF01
+/account/cx00/pkg/bin/RTOF_x001_cf01 cf01
+

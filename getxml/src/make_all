@@ -1,0 +1,22 @@
+XML_PATH=${IBEAR_PATH}/xml2
+
+FILE_H="-I${DSCI_PATH}/include -I${XML_PATH}/include"
+FILE_L="-L${DSCI_PATH}/lib -ldsci -L${XML_PATH}/lib -lxml2"
+FILE_C="iformat.cpp"
+FILE_O="iformat.o"
+IFLAGS="-DSS_64BIT_SERVER -D_REENTRANT -D_DEBUG_INFO_"
+
+CCS="g++ -fPIC -m64 -g -O2 -fpermissive"
+INCLUDE="-I../include -I../src ${FILE_H}"
+
+#######  ±‡“Î  #########################
+echo "Compiling the  *.cpp $<"
+${CCS} -c ${IFLAGS} ${FILE_C} ${INCLUDE}
+
+#######  C∂ØÃ¨ø‚ ########################
+echo "Compiling the  C∂ØÃ¨ø‚ $<"
+rm -f libiformat.so
+rm -f ../lib/libiformat.so
+g++ -shared -o libiformat.so ${FILE_O}
+
+mv libiformat.so ../lib

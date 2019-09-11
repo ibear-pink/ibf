@@ -1,0 +1,302 @@
+#include <stdlib.h>
+#include "stop_db_conn.h"
+
+//信控配置模型
+const char STRING_SQL_GET_STOPAWOKE_INFO[1024] = "select region_code,sm_code,card_type,credit_code,special_list,family_code,credit_name,over_fee,awake_fee,owe_awake_fee,restop_hours,singlestop_days,voicestop_days,limit_days,calling_times,awake_times,owe_awake_times,nvl(credit_awake_flag,0),credit_type,priority,property1,property2,property3 from cct_stopawake_conf where op_type=? order by priority";
+const char STRING_SQL_GET_RUNCODE_INFO[1024] = "select deal_flag,old_run,run_code,new_run from cct_stopstate_conf where stop_type=?";
+const char STRING_SQL_GET_SERVRELA_INFO[1024] = "select busi_code,serv_id from cct_servrela_conf where op_type=? and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_SMS_TEMPLATE[1024] = "select content,SEQ_SMS_PUSH.NEXTVAL,priority_level From PUSH_TEMPLATE where template_id=?";
+const char STRING_SQL_GET_SMS_TIME[1024] = "select day_type,day_value,begin_time,end_time from cct_smstime_conf order by day_type";
+const char STRING_SQL_GET_HOLIDAY_INFO[1024] = "select stop_flag,stop_type,nvl(trim(cj_flag),'Y'),nvl(trim(st_flag), 'Y'),nvl(trim(credit_cj_flag), 'Y'),to_char(begin_time,'yyyymmddhh24miss'),to_char(end_time,'yyyymmddhh24miss') from cct_stopholiday_conf";
+const char STRING_SQL_GET_PUB_IDROUTE_CONF[1024] = "select BEGIN_ID,END_ID,ID_TAIL,ONLINE_FLAG from PUB_IDROUTE_CONF WHERE ID_TYPE = ? AND APP_NAME = ?";
+const char STRING_SQL_GET_PAYCODE_INFO[1024] = "select para_id from ct_para_type_value where para_type_id = 251 and notes='1'";
+//日志模型
+const char STRING_SQL_GET_STOP_TIME_INFO[1024] = "select id_no,phone_no,contract_no,to_char(stop_time,'YYYYMMDDHH24MISS'),stop_type,old_run,run_code,stop_times from cct_stoptime_info where id_no =? ";
+const char STRING_SQL_UPD_STOP_TIME_INFO[1024] = "update cct_stoptime_info set contract_no=?,stop_time=?,stop_type=?,old_run=?,run_code=?,stop_times=? where id_no=?";
+const char STRING_SQL_INS_STOP_TIME_INFO[1024] = "insert into cct_stoptime_info(id_no,phone_no,contract_no,stop_time,stop_type,old_run,run_code,stop_times) values(?,?,?,?,?,?,?,1)";
+const char STRING_SQL_INS_STOP_HIS_INFO[1024] = "insert into cct_stoptime_his(id_no,phone_no,contract_no,stop_type,old_run,run_code,stop_time,stop_times) values(?,?,?,?,?,?,sysdate,?)";
+const char STRING_SQL_INS_REMAINFEE_RECD[1024] = "insert into CCT_REMAINFEE_RECD(phone_no,id_no,contract_no,run_code,prepay_fee,limit_owe,unbill_fee,owe_fee,group_owe,limit_high,op_code,op_time,restop_flag,pay_flag) values(?,?,?,?,?,?,?,?,?,?,?,sysdate,?,?)";
+const char STRING_SQL_INS_USERCHG_RECD[1024] = "insert into BAL_USERCHG_RECD (COMMAND_ID, TOTAL_DATE, PAY_SN, ID_NO, CONTRACT_NO, GROUP_ID, BRAND_ID, PHONE_NO,OLD_RUN, RUN_CODE, OP_TIME, OP_CODE, LOGIN_NO,LOGIN_GROUP,REMARK) values(SEQ_COMMON_ID.nextval,?,?,?,?,?,?,?,?, ?,sysdate,?,?,'10011',?)";
+const char STRING_SQL_INS_KEEPPHONE_HIS[1024] = "insert into CCT_KEEPPHONE_HIS(PHONE_NO,ID_NO,RUN_CODE,RUN_TIME,OP_CODE,TOTAL_DATE,LOGIN_ACCEPT,LOGIN_NO,OP_TIME,UPDATE_TYPE,UPDATE_LOGINNO,UPDATE_TIME,UPDATE_CODE,UPDATE_DATE,UPDATE_ACCEPT) select PHONE_NO,ID_NO,RUN_CODE,RUN_TIME,OP_CODE,TOTAL_DATE,LOGIN_ACCEPT,LOGIN_NO,OP_TIME,'d',?,sysdate,?,to_number(to_char(sysdate,'YYYYMMDD')),? from CCT_KEEPPHONE_INFO where id_no=?";
+const char STRING_SQL_DEL_KEEPPHONE_INFO[1024] = "delete from CCT_KEEPPHONE_INFO where id_no=?";
+const char STRING_SQL_INS_LOGINOPR_RECD[1024] = "insert into bal_loginopr_info(login_sn,login_no,login_group,total_date,id_No,phone_no,BRAND_ID,pay_type,pay_fee,op_code,op_time,REMARK) values(?,'system','245',?,?,?,?,'0',0,?,sysdate,?)";
+const char STRING_SQL_INS_TESTINTERFACE_RECD[1024] = "insert into CCT_RESULTTEST_RECD values(?,?,?,?,?,?,?,?,?,?,?,sysdate,NULL,'0')";
+const char STRING_SQL_INS_SMSSEND_HIS[1024] = "insert into in_smssend_his values(?,?,?,?,?,?,sysdate,'Y','N','success')";
+const char STRING_SQL_INS_SMSSEND_ERR[1024] = "insert into in_smssend_err values(?,?,?,?,?,?,sysdate,'Y','N',?,?)";
+const char STRING_SQL_GET_USERCHG_RUNCODE_INFO[1024] = "select old_run from BAL_USERCHG_RECD where id_no=? and pay_sn=? and TO_CHAR(OP_TIME,'YYYYMM')=TO_CHAR(sysdate,'YYYYMM') and run_code='A'";
+const char STRING_SQL_INS_PUSH_INFO[1024] = "insert into push_2_0200(SEQ,TEMPLATEID,PARAMETER,SERVICE_NO,PHONE_NO,INSERT_TIME,SEND_FLAG,OP_CODE,LOGIN_NO,SEND_TIME) values(?,?,?,?,?,sysdate,'0',?,'system',?)";
+
+//其他参考模型
+const char STRING_SQL_GET_USER_INFO[1024] = "select a.CUST_ID,a.contract_no,a.phone_no,a.master_serv_id,b.card_type,b.run_code,b.run_time,a.open_time,b.old_run,b.stop_flag,a.group_id,a.owner_type,b.user_grade_code from ur_user_info a,cs_userdetail_info b where a.id_no=b.id_no and a.id_no=?";
+const char STRING_SQL_GET_USER_BRAND_INFO[1024] = "select brand_id from ur_userbrand_rel where id_no=? and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_USER_REGION_INFO[1024] = "SELECT  REGION_CODE FROM (SELECT TO_CHAR (A.region_id) REGION_CODE FROM BS_cHNgROUP_DICT A,BS_cHNgROUP_REL B WHERE A.GROUP_ID = B.PARENT_GROUP_ID AND B.parent_level IN (1, 2) AND B.GROUP_ID =? ORDER BY region_id DESC) WHERE ROWNUM < 2";
+const char STRING_SQL_GET_CONTRACT_INFO[1024] = "select pay_code,contractatt_type,account_type from ac_contract_info where contract_no=?";
+const char STRING_SQL_GET_UR_FEEAWOKEADD_INFO[1024] = "select awoke_type,awoke_fee,reawoke_day,send_phone,valid_flag,BEGIN_HM,END_HM from UR_FEEAWOKEADD_INFO where id_no= ?";
+//wangzhia test drop
+//const char STRING_SQL_GET_UR_SPECIALLIST_INFO[1024] = "select LIST_TYPE,nvl(stop_flag,'Y'),nvl(warn_flag,'Y') from cs_SpecialList_info where id_no=? and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_UR_SPECIALLIST_INFO[1024] = "select LIST_TYPE from cs_SpecialList_info where id_no=? and list_type in('43','44') and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_AC_CONUSERREL_INFO_BY_C[1024] = "select id_no,bill_order from cs_conuserrel_info where contract_no=? and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_AC_CONUSERREL_INFO_BY_U[1024] = "select contract_no from cs_conuserrel_info where id_no=? and sysdate between eff_date and exp_date order by bill_order";
+const char STRING_SQL_GET_WHITE_LIST_NOSTOP[1024] = "select count(1) from cct_stopwhitelist_info where white_list_member=${phone_no} and white_list_type='3' and valid_flag='Y'";
+const char STRING_SQL_GET_SLAVE_ID[1024] = "select slave_id,relation_code from cs_userrel_info where master_id=? and relation_code IN ('59','52') and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_SLAVE_ID_SERVER[1024] = "select count(1) from UR_USERSVCTRACE_INFO where id_no=? and svc_id= 'BSO0000095'  and STATE='A' and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_WHITE_LIST_STOP[1024] = "select count(1) from cct_stopwhitelist_info where id_no=? and white_list_type=? and valid_flag='Y'";
+
+//老模型未转换
+const char STRING_SQL_GET_FEEAWOKE_INFO[1024] = "select awoke_fee,REAWOKE_DAY,TIME_FLAG from CS_FEEAWOKEADD_INFO where id_no=?";
+
+/*未出帐期间获取预存款*/
+/*1.查询账本表 2.查询出账标识和年月3.获取账本表中的出账年月4.获取未出帐状态下的预存款5*/
+const char STRING_SQL_GET_WRTOFF_MONTH[1024] = "select WRTOFF_MONTH from BAL_ACCTBOOK_INFO where contract_no=? and sysdate between begin_time and end_time and rownum<2";
+const char STRING_SQL_GET_STOP_ACT_WRTOFF_CTRL[1024] ="select NVL(WRTOFF_FLAG,0),NVL(NATURAL_MONTH,0) from PUB_WRTOFF_CTRL WHERE TO_CHAR(SYSDATE,'HH24MISS') BETWEEN START_TIME AND END_TIME AND TO_NUMBER(TO_CHAR(SYSDATE,'DD'))  BETWEEN START_DAY AND END_DAY";
+const char STRING_SQL_GET_STOP_CREDIT_LEVEL[1024]="select credit_class,stop_flag,owe_flag,valid_flag from CCT_CREDIT_INFO where id_no=? and sysdate between begin_time and end_time";
+/*冲销计划*/
+const char STRING_SQL_GET_WRITEPLAN_CONF[1024]="select count(distinct a.pay_type) from BAL_WRITEPLAN_CONF a ,ACT_ITEM_GROUP_DETAIL b where a.ACCT_ITEM_GROUP=b.ACCT_ITEM_GROUP and a.pay_type=? and b.ACCT_ITEM_CODE=?";
+const char STRING_SQL_GET_SUM_UNPAYOWE_INFO[1024] = "select nvl(sum(should_pay-favour_fee-payed_prepay-payed_later),0) from ACT_UNPAYOWE_INFO where contract_no=? and bill_cycle<=(to_number(to_char(add_months(to_date(to_char(sysdate,'YYYYMM'),'yyyymm'),(-1)*?),'yyyymm')))";
+const char STRING_SQL_GET_SUM_UNPAYOWE_INFO_OFF[1024] = "select nvl(sum(should_pay-favour_fee-payed_prepay-payed_later),0) from ACT_UNPAYOWE_INFO where contract_no=? and (natural_month!=? or bill_day!=3600) and bill_cycle<=(to_number(to_char(add_months(to_date(to_char(sysdate,'YYYYMM'),'yyyymm'),(-1)*?),'yyyymm')))";
+const char STRING_SQL_GET_UNPAYOWE_INFO_DET[1024] = "select contract_no,id_no,bill_cycle,cycle_type,bill_type,acct_item_code,status,should_pay, favour_fee,nvl((should_pay-favour_fee-payed_prepay-payed_later),0) from ACT_UNPAYOWE_INFO where contract_no=?";
+const char STRING_SQL_GET_UNPAYOWE_INFO_DET_OFF[1024] = "select a.contract_no,a.id_no,a.bill_cycle,a.cycle_type,a.bill_type,a.acct_item_code,a.status, a.should_pay, a.favour_fee,nvl((a.should_pay-a.favour_fee-a.payed_prepay-a.payed_later),0) from act_unpayowe_info a where a.contract_no=? and (a.natural_month!=? or a.bill_day!=3600) ";
+const char STRING_SQL_GET_UNPAYOWE_INFO_DET_CONID[1024] = "select contract_no,id_no,bill_cycle,cycle_type,bill_type,acct_item_code,status,should_pay, favour_fee,nvl((should_pay-favour_fee-payed_prepay-payed_later),0) from ACT_UNPAYOWE_INFO where contract_no=? and id_no=?";
+const char STRING_SQL_GET_UNPAYOWE_INFO_DET_CONID_OFF[1024] = "select a.contract_no,a.id_no,a.bill_cycle,a.cycle_type,a.bill_type,a.acct_item_code,a.status, a.should_pay, a.favour_fee,nvl((a.should_pay-a.favour_fee-a.payed_prepay-a.payed_later),0) from act_unpayowe_info a where a.contract_no=? and (a.natural_month!=? or a.bill_day!=3600) and a.id_no=? ";
+
+const char STRING_SQL_GET_SPE_ACCT_FLAG_INFO[1024] = "select count(a.pay_type) from BAL_ACCTBOOK_INFO a,bal_booktype_dict b where a.pay_type=b.pay_type  and a.contract_no=? and SUBSTR(B.PAY_ATTR,1,1)='0' and sysdate between a.begin_time and a.end_time";
+const char STRING_SQL_GET_PUB_BALANCE[1024] = "select nvl(sum(cur_balance),0) from BAL_ACCTBOOK_INFO where contract_no=? and sysdate between begin_time and end_time";
+const char STRING_SQL_GET_PUB_BALANCE_OFF[1024] = "select nvl(sum(decode(wrtoff_month,?,pre_balance,cur_balance)),0) from BAL_ACCTBOOK_INFO where contract_no=? and sysdate between begin_time and end_time";
+const char STRING_SQL_GET_ACCTBOOK_INFO[1024] = "select a.pay_type,nvl(sum(cur_balance),0),substr(b.pay_attr,1,1) from BAL_ACCTBOOK_INFO a,bal_booktype_dict b where a.pay_type=b.pay_type  and a.contract_no=? and sysdate between a.begin_time and a.end_time group by a.pay_type,b.pay_attr,b.priority order by substr(b.pay_attr,1,1),b.priority desc";
+const char STRING_SQL_GET_ACCTBOOK_INFO_OFF[1024] = "select a.pay_type,nvl(sum(PRE_BALANCE),0),substr(b.pay_attr,1,1) from BAL_ACCTBOOK_INFO a,bal_booktype_dict b where a.pay_type=b.pay_type  and a.contract_no=? and sysdate between a.begin_time and a.end_time group by a.pay_type,b.pay_attr,b.priority order by substr(b.pay_attr,1,1),b.priority desc";
+
+const char STRING_SQL_GET_UNPAYOWE_DETAIL[1024] = "select ACCT_ITEM_CODE,should_pay,favour_fee,payed_prepay,payed_later,status from act_unpayowe_info where bill_cycle=? and contract_no= ?";
+const char STRING_SQL_GET_UNPAYOWE_PRE_DETAIL[1024] = "select ACCT_ITEM_CODE,should_pay,favour_fee,payed_prepay,payed_later,status from act_unpayowe_info where bill_cycle=? and contract_no= ? and id_no=?";
+
+/*后台公共配置表获取*/
+const char STRING_SQL_GET_CCT_DEMOLITION_CONF[1024]="select TABLE_SOURCE,TABLE_END,OP_SQL,REQUIREMENT from CCT_DEMOLITION_CONF where sysdate between eff_date and exp_date and op_type=? order by table_source desc";
+
+/*获取流水*/
+const char STRING_SQL_GET_ACCEPT_INFO[1024] = "select seq_system_sn.nextval from dual";
+
+/*获取dead信息*/
+const char STRING_SQL_GET_AC_CONUSERRELDEAD_INFO_BY_C[1024] = "select id_no from AC_CONUSERREL_DEAD where contract_no=? and sysdate between eff_date and exp_date";
+const char STRING_SQL_GET_USERDEAD_INFO[1024] = "select a.CUST_ID,a.contract_no,a.phone_no,a.master_serv_id,b.card_type,b.run_code,b.run_time,a.open_time,b.old_run,b.stop_flag,a.group_id,a.owner_type,b.user_grade_code from ur_userdead_info a,cs_userdetaildead_info b where a.id_no=b.id_no and a.id_no=?";
+const char STRING_SQL_GET_ACCT_BALDEAD_INFO[1024] = "select nvl(sum(cur_balance),0) from BAL_ACCTBOOK_DEAD a,bal_booktype_dict b where a.pay_type=b.pay_type  and a.contract_no=? and SUBSTR(B.PAY_ATTR,1,1)='1' and sysdate between a.begin_time and a.end_time";
+const char STRING_SQL_GET_ACCT_BALDEAD_INFO_OFF[1024] = "select nvl(sum(PRE_BALANCE),0) from BAL_ACCTBOOK_DEAD a,bal_booktype_dict b where a.pay_type=b.pay_type  and a.contract_no=? and SUBSTR(B.PAY_ATTR,1,1)='1' and sysdate between a.begin_time and a.end_time";
+const char STRING_SQL_GET_CREDIT_HIS_INFO[1024]="select credit_class,stop_flag,owe_flag,valid_flag from (select credit_class,stop_flag,owe_flag,valid_flag from cct_creditchg_his where id_no=? order by op_time desc) where rownum<2";
+
+/*获取所有的消费信息*/
+const char STRING_SQL_GET_ALLPAY_UNPAY_INFO[1024]="SELECT nvl(sum(should_pay-favour_fee),0) FROM ACT_UNPAYOWE_INFO where contract_no=? and id_no=? and natural_month=? and bill_begin=?";
+const char STRING_SQL_GET_ALLPAY_PAYED_INFO[1024]="SELECT nvl(sum(should_pay-favour_fee),0) FROM ACT_PAYEDOWE_INFO where contract_no=? and id_no=? and natural_month=? and bill_begin=?";
+
+/*批量比对信控Test代码*/
+const char STRING_SQL_UPD_USERDETAIL_INFO[1024] = "update cs_userdetail_info set run_code=?,run_time=? where id_no=?";
+
+/*给经分入表：停机次数*/
+const char STRING_SQL_UPD_USERSTOP_INFO[1024] = "update cct_userstop_info set stop_times=stop_times+1 where id_no=?";
+const char STRING_SQL_INS_USERSTOP_INFO[1024] = "insert into cct_userstop_info values(?,1,0,sysdate,sysdate,0,0)";
+
+int load_common_conf (char * stop_common, STOP_COMMON_CONF *out_conf_info)
+{
+	STOP_COMMON_CONF conf_info;
+	char sFileName[1024] = {0};
+	sprintf (sFileName, "%s", stop_common);
+	
+	FILE *fp = NULL;
+	char buffer[2048] = {0};
+
+	fp = fopen (sFileName, "r");
+	if (NULL == fp)
+	{
+		printf("打开文件<%s>失败!\n", sFileName);
+		return -1;
+	}
+	
+	int datanum = 0;
+	while (memset(buffer, 0, sizeof(buffer)), 0 != fgets(buffer, sizeof(buffer), fp))
+	{
+		if (0 >= strlen(buffer))
+		{
+			continue;
+		}
+
+		if ('#' == buffer[0])
+		{
+			continue;
+		}
+	
+		int len = strlen (buffer);
+		
+		if (buffer[len-1] == '\n')
+		{
+			buffer[len-1] = '\0';
+		}
+		
+		int i = 0;
+		char strBuf[2048] = {0}, strKey[64] = {0}, strValue[1024] = {0}, sqlstr[1024] = {0}, op_code[10+1] = {0}, data_num[10] = {0};
+		char *p = NULL;
+		strcpy (strBuf, buffer);
+		p = strtok (strBuf, "|");
+		while (p)
+		{
+			++i;
+			
+			if (i == 1)
+			{
+				strcpy (strKey, p);
+			}
+			else
+			{
+				strcpy (strValue, p);
+			}
+			p = strtok (NULL, "|");
+		}
+
+		if (strcmp (strKey, "busi_logic_num") == 0)
+		{
+			printf("key[%s],value[%s]\n",strKey,strValue);
+			conf_info.funcInfo.size = atoi (strValue);
+			continue;
+		}
+		
+		if (strcmp (strKey, "opcode_list") == 0)
+		{
+			printf("key[%s],value[%s]\n",strKey,strValue);
+			char *p = NULL;
+			int num = 0,i = 0,len = 0,end = 0,begin = 0;
+			char tStr1[10+1] = {0};
+			char strBuf[2048] = {0};
+			
+			strcpy (strBuf, strValue);
+			len = strlen(strBuf);
+			if (len == 0)
+			{
+				continue;
+			}
+			if (strBuf[len-1] != ';')
+			{
+				strBuf[len] = ';';
+				len ++;
+			}
+			
+			while (strBuf[i] != '\0' && i <= len)
+			{
+				if (strBuf[i] == ';')
+				{
+					end = i;
+					i++;
+				}
+				else
+				{
+					i++;
+					continue;
+				}
+				memcpy (tStr1, strBuf+begin, end - begin);
+				tStr1[end-begin] = '\0';
+				printf("tStr1=%s\n",tStr1);
+				strcpy (conf_info.opodeInfo.opcodes[num], tStr1);
+				begin = i;
+				num++;
+			}
+			conf_info.opodeInfo.opcode_num = num;
+			continue;
+		}
+		
+		if (strcmp (strKey, "rownum") == 0)
+		{
+			printf("key[%s],value[%s]\n",strKey,strValue);
+			conf_info.opodeInfo.rownum = atoi(strValue);
+		}
+		
+		int func_loop = 0;
+		for (func_loop = 0; func_loop < conf_info.funcInfo.size; func_loop++)
+		{
+			char str_tmp[32] = {0};
+			sprintf (str_tmp, "%s%d", "func_key", func_loop);
+			
+			if (strcmp (strKey, str_tmp) == 0)
+			{
+				strcpy (conf_info.funcInfo.busi_info[func_loop].busi_func_key, strValue);
+				break;
+			}
+			
+			memset (str_tmp, 0, sizeof(str_tmp));
+			sprintf (str_tmp, "%s%d", "func_list", func_loop);
+			
+			if (strcmp (strKey, str_tmp) == 0)
+			{
+				char *p = NULL;
+				char strBuf[2048] = {0};
+				strcpy (strBuf, strValue);
+				
+				p = strtok (strBuf, ";");
+				while (p)
+				{
+					if (p == NULL)
+					{
+						break;
+					}
+					else
+					{
+						conf_info.funcInfo.busi_info[func_loop].size++;
+						
+						strcpy (conf_info.funcInfo.busi_info[func_loop].busi_func[conf_info.funcInfo.busi_info[func_loop].size-1], p);
+					}
+					
+					p = strtok (NULL, ";");
+				}
+				break;
+			}
+		}
+		/*if (strcmp (strKey, DB_TABLE_SQL_GET_CCT_DEALDATA_INFO) == 0)
+		{
+			strcpy (conf_info.sqlInfo.sql_info[I_SQL_GET_CCT_DEALDATA_INFO_INFO], strValue);
+			continue;
+		}*/
+		
+		if (strcmp (strKey, "datanum") == 0)
+		{
+			datanum = atoi(strValue);
+			conf_info.sqlInfo.datanum = datanum;
+			printf("conf_info.sqlInfo.datanum = %d\n",conf_info.sqlInfo.datanum);
+			continue;
+		}
+		for (int i = 0; i < datanum; i++)
+		{
+			sprintf(sqlstr,"%s_%d",DB_TABLE_SQL_GET_DATA_INFO,i);
+			if (strcmp (strKey, sqlstr) == 0)
+			{
+				strcpy (conf_info.sqlInfo.getdata[i].sqlstr, strValue);
+				continue;
+			}
+			sprintf(data_num,"data_num_%d",i);
+			if (strcmp (strKey, data_num) == 0)
+			{
+				conf_info.sqlInfo.getdata[i].data_num = atoi(strValue);
+				continue;
+			}
+			sprintf(op_code,"op_code_%d",i);
+			if (strcmp (strKey, op_code) == 0)
+			{
+				strcpy (conf_info.sqlInfo.getdata[i].op_code, strValue);
+				continue;
+			}
+		}
+	}
+	
+	if (NULL != fp)
+	{
+		fclose (fp);
+	}
+	*out_conf_info = conf_info;
+	return 0;
+}
+
+int stop_common_init(char *stop_common,STOP_COMMON_CONF *conf_info)
+{
+	if (stop_common != NULL)
+	{
+		if (0 != load_common_conf(stop_common,conf_info))
+		{
+			printf ("FILE[%s]LINE[%d]abm_load_common_conf is failed.\n", __FILE__, __LINE__);
+			return -1;
+		}
+	}
+	return 0;
+}

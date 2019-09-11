@@ -1,0 +1,1173 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include "cfgfile.h"
+
+#ifdef DEBUG
+#define AUTOCALL_DEBUG printf("DEBUG->FILE[%s]LINE[%d]ERRNO[%d]ERRMSG[%s]\n", __FILE__, __LINE__, errno, strerror(errno));fflush(stdout);
+#else
+#define AUTOCALL_DEBUG ;
+#endif
+
+void BUSI_CFG_ERRLOG(char *chGroupName, char *chKeyName)
+{
+	printf("ERR:GROUP[%s]KEY[%s]\n", chGroupName, chKeyName);
+}
+
+static int get_password(char *file_path, char *str_user, char *str_password)
+{
+	/*FILE *loginfo;                                        
+	char user[20];                                        
+	char pwd[20];                                         
+	char tmp_line[10];                                    
+	char filename[200];                                   
+	int  i,k,pointer=0;                                   
+	char key[10];                                          
+                                                              
+	strcpy(key, "DFJLT");                                 
+	memset(filename, 0, sizeof(filename));                
+	strcpy(filename, file_path);                          
+	if((loginfo=fopen(filename,"r"))==NULL)               
+	   return -1;                                       
+	                                                      
+	fgets(user, 20, loginfo);                             
+	fgets(user, 20, loginfo);                             
+	fgets(pwd, 20, loginfo);                              
+	fgets(pwd, 20, loginfo);                              
+	fclose(loginfo);                                      
+	                                                      
+	pointer = 0;                                          
+	i = strlen(user);                                     
+	user[i-1] = 0x00;                                     
+	                                                      
+	for(k = 0; k < i-1; k++)                              
+	{                                                     
+		user[k]=user[k]^key[pointer];                 
+		                                              
+		pointer++;                                    
+		if (pointer==5)                               
+			pointer=0;                            
+	}
+	
+	pointer=0; 
+	i = strlen( pwd );
+	pwd[i-1] = 0x00; 
+	for (k = 0; k < i-1; k++) 
+	{
+		pwd[k]=pwd[k]^key[pointer];
+		pointer++;
+		if (pointer==5)
+			pointer=0;
+	}
+                                                      
+	strcpy(str_user, user);                        
+	strcpy(str_password, pwd);                         
+*/  
+	char buf[256] = {0};
+	char dbuf[256] = {0};
+	char l_user[20];
+	char l_pwd[20];
+	FILE *fp = NULL;
+	sprintf(buf, "getpwd %s", file_path);
+	fp = popen(buf, "rb");
+	if(fp == NULL)
+	{
+		printf("密码文件不存在!!请检查配置!![%s]\n",file_path);
+		exit(1);
+	}
+	fgets(dbuf, 256, fp);
+	sscanf(dbuf, "%s %s", l_user,l_pwd);
+	printf("username=[%s] password=[%s]\n",l_user,l_pwd);
+	pclose(fp);
+                                                      
+	strcpy(str_user, l_user);                        
+	strcpy(str_password, l_pwd);                         
+	                                           
+	return 0;                                             
+}  
+
+/*
+function:		busi_cfgfile_read
+description:	读配置文件并验证内容
+Input:		chFilename:文件名
+Output:
+Return:		0:成功,非0:失败
+others:
+*/
+int busi_cfgfile_read(stAppCfg *pAppCfg)
+{
+	stIniFile_File stIniFile;
+	int iRcode;
+
+	IniFile_Init(&stIniFile);
+
+	/* 读配置文件 */
+	iRcode = IniFile_ReadFile(&stIniFile, pAppCfg->chCfgFile);
+	if(iRcode)
+	{
+		printf("read cfgfile wrong....[iRcode=%d]\n ",iRcode);
+		AUTOCALL_DEBUG;
+		//BUSI_WRITE_LOG();/*记监控日志*/
+		return -1;
+	}
+
+	iRcode = busi_cfgfile_check(&stIniFile, pAppCfg);
+	if(iRcode)
+	{
+		printf("check cfgfile  wrong....\n ");
+		AUTOCALL_DEBUG;
+		//BUSI_WRITE_LOG();/*记监控日志*/
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+function:		busi_cfgfile_check
+description:	验证配置文件内容
+Input:		pstObj:内部数据操作对象
+Output:
+Return:		0:成功,非0:失败
+others:
+*/
+int busi_cfgfile_check(stIniFile_File *pstObj, stAppCfg *pAppCfg)
+{
+	stIniFile_Group *pstGroupSystem;
+	stIniFile_Group *pstGroupServer;
+	int iRcode;
+	char chGroupName[64+1];
+	char chKeyName[64+1];
+
+	strcpy(chGroupName, "system");
+	strcpy(chKeyName, "");
+	iRcode=IniFile_File_GetGroupByName(pstObj, &pstGroupSystem, chGroupName);
+	if(iRcode)
+	{
+		printf("get system group wrong \n");
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	iRcode = busi_cfgfile_check_System(pstGroupSystem, pAppCfg);
+	if(iRcode)
+	{
+		printf("check  system group wrong \n");
+		return -1;
+	}
+
+	/***************************************************/
+	strcpy(chGroupName, "SERVER_INFO");
+	strcpy(chKeyName, "");
+	iRcode=IniFile_File_GetGroupByName(pstObj, &pstGroupServer, chGroupName);
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+	
+	stIniFile_Key   *pstKey;
+
+	strcpy(chKeyName, "server_num");
+	iRcode=IniFile_Group_GetKeyByName(pstGroupServer, &pstKey, chKeyName)
+		||(strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pAppCfg->stServer.server_num = 1;
+	}
+	else
+	{
+		pAppCfg->stServer.server_num = atoi (pstKey->chValue);
+	}
+	pstGroupServer = NULL;
+	
+	sprintf (chGroupName, "%s", "PROC_SERVER");
+	strcpy(chKeyName, "");
+	iRcode=IniFile_File_GetGroupByName(pstObj, &pstGroupServer, chGroupName);
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+	for (int i = 1; i <= pAppCfg->stServer.server_num; i++)
+	{
+		iRcode = busi_cfgfile_check_Server(chGroupName, pstGroupServer, &(pAppCfg->stServer.server_info[i-1]));
+		if(iRcode)
+		{
+			return -1;
+		}		
+	}
+	
+	/***************************************************/
+	strcpy(chGroupName, "LOG_INFO");
+	strcpy(chKeyName, "");
+	iRcode=IniFile_File_GetGroupByName(pstObj, &pstGroupServer, chGroupName);
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(chKeyName, "log_num");
+	iRcode=IniFile_Group_GetKeyByName(pstGroupServer, &pstKey, chKeyName)
+		||(strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pAppCfg->stLogServer.log_num = 0;
+	}
+	else 
+	{
+		pAppCfg->stLogServer.log_num = atoi (pstKey->chValue);
+	}
+	
+	if(pAppCfg->stLogServer.log_num < 0 || pAppCfg->stLogServer.log_num > MAX_LOG_SERVER_NUM)
+	{
+		printf("FILE[%s]LINE[%d]ERR_MSG[log_num<%d> is faild.]", __FILE__, __LINE__, pAppCfg->stLogServer.log_num);
+		return -1;
+	}
+	
+	if (pAppCfg->stLogServer.log_num == 0)
+	{
+		strcpy(chKeyName, "log_path");
+		iRcode=IniFile_Group_GetKeyByName(pstGroupServer, &pstKey, chKeyName)
+			||(strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+		strcpy(pAppCfg->stLogServer.log_path, pstKey->chValue);
+	}
+	else 
+	{
+		pstGroupServer = NULL;
+		
+		sprintf (chGroupName, "%s", "LOG");
+		strcpy(chKeyName, "");
+		iRcode=IniFile_File_GetGroupByName(pstObj, &pstGroupServer, chGroupName);
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+		for (int i = 1; i <= pAppCfg->stLogServer.log_num; i++)
+		{
+			iRcode = busi_cfgfile_check_LogServer(chGroupName, pstGroupServer, &(pAppCfg->stLogServer.log_mgr[i-1]));
+			if(iRcode)
+			{
+				return -1;
+			}
+		}
+	}
+	
+	pstGroupServer = NULL;
+	
+	sprintf (chGroupName, "%s", "ZK_INFO");
+	strcpy(chKeyName, "");
+	iRcode=IniFile_File_GetGroupByName(pstObj, &pstGroupServer, chGroupName);
+	if(iRcode)
+	{
+		(pAppCfg->stZKServer).use_zk = false;
+	}
+	else 
+	{
+		iRcode = busi_cfgfile_check_ZKServer(chGroupName,pstGroupServer, &(pAppCfg->stZKServer));
+		if(iRcode)
+		{
+			return -1;
+		}
+	}
+	
+	/*不好意思，下面hard code了过滤条件。判断如果parse_file为“#”的话就不进行解析，for C205 etc.*/
+	if (pstGroupSystem != NULL)
+	{
+		for (int i = 0; i < pstGroupSystem->iKeyNumber; i++)
+		{
+			if ((strcmp(pstGroupSystem->stKeyList[i].chName, "parse_file") == 0) && (strcmp(pstGroupSystem->stKeyList[i].chValue, "#") == 0))
+			{
+				printf("LUCCCCCCK: [%s][%s]\n", pstGroupSystem->stKeyList[i].chName, pstGroupSystem->stKeyList[i].chValue);
+				
+				return 0;
+			}
+		}
+	}
+		
+	iRcode = load_parse_file_cfgfile (&(pAppCfg->parse_info), pAppCfg->stSystem.parse_file);
+	if (0 != iRcode)
+	{
+		printf ("FILE[%s]LINE[%d]load_parse_file_cfgfile is error.", __FILE__, __LINE__);
+		return -1;
+	}
+	
+	return 0;
+}
+
+/*
+function:		busi_cfgfile_check_System
+description:	验证配置文件内容中的一个组
+Input:		pstObj:内部数据操作对象
+Output:
+Return:		0:成功,非0:失败
+others:
+*/
+int busi_cfgfile_check_System(stIniFile_Group *pstObj, stAppCfg *pAppCfg)
+{
+	stIniFile_Key   *pstKey;
+	int iRcode;
+	char chGroupName[64+1];
+	char chKeyName[64+1];
+
+	strcpy(chGroupName, "SYSTEM");
+
+	strcpy(chKeyName, "program_name");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+	strcpy(pAppCfg->stSystem.program_name, pstKey->chValue);
+	
+	/***************************************************/
+	strcpy(chKeyName, "mach_code");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pAppCfg->stSystem.mach_code, "NOT_CONFIG");
+	}
+	else 
+	{
+		strcpy(pAppCfg->stSystem.mach_code, pstKey->chValue);
+	}
+	
+	/***************************************************/
+	strcpy(chKeyName, "db_num");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pAppCfg->stSystem.db_num = 0;
+	}
+	else 
+	{
+		pAppCfg->stSystem.db_num = atoi(pstKey->chValue);
+	}
+	
+	/***************************************************/
+	
+	for (int i = 0; i < pAppCfg->stSystem.db_num; i++)
+	{
+		sprintf (chKeyName, "%s%d", "db_id_", i);
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+	
+		pAppCfg->stSystem.db_id[i] = atoi(pstKey->chValue);
+		printf("db_id[%d]=%d\n",i,pAppCfg->stSystem.db_id[i]);
+	}
+
+	/***************************************************/
+	strcpy(chKeyName, "ibear_name");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		char *p_env_abm = NULL;
+		p_env_abm = getenv ("IBEAR_HOME");
+		if (NULL == p_env_abm)
+		{
+			printf ("FILE[%s]LINE[%d]ERR_MSG[取得IBEAR_HOME环境变量失败\n", __FILE__, __LINE__);
+			return false;
+		}
+		else 
+		{
+			char sFileName[1024] = {0};
+			sprintf (sFileName, "%s/sqlMapConfig.xml", p_env_abm);
+			strcpy(pAppCfg->stSystem.ibear_name , sFileName);
+		}
+	}
+	else 
+	{
+		strcpy(pAppCfg->stSystem.ibear_name , pstKey->chValue);
+	}
+	
+	/***************************************************/
+	strcpy(chKeyName, "stop_common");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pAppCfg->stSystem.stop_common , "/");
+	}
+	else 
+	{
+		strcpy(pAppCfg->stSystem.stop_common , pstKey->chValue);
+	}
+	
+	/***************************************************/
+	strcpy(chKeyName, "parse_file");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pAppCfg->stSystem.parse_file , "/");
+	}
+	else 
+	{
+		strcpy(pAppCfg->stSystem.parse_file , pstKey->chValue);
+	}
+	
+	/***************************************************/
+	
+	return 0;
+}
+
+int busi_cfgfile_check_Server(char *chGroupName, stIniFile_Group *pstObj, stAppCfg_Proc_Server *pServer)
+{
+	stIniFile_Key   *pstKey;
+	int iRcode;
+	char chKeyName[64+1];
+	
+	strcpy(chKeyName, "deal_type");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	pServer->deal_type = atoi(pstKey->chValue);
+	
+	/**************************************************/
+	strcpy(chKeyName, "interface_type");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	pServer->interface_type = atoi(pstKey->chValue);
+	
+	/**************************************************/
+	strcpy(chKeyName, "is_give");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	pServer->is_give = atoi(pstKey->chValue);
+	
+	/**************************************************/
+	strcpy(chKeyName, "server_type");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pServer->server_type = 0;
+	}
+	else
+	{
+		pServer->server_type = atoi(pstKey->chValue);
+	}
+	
+	/**************************************************/
+	strcpy(chKeyName, "thread_num");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pServer->thread_num = 1;
+	}
+	else
+	{
+		pServer->thread_num = atoi(pstKey->chValue);
+	}
+  
+	/***************************************************/
+  	strcpy(chKeyName, "server_name");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->server_name, pstKey->chValue);
+	
+	/***************************************************/
+  strcpy(chKeyName, "java_vm");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pServer->java_vm = 0;
+	}
+	else
+	{
+		pServer->java_vm = atoi(pstKey->chValue);
+	}
+	
+	/***************************************************/
+  	strcpy(chKeyName, "fresh_time");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		sprintf (pServer->fresh_time, "x");
+	}
+	else 
+	{
+		sprintf (pServer->fresh_time, "%s", pstKey->chValue);
+	}
+	
+	/***************************************************/
+  	strcpy(chKeyName, "indir");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pServer->file_cfg_info.indir,"");
+	}
+	else 
+	{
+		sprintf (pServer->file_cfg_info.indir, "%s", pstKey->chValue);
+	}
+	
+	/***************************************************/
+  	strcpy(chKeyName, "errdir");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pServer->file_cfg_info.errdir,"");
+	}
+	else 
+	{
+		sprintf (pServer->file_cfg_info.errdir, "%s", pstKey->chValue);
+	}
+	/***************************************************/
+  	strcpy(chKeyName, "data_path");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pServer->file_cfg_info.data_path,"");
+	}
+	else 
+	{
+		sprintf (pServer->file_cfg_info.data_path, "%s", pstKey->chValue);
+	}
+	
+	/***************************************************/
+  	strcpy(chKeyName, "tmpdir");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pServer->out_cfg_info.tmpdir,"");
+	}
+	else 
+	{
+		sprintf (pServer->out_cfg_info.tmpdir, "%s", pstKey->chValue);
+	}
+	
+	/***************************************************/
+  	strcpy(chKeyName, "outdir");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pServer->out_cfg_info.outdir,"");
+	}
+	else 
+	{
+		sprintf (pServer->out_cfg_info.outdir, "%s", pstKey->chValue);
+	}
+	
+	/***************************************************/
+  	strcpy(chKeyName, "runlog");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		strcpy(pServer->file_cfg_info.runlog,"");
+	}
+	else 
+	{
+		sprintf (pServer->file_cfg_info.runlog, "%s", pstKey->chValue);
+	}
+	/***************************************************/
+	
+	
+	if(pServer->interface_type == INTERFACE_TYPE_TABLE || pServer->interface_type == INTERFACE_TYPE_FILE)
+	{
+		strcpy(chKeyName, "tab_type");
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			pServer->bak_cfg_info.tab_type = 0;
+			printf("不做出口备份！！！\n");
+			return 0;
+		}
+		else 
+		{
+			pServer->bak_cfg_info.tab_type = atoi(pstKey->chValue);
+		}
+		
+		if (pServer->bak_cfg_info.tab_type != 0)
+		{
+			strcpy(chKeyName, "tab_writemode");
+			iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName);
+			if(iRcode)
+			{
+				BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+				return -1;
+			}
+			pServer->bak_cfg_info.tab_writemode = atoi(pstKey->chValue);
+			
+			strcpy(chKeyName, "tab_backuptype");
+			iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName);
+			if(iRcode)
+			{
+				BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+				return -1;
+			}
+			pServer->bak_cfg_info.tab_backuptype = atoi(pstKey->chValue);
+			
+			strcpy(chKeyName, "tab_interval");
+			iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName);
+			if(iRcode)
+			{
+				BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+				return -1;
+			}
+			pServer->bak_cfg_info.tab_interval = atoi(pstKey->chValue);
+			
+			strcpy(chKeyName, "tab_backupsize");
+			iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName);
+			if(iRcode)
+			{
+				BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+				return -1;
+			}
+			pServer->bak_cfg_info.tab_backupsize = atoi(pstKey->chValue);
+			
+			strcpy(chKeyName, "tab_bakdir");
+			iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName);
+			if(iRcode)
+			{
+				BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+				return -1;
+			}
+			strcpy(pServer->bak_cfg_info.bakdir, pstKey->chValue);
+
+			strcpy(chKeyName, "tab_tmpdir");
+			iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName);
+			if(iRcode)
+			{
+				BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+				strcpy(pServer->bak_cfg_info.tmpdir, "");
+			}
+			else 
+			{
+				strcpy(pServer->bak_cfg_info.tmpdir, pstKey->chValue);
+			}
+		}
+	}
+	return 0;
+}
+
+int busi_cfgfile_check_LogServer(char *chGroupName, stIniFile_Group *pstObj, struct log_server *pServer)
+{
+	stIniFile_Key   *pstKey;
+	int iRcode;
+	char chKeyName[64+1];
+	
+	strcpy(chKeyName, "log_path");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->log_path, pstKey->chValue);
+  
+	/***************************************************/
+  	strcpy(chKeyName, "log_name");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->log_name, pstKey->chValue);
+
+	/***************************************************/
+  	strcpy(chKeyName, "log_thread_num");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pServer->log_thread_num = 0;
+	}
+	else 
+	{
+		pServer->log_thread_num = atoi(pstKey->chValue);
+	}
+
+	/***************************************************/
+  	strcpy(chKeyName, "log_file_num");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		pServer->log_file_num = 0;
+	}
+	else 
+	{
+		pServer->log_file_num = atoi(pstKey->chValue);
+	}
+	
+	for (int log_looper = 1; log_looper <=pServer->log_file_num; log_looper++)
+	{
+		sprintf(chKeyName, "%s%d", "log_type", log_looper);
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+	
+		pServer->logfile_info[log_looper-1].log_type = atoi(pstKey->chValue);
+		
+		sprintf(chKeyName, "%s%d", "log_intervaltime", log_looper);
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+	
+		pServer->logfile_info[log_looper-1].log_interval = atoi(pstKey->chValue);
+		
+		sprintf(chKeyName, "%s%d", "log_backupsize", log_looper);
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+	
+		pServer->logfile_info[log_looper-1].log_backup_size = atoi(pstKey->chValue);
+		
+		sprintf(chKeyName, "%s%d", "log_procmode", log_looper);
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+	
+		pServer->logfile_info[log_looper-1].log_procmode = atoi(pstKey->chValue);
+		
+		sprintf(chKeyName, "%s%d", "log_backuptype", log_looper);
+		iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+			|| (strcmp(pstKey->chValue, "") == 0)
+		;
+		if(iRcode)
+		{
+			BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+			return -1;
+		}
+	
+		pServer->logfile_info[log_looper-1].log_backup_type = atoi(pstKey->chValue);
+	}
+
+	return 0;
+}
+
+int busi_cfgfile_check_ZKServer(char *chGroupName,stIniFile_Group *pstObj, stAppCfg_ZK_Info *pServer)
+{
+	stIniFile_Key   *pstKey;
+	int iRcode;
+	char chKeyName[64+1];
+	
+	strcpy(chKeyName, "ZK_CLUSTER");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->zk_cluster, pstKey->chValue);
+  
+	/***************************************************/
+  	strcpy(chKeyName, "ZK_ATTR");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->zk_attr, pstKey->chValue);
+
+	/***************************************************/
+  	strcpy(chKeyName, "ZK_SERVICE");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->zk_service ,pstKey->chValue);
+  
+	/***************************************************/
+  	strcpy(chKeyName, "ZK_TYPE");
+	iRcode=IniFile_Group_GetKeyByName(pstObj, &pstKey, chKeyName)
+		|| (strcmp(pstKey->chValue, "") == 0)
+	;
+	if(iRcode)
+	{
+		BUSI_CFG_ERRLOG(chGroupName, chKeyName);
+		return -1;
+	}
+
+	strcpy(pServer->zk_type ,pstKey->chValue);
+	pServer->use_zk = true;
+	return 0;
+}
+
+/******************************************************************
+Function:		int strupper(char *src_str)
+Description:	将字符串中的字符转大写
+Input:			char * src_str  需要转换的字符串
+Return: 		int  0
+Others:
+********************************************************************/
+int strupper(char *src_str)
+{
+    while(*src_str != '\0')
+    {
+        *src_str = toupper(*src_str);
+        src_str++;
+    }
+
+    return 0;
+}
+
+/*
+function:   cf_file_ifdir()
+description:分析是否为目录
+Input:		fn:目录名
+Output:
+Return:		0:合法,!0:非法
+others:
+*/
+int cf_file_ifdir(const char *fn)
+{
+	struct stat filestat;
+
+	if(stat(fn, &filestat) != 0)
+	{
+		return -1;
+	}
+
+	if(filestat.st_mode & S_IFDIR)
+	{
+		return 0;
+	}
+
+	return -1;
+}
+
+int load_parse_file_cfgfile (stAppCfg_ParseFile *parse_info, char *parse_file)
+{
+	char sFileName[1024] = {0};
+	sprintf (sFileName, "%s", parse_file);
+	
+	FILE *fp = NULL;
+	char buffer[2048] = {0};
+
+	fp = fopen (sFileName, "r");
+	if (NULL == fp)
+	{
+		printf("打开文件<%s>失败!\n", sFileName);
+		return -1;
+	}
+	
+	while (memset(buffer, 0, sizeof(buffer)), 0 != fgets(buffer, sizeof(buffer), fp))
+	{
+		if (0 >= strlen(buffer))
+		{
+			continue;
+		}
+
+		if ('#' == buffer[0])
+		{
+			continue;
+		}
+	
+		int len = strlen (buffer);
+		
+		if (buffer[len-1] == '\n')
+		{
+			buffer[len-1] = '\0';
+		}
+		
+		int i = 0;
+		char strBuf[2048] = {0}, strKey[64] = {0}, strValue[1024] = {0};
+		char *p = NULL;
+		strcpy (strBuf, buffer);
+		p = strtok (strBuf, "=");
+		while (p)
+		{
+			++i;
+			
+			if (i == 1)
+			{
+				strcpy (strKey, p);
+			}
+			else
+			{
+				strcpy (strValue, p);
+			}
+			p = strtok (NULL, "=");
+		}
+
+		if (strcmp (strKey, "parse_file_num") == 0)
+		{
+			parse_info->size = atoi (strValue);
+			continue;
+		}
+		
+		if (NULL != strstr(strKey, "fieldnum"))
+		{
+			char *str = NULL;
+			char strBuf[2048] = {0};
+			strcpy (strBuf, strKey);
+			
+			int j = 0, num = 0;
+			str = strtok (strBuf, "_");
+			while (str)
+			{
+				++j;
+				
+				if (2 == j)
+				{
+					num = atoi (str);
+				}
+				
+				str = strtok (NULL, "_");
+			}
+			
+			parse_info->data[num].size = atoi (strValue);
+
+			continue;
+		}
+		
+		if (NULL != strstr(strKey, "mainfield"))
+		{
+			char *str = NULL;
+			char strBuf[2048] = {0};
+			strcpy (strBuf, strKey);
+			
+			int j = 0, num = 0;
+			str = strtok (strBuf, "_");
+			while (str)
+			{
+				++j;
+				
+				if (2 == j)
+				{
+					num = atoi (str);
+				}
+				
+				str = strtok (NULL, "_");
+			}
+			
+			parse_info->data[num].main_field = atoi(strValue);
+
+			continue;
+		}
+		
+		if (NULL != strstr(strKey, "seqfield"))
+		{
+			char *str = NULL;
+			char strBuf[2048] = {0};
+			strcpy (strBuf, strKey);
+			
+			int j = 0, num = 0;
+			str = strtok (strBuf, "_");
+			while (str)
+			{
+				++j;
+				
+				if (2 == j)
+				{
+					num = atoi (str);
+				}
+				
+				str = strtok (NULL, "_");
+			}
+			
+			parse_info->data[num].seq_field = atoi(strValue);
+			continue;
+		}
+					
+		if (NULL != strstr(strKey, "filetype"))
+		{
+			char *str = NULL;
+			char strBuf[2048] = {0};
+			strcpy (strBuf, strKey);
+			
+			int j = 0, num = 0;
+			str = strtok (strBuf, "_");
+			while (str)
+			{
+				++j;
+				
+				if (2 == j)
+				{
+					num = atoi (str);
+				}
+				
+				str = strtok (NULL, "_");
+			}
+			
+			parse_info->data[num].file_type = atoi (strValue);
+			
+			continue;
+		}
+		if (NULL != strstr(strKey, "filecode"))
+		{
+			char *str = NULL;
+			char strBuf[2048] = {0};
+			strcpy (strBuf, strKey);
+			
+			int j = 0, num = 0;
+			str = strtok (strBuf, "_");
+			while (str)
+			{
+				++j;
+				
+				if (2 == j)
+				{
+					num = atoi (str);
+				}
+				
+				str = strtok (NULL, "_");
+			}
+			
+			strcpy(parse_info->data[num].file_code ,strValue);
+			
+			continue;
+		}
+		
+		if (NULL != strstr(strKey, "field"))
+		{
+			char *str = NULL;
+			char strBuf[2048] = {0};
+			strcpy (strBuf, strKey);
+			
+			int j = 0, file_num = 0, field_num = 0;
+			str = strtok (strBuf, "_");
+			while (str)
+			{
+				++j;
+				
+				if (2 == j)
+				{
+					file_num = atoi (str);
+				}
+				else if (3 == j)
+				{
+					field_num = atoi (str);
+				}
+				
+				str = strtok (NULL, "_");
+			}
+			
+			strcpy (parse_info->data[file_num].field[field_num], strValue);
+			
+			continue;
+		}
+	}
+	
+	if (NULL != fp)
+	{
+		fclose (fp);
+	}
+		
+	return 0;
+}

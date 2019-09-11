@@ -1,0 +1,26 @@
+include ../makefile.cfg
+
+OBJ = IniFile.o Thread.o CMutexLock.o FILE.o rtStopPub.o cfgfile.o stop_db_conn.o CDealFile.o cJSON.o CPublicDeal.o CDealData.o CDealDataMgr.o CPublicData.o CPublicMgr.o CProServerManager.o DynBase.o $(PUBOBJDIR)/ComZooKeeper.o  $(PUBOBJDIR)/CommonFun.o $(PUBOBJDIR)/ComString.o $(PUBOBJDIR)/ComFile.o $(PUBOBJDIR)/ComLogFile.o $(PUBOBJDIR)/ComMutex.o $(PUBOBJDIR)/ComDir.o $(PUBOBJDIR)/ComMonitor.o $(PUBOBJDIR)/ComThread.o
+#SDFS_FILE.o CLogFile.o CLogManager.o 
+
+all: libbgpublic.a clean
+
+libbgpublic.a:$(OBJ)
+	ar -rv libbgpublic.a $(OBJ)
+
+	mv -f $@ ../lib
+
+	@echo "### $@ loaded ###\n"
+
+
+.cpp.o:
+	echo "Compiling the $<"
+	$(CC) -c $(CFLAGS) $<
+.c.o:
+	echo "Compiling the $<"
+	$(CC) -c $(CFLAGS) $<
+
+clean:
+	rm -f *.o
+	rm -f *.lis
+

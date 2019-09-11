@@ -1,0 +1,861 @@
+/**************************
+* 服务名称:rtStopPub
+* 功能描述:公共文件
+* 程序版本:V1.0
+* 编码日期:2011/11/09
+* 编码人员:
+**************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/time.h>
+#include "ibearpub.h"
+
+char *xmlTrim(char *S)
+{
+  int I = 0, i = 0, L = 0;
+  if (S == NULL)
+  {
+    return S;
+  }
+  L = strlen(S) - 1;
+  I = 0;
+  while ( (I <= L) && (S[I] <= ' ') && (S[I] > 0) )
+  {
+    I ++;
+  }
+  if (I > L)
+  {
+    S[0] = '\0';
+  }
+  else
+  {
+    while ( (S[L] <= ' ')  && (S[L] > 0 ) )
+    {
+      L --;
+    }
+    strncpy(S, S + I, L + 1);
+    S[L + 1 - I] = '\0';
+  }
+  return S;
+}
+
+// 替换字符串中特征字符串为指定字符串
+char * xml_strrep(char *pInput,char *pOutput,char *pSrc,char *pDst)
+{
+	char *p;//*p1;
+	char p1[1024] = {0};
+	int len;
+	
+	if (pInput == NULL || pSrc == NULL || pDst == NULL)
+		return NULL;
+	
+	p = strstr(pInput, pSrc);       //返回字符串第一次出现的地址,否则返回NULL
+	if (p == NULL)  /*not found*/
+		return NULL;
+	//printf("p=%s\n",p);
+	len = strlen(pInput) + strlen(pDst) - strlen(pSrc);
+	/*p1 = (char*)malloc(len);
+	if (p1 == NULL)
+	{
+		return NULL;
+	}
+	bzero(p1, len);*/
+	strncpy(p1, pInput, p-pInput);
+	strcat(p1, pDst);
+	//printf("p1=%s\n",p1);
+	p += strlen(pSrc);
+	strcat(p1, p);
+	strcpy(pOutput,p1);
+
+	return pOutput;
+}
+
+template<class D>
+void clearXMLList (vector<D*> &vList)
+{
+	if (vList.size() == 0)
+	{
+		return;
+	}
+	
+	typename vector<D*>::iterator iter;
+	for (iter = vList.begin(); iter != vList.end(); iter++)
+	{
+		D *pData = *iter;
+		delete pData;
+		pData = NULL;
+	}
+	
+	vList.clear ();
+	
+	return;
+}
+
+template<typename K, typename V>
+void clearXMLList (map<K, V*> &mList)
+{
+	if (mList.size() == 0)
+	{
+		return;
+	}
+	
+	typename map<K, V*>::iterator iter;
+	for (iter = mList.begin(); iter != mList.end(); iter++)
+	{
+		V *pData = iter->second;
+		delete pData;
+		pData = NULL;
+	}
+	
+	mList.clear ();
+}
+
+template<typename K, typename V>
+void clearXMLList (multimap<K, V*> &mList)
+{
+	if (mList.size() == 0)
+	{
+		return;
+	}
+	
+	typename multimap<K, V*>::iterator iter;
+	for (iter = mList.begin(); iter != mList.end(); iter++)
+	{
+		V *pData = iter->second;
+		delete pData;
+		pData = NULL;
+	}
+	
+	mList.clear ();
+}
+
+template<typename K, typename V> 
+void clearXMLList (map<K, vector<V*> > &mList)
+{
+	if (mList.size() == 0)
+	{
+		return;
+	}
+
+	vector<V*> vList;
+	typename vector<V*>::iterator vIter;
+	typename map<K, vector<V*> >::iterator iter;
+
+	//内存释放
+	for (iter = mList.begin(); iter != mList.end(); iter++)
+	{
+		vList = iter->second;
+
+		for (vIter = vList.begin(); vIter != vList.end(); vIter++)
+		{
+			V *pNode = *vIter;
+			delete pNode;
+			pNode = NULL;
+		}
+		
+		vList.clear();
+	}
+		
+	mList.clear();
+}
+
+/*
+ *读文件，返回文件内容
+ *入参：文件全路径
+ *出参：文件内容
+*/
+int xmlFileRead(char* filename,string *info)
+{
+	if(filename == NULL || strcmp(xmlTrim(filename),"") == 0)
+	{
+		return NULL;
+	}
+	string temp;
+	FILE *pf = fopen(filename,"r");
+	fseek(pf,0,SEEK_END);
+	long lSize = ftell(pf);
+	// 用完后需要将内存free掉
+	char* text=(char*)malloc(lSize+1);
+	if (text == NULL)
+	{
+		return NULL;
+	}
+	rewind(pf); 
+	fread(text,sizeof(char),lSize,pf);
+	text[lSize] = '\0';
+	fclose(pf);
+	pf = NULL;
+	temp = string(text);
+	*info = temp;
+	free(text);
+	text = NULL;
+	return 0;
+}
+
+/*
+ * 解析sqlMapConfig.xml 将数据计入内存
+ * pSrc:sqlMapConfig.xml的路径
+*/
+int Analysis_ConfXML(char *pSrc,stSqlMapConfig *sql_Conf)
+{
+	char pro_MapValue[1024] = {0};
+	char sz_Value[1024] = {0};
+	xmlDocPtr doc = NULL;
+	xmlNodePtr cur = NULL;
+
+	printf("xml路径为：%s\n",pSrc);
+	string xml_src;
+	xmlFileRead(pSrc,&xml_src);
+	if (strcmp(xml_src.c_str(),"") == 0)
+	{
+		printf("xml_src为空！\n");
+		return -1;
+	}
+	//printf("xml：%s\n",xml_src);
+	/*解析入参*/
+	doc = xmlParseMemory(xml_src.c_str(),sizeof(xml_src.c_str()));
+	if(doc==NULL)
+	{
+		printf("xml：%s\n",xml_src.c_str());
+		printf("入参为空！\n");
+		return -1;
+	}
+
+	cur = xmlDocGetRootElement(doc); //确定文档根元素
+	if (cur==NULL)/*检查确认当前文档中包含内容*/
+	{
+		printf("xmlDocGetRootElement wrong!\n");
+		xmlFreeDoc(doc);
+		return -1;
+	}
+	/*确认文档是正确的类型,"sqlMapConfig"是使用xml的根类型。*/
+	if(xmlStrcasecmp(cur->name,(const xmlChar *)"sqlMapConfig")!=0)
+	{
+		printf("document of the wrong type, root node =%s  != sqlMapConfig!!!\n",cur->name);
+		xmlFreeDoc(doc);
+		return -1;
+	}
+
+	cur=cur->xmlChildrenNode;
+	int i = 0;
+	while (cur != NULL)
+	{
+		memset(sz_Value,0,sizeof(sz_Value));
+		if(xmlStrcasecmp(cur->name,(const xmlChar *)"settings")==0)
+		{
+			/*------------------------------------cacheModelsEnabled----------------------------------*/
+			sprintf(sz_Value,"%s",xmlGetProp(cur,(const xmlChar *)"cacheModelsEnabled"));
+			if(sz_Value==NULL)
+			{
+				cur=cur->next;
+				printf("xmlGetProp %s is wrong!\n",cur->name);
+				return -1;
+			}
+			strcpy((sql_Conf->set).cacheModelsEnabled,sz_Value);
+			printf("cacheModelsEnabled:%s\n",(sql_Conf->set).cacheModelsEnabled);
+			/*------------------------------------autoCommit----------------------------------*/
+			sprintf(sz_Value,"%s",xmlGetProp(cur,(const xmlChar *)"autoCommit"));
+			if(sz_Value==NULL)
+			{
+				(sql_Conf->set).autoCommit = atoi(sz_Value);
+			}
+			else
+			{
+				(sql_Conf->set).autoCommit = atoi(sz_Value);
+			}
+			printf("autoCommit:%d\n",(sql_Conf->set).autoCommit);
+			/*----------------------------------------------------------------------*/
+		}
+
+		if(xmlStrcasecmp(cur->name,(const xmlChar *)"sqlMap")==0)
+		{
+			strcpy(sz_Value,(char *)xmlGetProp(cur,(const xmlChar *)"resource"));
+			if(sz_Value==NULL)
+			{
+				cur=cur->next;
+				printf("xmlGetProp %s is wrong!\n",cur->name);
+				return -1;
+			}
+			
+			strcpy(sql_Conf->sqlsrc_map[i],sz_Value);
+			printf("[%d]resource:%s\n",i,sz_Value);
+			i++;
+			sql_Conf->map_num = i;
+		}
+		cur=cur->next;
+	}
+	
+	xmlFreeDoc(doc);
+	//xmlCleanupParser();
+	
+	return 0;
+}
+
+/*
+ * 解析sql的xml，将数据计入内存
+ * pSrc:解析sql的xml的路径
+*/
+int Analysis_SqlXML(stSqlMapConfig *sql_Conf,map<string,stSqlMap*> *sqlconfs,stSettings *settings)
+{
+	map<string,stSqlMap*> sqlconfs_tmp;
+	map<string,string> repedMap;
+	repedMap.insert(pair<string,string>(string("@lt"),string("<")));
+	repedMap.insert(pair<string,string>(string("@gt"),string(">")));
+	
+	for(int i = 0; i < sql_Conf->map_num; i++)
+	{
+		/*解析入参*/
+		xmlDocPtr doc = NULL;
+		xmlNodePtr cur = NULL;
+		xmlNodePtr sel = NULL;
+		char pro_MapValue[1024] = {0};
+		char sz_Value[1024] = {0};
+		char pSrc[1024] = {0};
+		
+		strcpy(pSrc,sql_Conf->sqlsrc_map[i]);
+		
+		string xml_src;
+		xmlFileRead(pSrc,&xml_src);
+		
+		if (strcmp(xml_src.c_str(),"") == 0)
+		{
+			printf("xml_src为空！\n");
+			return -1;
+		}
+		//printf("xml：%s\n",xml_src.c_str());
+		/*解析入参*/
+		doc = xmlParseMemory(xml_src.c_str(),sizeof(xml_src.c_str()));
+		if(doc==NULL)
+		{
+			printf("%s\n",xml_src.c_str());
+			printf("入参为空！或格式错误，请检查xml文件%s\n",pSrc);
+			return -1;
+		}
+		/*输入参数赋值 begin*/
+		cur = xmlDocGetRootElement(doc);
+		if (cur==NULL)
+		{
+			printf("xmlDocGetRootElement wrong!\n");
+			return -1;
+		}
+		
+		if(xmlStrcasecmp(cur->name,(const xmlChar *)"sqlMap")==0)
+		{
+			strcpy(pro_MapValue,(char *)xmlGetProp(cur,(const xmlChar *)"namespace"));
+			if(pro_MapValue==NULL)
+			{
+				printf("namespace %s is wrong!\n",cur->name);
+				return -1;
+			}
+			//printf("namespace:%s\n",pro_MapValue);
+		}
+		
+		cur=cur->xmlChildrenNode;
+		if (cur==NULL)
+		{
+			printf("xmlChildrenNode next wrong !\n");
+			return -1;
+		}
+		while (cur != NULL)
+		{
+			stSqlMap *sqlmap = new stSqlMap();
+			char MapValue[1024] = {0};
+			//memset(pro_MapValue,0,sizeof(pro_MapValue));
+			if(xmlStrcasecmp(cur->name,(const xmlChar *)"insert")==0 || xmlStrcasecmp(cur->name,(const xmlChar *)"update")==0 || xmlStrcasecmp(cur->name,(const xmlChar *)"delete")==0)
+			{
+				strcpy(sqlmap->id,(char *)xmlGetProp(cur,(const xmlChar *)"id"));
+				if(sqlmap->id==NULL)
+				{
+					printf("sqlmap->id %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(sqlmap->param,(char *)xmlGetProp(cur,(const xmlChar *)"parameterClass"));
+				if(sqlmap->param==NULL)
+				{
+					printf("sqlmap->param %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(sqlmap->db_no,(char *)xmlGetProp(cur,(const xmlChar *)"db_no"));
+				if(sqlmap->db_no==NULL)
+				{
+					printf("sqlmap->db_no %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(MapValue,(char *)xmlGetText(cur));
+				if(MapValue==NULL)
+				{
+					printf("sqlmap->sql %s is wrong!\n",cur->name);
+					return -1;
+				}
+				xmlConvSpeChar(MapValue,sqlmap->sql,repedMap);
+			}
+			else if(xmlStrcasecmp(cur->name,(const xmlChar *)"select")==0)
+			{
+				strcpy(sqlmap->id,(char *)xmlGetProp(cur,(const xmlChar *)"id"));
+				if(sqlmap->id==NULL)
+				{
+					printf("sqlmap->id %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(sqlmap->param,(char *)xmlGetProp(cur,(const xmlChar *)"parameterClass"));
+				if(sqlmap->param==NULL)
+				{
+					printf("sqlmap->param %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(sqlmap->res_num,(char *)xmlGetProp(cur,(const xmlChar *)"resultNum"));
+				if(sqlmap->res_num==NULL)
+				{
+					printf("sqlmap->res_num %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(sqlmap->db_no,(char *)xmlGetProp(cur,(const xmlChar *)"db_no"));
+				if(sqlmap->db_no==NULL)
+				{
+					printf("sqlmap->db_no %s is wrong!\n",cur->name);
+					return -1;
+				}
+				
+				strcpy(MapValue,(char *)xmlGetText(cur));
+				if(MapValue==NULL)
+				{
+					printf("sqlmap->sql %s is wrong!\n",cur->name);
+					return -1;
+				}
+				xmlConvSpeChar(MapValue,sqlmap->sql,repedMap);
+			}
+			//printf("[%s]%s\n",sqlmap->id,sqlmap->sql);
+			sqlconfs_tmp.insert(pair<string,stSqlMap*>(sqlmap->id,sqlmap));
+			cur=cur->next;
+		}
+		if (doc != NULL)
+		{
+			xmlFreeDoc(doc);
+			//xmlCleanupParser();
+		}
+	}
+
+	*sqlconfs = sqlconfs_tmp;
+	memcpy (settings, &(sql_Conf->set), sizeof(stSettings));
+	
+	/*if (sqlconfs_tmp.size()!=0)
+	{
+		clearXMLList(sqlconfs_tmp);
+	}*/
+	
+	return 0;
+}
+
+int init_XxmlFile(char *fileName,map<string,stSqlMap*> *sqlconfs,stSettings *settings)
+{
+	printf("初始化XML文件！\n");
+	stSqlMapConfig *sql_Conf = new stSqlMapConfig();
+	if (0 != Analysis_ConfXML(fileName,sql_Conf))
+	{
+		printf("Analysis_ConfXML ERROR\n");
+		delete sql_Conf;
+		sql_Conf = NULL;
+		return -1;
+	}
+	
+	if (0 != Analysis_SqlXML(sql_Conf,sqlconfs,settings))
+	{
+		printf("Analysis_SqlXML ERROR\n");
+		delete sql_Conf;
+		sql_Conf = NULL;
+		return -1;
+	}
+	
+	delete sql_Conf;
+	sql_Conf = NULL;
+	
+	getSqlContent(sqlconfs);
+	//解析后的sql;
+	//链接的数据库编号db_no;
+	//key值
+	//属性map
+	printf("初始化XML文件成功！\n");
+	
+	return 0;
+}
+
+/*
+解析SQL
+入参：
+	tpl_content,需要解析SQL
+出参：
+	out_content,解析后拼接正常的串,参数value值，防止硬解析
+	bindParams,参数key及类型
+*/
+int xmlbuild_sql(char *tpl_content,char *out_content,map<string,stSQLParam*> *bindParams)
+{
+	int iRet = 0;
+	char param[128] = {0};
+	char tmpBuf[1024] = {0};
+	char out_content_tmp[1024] = {0};
+	char key[32] = {0};//参数名称
+	char type[10] = {0};//参数类型
+	char repedStr[64] = {0};
+	char flag[1+1] = {0};//替换后的值
+	char *p=NULL;
+	int i = 0, end = 0, begin = 0, mid = 0, num = 0, o_begin = 0, o_end = 0;
+	int len1 = 0 , q = 0;
+	
+	map<string,stSQLParam*> tmpBindParams;
+	strcpy(flag,"?");
+	sprintf (tmpBuf, "%s", tpl_content);
+	int len = strlen(tmpBuf);
+	tmpBuf[len] = '\0';
+	sprintf (out_content_tmp, "%s", tmpBuf);
+	int is_empty = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == '$' && tmpBuf[i+1] == '{')
+		{
+			begin = i+2;
+			i++;
+			continue;
+		}
+		else if (tmpBuf[i] == '|')
+		{
+			mid = i;
+			memcpy (key, tmpBuf+begin, mid - begin);
+			key[mid-begin] = '\0';
+		}
+		else if (tmpBuf[i] == '}')
+		{
+			stSQLParam *sql_param = new stSQLParam();
+			end = i;
+			memcpy (type, tmpBuf+begin, end - begin);
+			type[end-begin] = '\0';
+			strcpy(sql_param->key,key);
+			strcpy(sql_param->type,type);
+			sql_param->num = num;
+			sql_param->isEmpty = is_empty;
+			num++;
+			tmpBindParams.insert(pair<string,stSQLParam*>(string(key),sql_param));
+		}
+		else if (tmpBuf[i] == '#')
+		{
+			if (o_begin == 0)
+			{
+				o_begin = i+1;
+				o_end = 0;
+			}
+			else if (o_end == 0)
+			{
+				o_end = i;
+				memcpy (key, tmpBuf+o_begin, o_end-o_begin);
+				key[o_end - o_begin] = '\0';
+				stSQLParam *sql_param = new stSQLParam();
+				strcpy(sql_param->key,key);
+				strcpy(sql_param->type,"char");
+				sql_param->name_type = 1;
+				sql_param->isEmpty = is_empty;
+				tmpBindParams.insert(pair<string,stSQLParam*>(string(key),sql_param));
+				o_begin = 0;
+			}
+		}
+		else if (tmpBuf[i] == '$' && tmpBuf[i+1] == 'E' && tmpBuf[i+2] == '[')
+		{
+			is_empty = 1;
+		}
+		else if (tmpBuf[i] == ']')
+		{
+			is_empty = 0;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		i++;
+		begin = i;
+	}
+	
+  for (map<string,stSQLParam*>::iterator iter = tmpBindParams.begin();iter != tmpBindParams.end();iter++)
+  {
+  	stSQLParam *param = iter->second;
+		memset(repedStr,0,sizeof(repedStr));
+		sprintf(repedStr,"${%s|%s}",param->key,param->type);
+  	p = strstr(out_content_tmp, repedStr);
+  	if (p == NULL)
+		{
+			continue;
+		}
+
+		if( NULL==xml_strrep((char *)out_content_tmp,(char *)out_content_tmp,repedStr,flag))
+		{
+			if ( 0 != tmpBindParams.size())
+			{
+				clearXMLList(tmpBindParams);
+			}
+			return -1;
+		}
+  }
+	strcpy(out_content,out_content_tmp);
+	
+	*bindParams = tmpBindParams;
+	/*if ( 0 != tmpBindParams.size())
+	{
+		clearXMLList(tmpBindParams);
+	}*/
+  
+  return 0;
+}
+
+int getSqlContent(map<string,stSqlMap*> *sqlconfs)
+{
+	//map<string,stSQLParam*> bindParams_tmp;
+	stSqlMap *sqlmap = NULL;
+	char sql[1024] = {0};
+	char key[1024] = {0};
+	char tmp_out[1024] = {0};
+	
+	for (map<string,stSqlMap*>::iterator dataIter = (*sqlconfs).begin(); dataIter != (*sqlconfs).end(); dataIter++)
+	{
+		sqlmap = dataIter->second;
+		if (0 != xmlbuild_sql(sqlmap->sql,tmp_out,&(sqlmap->inParams)))
+		{
+			return -1;
+		}
+		strcpy(sqlmap->new_sql,tmp_out);
+		//sqlmap->inParams = bindParams_tmp;
+	}
+	
+	return 0;
+}
+
+int xmlConvSpeChar(char *old_src,char *new_src,map<string,string> repedMap)
+{
+	char temp_src[1024] = {0};
+	//map<string,string> repedMap;
+	strcpy(temp_src,old_src);
+	strcpy(new_src,old_src);
+	//增加替换项
+	//repedMap.insert(pair<string,string>(string("@lt"),string("<")));
+	//repedMap.insert(pair<string,string>(string("@gt"),string(">")));
+	for (map<string,string>::iterator it=repedMap.begin();it!=repedMap.end();it++)
+	{
+		char *p=NULL;
+		char repedStr[5]={0};
+		char flag[5]={0};
+		
+		strcpy(repedStr,(it->first).c_str());
+		strcpy(flag,(it->second).c_str());
+		p = strstr(temp_src, repedStr);
+		while (p != NULL)
+		{
+			if( NULL==xml_strrep((char *)temp_src,(char *)new_src,repedStr,flag))
+			{
+				return -1;
+			}
+			strcpy(temp_src,new_src);
+		}
+	}
+	
+	return 0;
+}
+
+// 替换字符串中特征字符串为指定字符串
+char * xml_deleteEmptyStr(char *src,char *new_src)
+{
+	char *p,*p1,*result;
+	char right[1024] = {0};
+	int len,right_len;
+	char pSrc[3+1] = {0};
+	char pDsc[1+1] = {0};
+	strcpy(pSrc,"$E[");
+	strcpy(pDsc,"]");
+	
+	if (src == NULL)
+		return NULL;
+	
+	p = strstr(src, pSrc);       //返回字符串第一次出现的地址,否则返回NULL
+	if (p == NULL)  /*not found*/
+		return NULL;
+	p1 = strstr(src, pDsc);       //返回字符串第一次出现的地址,否则返回NULL
+	if (p1 == NULL)  /*not found*/
+		return NULL;
+	
+	right_len = strlen(p1) - strlen(pDsc);
+	len = strlen(src) - strlen(p) + right_len;
+	result = (char*)malloc(len+1);
+	if (result == NULL)
+	{
+		return NULL;
+	}
+	bzero(result, len+1);
+	strncpy(result, src, strlen(src) - strlen(p));
+	//printf("res[%s];rlen[%d]\n",result,right_len);
+	if (right_len > 0)
+	{
+		//right = (char*)malloc(right_len);
+		//bzero(right, right_len);
+		strncpy(right, p1+strlen(pDsc), strlen(p1));
+		strcat(result, right);
+	}
+	strcpy(new_src,result);
+	
+	return new_src;
+}
+
+int replaceSql(char *src,map<string,stSQLParam*> bindParams,char *new_src) 
+{
+	char temp_src[1024] = {0};
+	char temp_dsrc[1024] = {0};
+	strcpy(temp_src,src);
+	strcpy(new_src,src);
+	xmlTrim(new_src);
+	for(map<string,stSQLParam*>::iterator ii = bindParams.begin(); ii != bindParams.end(); ii++)
+	{
+		stSQLParam *param = ii->second;
+		char *p=NULL;
+		char repedStr[32] = {0};
+		memset(temp_dsrc,0,sizeof(temp_dsrc));
+		//printf("key[%s]isEmpty=%d,type=%d\n",param->key,param->isEmpty,param->name_type);
+		if (param->name_type == 0 && param->isEmpty != 2)
+		{
+			continue;
+		}
+		else if(param->isEmpty == 2)
+		{
+			if (NULL == xml_deleteEmptyStr(temp_src,temp_dsrc))
+			{
+				return -1;
+			}
+		}
+		else 
+		{
+			strcpy(temp_dsrc,temp_src);
+		}
+		sprintf(repedStr,"#%s#",param->key);
+		p = strstr(temp_dsrc, repedStr);
+		if (p != NULL)
+		{
+			if( NULL==xml_strrep((char *)temp_dsrc,(char *)new_src,repedStr,param->value))
+			{
+				return -1;
+			}
+			strcpy(temp_src,new_src);
+		}
+		else 
+		{
+			strcpy(new_src,temp_dsrc);
+			strcpy(temp_src,new_src);
+		}
+	}
+	if (NULL == isEmpty_strrep(new_src,new_src))
+	{
+		return -1;
+	}
+	strcpy(temp_src,new_src);
+	return 0;
+}
+
+// 替换字符串中特征字符串为指定字符串
+char * isEmpty_strrep(char *pInput,char *pOutput)
+{
+	char *p,*pp;//*p1;
+	char p1[1024] = {0};
+	char p2[1024] = {0};
+	int len;
+	char pSrc_a[32] = {0};
+	char pSrc_b[32] = {0};
+	strcpy(pSrc_a,"$E[");
+	strcpy(pSrc_b,"]");
+	
+	if (pInput == NULL)
+		return NULL;
+	
+	p = strstr(pInput, pSrc_a);
+	if (p == NULL)
+		return pInput;
+		
+	strncpy(p1, pInput, p-pInput);
+	p += strlen(pSrc_a);
+	
+	pp = strstr(p, pSrc_b);
+	if (pp == NULL)
+		return NULL;
+		
+	strncpy(p2, p, pp-p);
+	pp += strlen(pSrc_b);
+	
+	sprintf(pOutput,"%s%s%s",p1,p2,pp);
+
+	return pOutput;
+}
+
+long ibear_getUTime()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (((unsigned long)tv.tv_sec) * 1000*1000 + ((unsigned long)tv.tv_usec)); 
+}
+
+
+#if 0
+char * xml_strrep(char *pInput, char *pOutput, char *pSrc, char *pDst)
+{
+  char *pi, *po, *p;
+  int nSrcLen, nDstLen, nLen;
+	if(pInput==NULL
+	||pOutput==NULL
+	||pSrc==NULL
+	||pDst==NULL)
+	{      
+		return NULL;
+	}
+  /* 指向输入字符串的游动指针.*/
+  pi = pInput;
+  /* 指向输出字符串的游动指针.*/
+  po = pOutput;
+  /* 计算被替换串和替换串的长度.*/
+  nSrcLen = strlen(pSrc);
+  nDstLen = strlen(pDst);
+
+  /* 查找pi指向字符串中第一次出现替换串的位置,并返回指针(找不到则返回null).*/
+  p = strstr(pi, pSrc);
+	if(p) {
+        /* 找到.*/
+        while(p) {
+              /* 计算被替换串前边字符串的长度.*/
+            nLen = (int)(p - pi);
+              /* 复制到输出字符串.*/
+            memcpy(po, pi, nLen);
+            memcpy(po + nLen, pDst, nDstLen);
+              /* 跳过被替换串.*/
+            pi = p + nSrcLen;
+            //printf("pi:%s\n",pi);
+              /* 调整指向输出串的指针位置.*/
+            po = po + nLen + nDstLen;
+              /* 继续查找.*/
+            p = strstr(pi, pSrc);
+        }
+        /* 复制剩余字符串.*/
+        //printf("po_be---%s\n",po);
+        //printf("pi_be---%s\n",pi);
+       	strcpy(po, pi);
+        //printf("po_af---%s\n",po);
+        //printf("pi_af---%s\n",pi);
+  }
+  else
+  {
+		/* 没有找到则原样复制.*/
+		strcpy(po, pi);
+	}
+	//printf("ppo=%s\n",po);
+	//printf("pOutput=%s\n",pOutput);
+	return pOutput;
+}
+#endif

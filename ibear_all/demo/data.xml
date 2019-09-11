@@ -1,0 +1,41 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<!--全库测试-->
+	<select id="selectTestCount" parameterClass="Map">select count(1) from #TABLE_NAME#</select>
+	<insert id="dmlTestAll" parameterClass="Map" db_no="0">insert into abc(a,b,c,d) values(${a|char},${b|int},${c|date},${d|char})</insert>
+	<select id="selectTestAll" parameterClass="Map" db_no="0">select a,b,c,d from abc</select>
+	<select id="selectTest" parameterClass="Map" db_no="0">select a,b,c,d from abc where a=${a|char}</select>
+	<delete id="deleteTEST" parameterClass="Map" db_no="0">delete from abc</delete>
+	<select id="selInList" parameterClass="Map" db_no="0">select a,b,c,d from abc where b in ($L[list])</select>
+	<select id="SEL_TEST_DOUBLE" parameterClass="Map">select a,b,c from #TABLE_NAME# where b=${b|int} $E[and a=${a|char} ]$E[and d=${d|int}] union all select a,b,c from #TABLE_NAME# where b=${b|int} $E[and a=${a|char} ]and d=${d|int}</select>
+	
+	<!--oracle多行返回-->
+	<select id="SEL_TEST_LIST" parameterClass="Map" db_no="0">select a,b,c from abc where rownum @lt ${a|int}</select>
+	<select id="SEL_TEST_LIST1" parameterClass="Map" db_no="0">select a,b,c from abc where a=${a|char}</select>
+	<select id="SEL_TEST_LIST2" parameterClass="Map" db_no="0">select a,b,c from abc where rownum @lt 10</select>
+	
+	<!--lob test-->
+	<delete id="DELETE_BLOB" parameterClass="Map" db_no="0">
+		delete from abc_lob
+	</delete>
+	<insert id="INSERT_BLOB" parameterClass="Map" db_no="0">
+		insert into abc_lob(a,b,c,d,e) values(${A|char},${B|long},${C|date},${D|blob|2000},${E|clob|2000})
+	</insert>
+	<select id="SELECT_BLOB_FETCH" parameterClass="Map" db_no="0">
+		<param name="d" type="blob" />
+		<param name="e" type="clob" />
+		select a,b,c,d,e from abc_lob
+	</select>
+	<select id="SELECT_BLOB_ALL" parameterClass="Map" db_no="0">
+		<param name="d" type="blob" />
+		<param name="e" type="clob" />
+		select a,b,c,d,e from abc_lob
+	</select>
+	<select id="SELECT_BLOB" parameterClass="Map" db_no="0">
+		<param name="d" type="blob" />
+		<param name="e" type="clob" />
+		select a,b,c,d,e from abc_lob where a=${A|char} and c=${C|char}
+	</select>
+</sqlMap>
+

@@ -1,0 +1,223 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+ 
+#include "rtStopPub.h"
+#include "CLogManager.h"
+
+CLogManager::CLogManager (void)
+{
+	m_LogServer.clear ();
+	
+	m_AppCfg = NULL;
+	
+	m_IsRun = false;
+}
+
+CLogManager::~CLogManager (void)
+{
+	if (m_LogServer.size() != 0)
+	{
+		this->Close();
+	}
+}
+
+bool CLogManager::IsRun ()
+{
+	return m_IsRun;
+}
+
+Ret CLogManager::Backup (void)
+{
+	mapLogServer::iterator iter;
+	for (iter = m_LogServer.begin(); iter != m_LogServer.end(); iter++)
+	{
+		CLogServer *pNode = iter->second;
+		
+		if (0 != pNode->Backup())
+		{
+			return RET_FAIL;
+		}
+	}
+	
+	return RET_OK;
+}
+
+bool CLogManager::Close (void)
+{
+	mapLogServer::iterator iter;
+	for (iter = m_LogServer.begin(); iter != m_LogServer.end(); iter++)
+	{
+		delete (iter->second);
+	}
+	
+	m_LogServer.clear();
+	
+	return true;
+}
+
+CLogFile *CLogManager::GetLogFile (const string m_StrLogName, UnInt32 nLogType)
+{
+	mapLogServer::iterator iter = m_LogServer.find(m_StrLogName);
+	if (iter != m_LogServer.end())
+	{
+		return (iter->second)->GetLogFile(nLogType);
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
+Ret CLogManager::RegisterLog (string m_StrLogName, CLogServer *pServer)
+{
+	mapLogServer::iterator iter = m_LogServer.find(m_StrLogName);
+	
+	if (iter == m_LogServer.end())
+	{
+		m_LogServer.insert (pair<string, CLogServer *>(m_StrLogName, pServer));
+	}
+	
+	return RET_OK;
+}
+
+Ret CLogManager::UnRegisterLog (string m_StrLogName, CLogServer *pServer)
+{
+	mapLogServer::iterator iter = m_LogServer.find(m_StrLogName);
+	
+	if (iter != m_LogServer.end())
+	{
+		delete (iter->second);
+		
+		m_LogServer.erase(iter);
+	}
+	
+	return RET_OK;
+}
+
+bool CLogManager::Init (stAppCfg *pCfgInfo)
+{
+	m_AppCfg = pCfgInfo;
+	m_processNum = 0;
+	
+	return true;
+}
+
+bool CLogManager::Init (stAppCfg *pCfgInfo,int processNum)
+{
+	m_AppCfg = pCfgInfo;
+	m_processNum = processNum;
+	
+	return true;
+}
+
+void CLogManager::run (void)
+{
+	int iRet = 0;
+	for (int i = 0; i < m_AppCfg->stLogServer.log_num; i++)
+	{
+		struct log_server *pNode = &(m_AppCfg->stLogServer.log_mgr[i]);
+		if (pNode->log_thread_num == 0)
+		{
+			CLogServer *pServer = new CLogServer ();
+			char log_name[128] = {0};
+			sprintf(log_name,"%s",pNode->log_name);
+			pServer->SetLogInfo (pNode->log_path, log_name);
+		
+			for (int j = 0; j < pNode->log_file_num; j++)
+			{
+				struct log_file_info *pFileNode = &(pNode->logfile_info[j]);
+	
+				iRet = pServer->AddLogFile (pFileNode->log_type, pFileNode->log_interval, pFileNode->log_backup_size, pFileNode->log_procmode, pFileNode->log_backup_type);
+				if (0 != iRet)
+				{
+					printf ("FILE[%s]LINE[%d]ERR_MSG[AddLogFile Is Failed.]\n", __FILE__, __LINE__);
+					return;
+				}
+			}
+			
+			iRet = RegisterLog (string(log_name), pServer);
+			if (0 != iRet)
+			{
+				printf ("FILE[%s]LINE[%d]ERR_MSG[RegisterLog Is Failed.\n]", __FILE__, __LINE__);
+				return;
+			}
+		}
+		else
+		{
+			for (int j = 0; j< pNode->log_thread_num; j++)
+			{
+				CLogServer *pServer = new CLogServer ();
+				char log_name[128] = {0};
+				sprintf(log_name,"%s_%d_%d",pNode->log_name,m_processNum,j);
+				pServer->SetLogInfo (pNode->log_path, log_name);
+				for (int z = 0; z < pNode->log_file_num; z++)
+				{
+					struct log_file_info *pFileNode = &(pNode->logfile_info[z]);
+					iRet = pServer->AddLogFile (pFileNode->log_type, pFileNode->log_interval, pFileNode->log_backup_size, pFileNode->log_procmode, pFileNode->log_backup_type);
+					if (0 != iRet)
+					{
+						printf ("FILE[%s]LINE[%d]ERR_MSG[AddLogFile Is Failed.]\n", __FILE__, __LINE__);
+						return;
+					}
+				}
+				
+				iRet = RegisterLog (string(log_name), pServer);
+				if (0 != iRet)
+				{
+					printf ("FILE[%s]LINE[%d]ERR_MSG[RegisterLog Is Failed.\n]", __FILE__, __LINE__);
+					return;
+				}
+			}
+		}
+	}
+	
+	while (getThreadState() == THREAD_STAT_RUNNING)
+	{
+		for (mapLogServer::iterator iter = m_LogServer.begin(); iter != m_LogServer.end(); iter++)
+		{
+			if (0 != iter->second->Backup())
+			{
+				printf ("FILE[%s]LINE[%d]ERR_MSG[Backup Is Failed.]\n", __FILE__, __LINE__);
+			}
+		}
+		
+		sleep (5);
+	}
+
+	return;
+}
+
+void WriteLog (const string m_StrLogName, UnInt32 nLogType, UnInt32 nLevel, const char *fmt, ...)
+{
+	char szDescription[MAX_LOG_LENGTH] = {0};
+	char buffer[MAX_LOG_LENGTH] = {0};
+	
+	va_list args;
+	va_start(args, fmt);
+
+	vsnprintf (szDescription, MAX_LOG_LENGTH, fmt, args);
+	va_end (args);
+	
+	if (nLogType == LOG_APP_STATINFO ||
+		nLogType == LOG_APP_PERFORMANCE ||
+		nLogType == LOG_SYS_RUNNING ||
+		nLogType == LOG_SYS_NORMAL)
+	{
+		strcpy(buffer, szDescription);
+	}
+	else
+	{
+		char szTime[25];
+		memset(szTime, 0, sizeof(szTime));
+  	getSysDatetoStr(szTime);
+  	sprintf(buffer,"[%s] [level:%d] %s", szTime, nLevel, szDescription);
+	}
+	CLogFile *pLogFile = App_LogManager::Instance()->GetLogFile(m_StrLogName, nLogType);
+	if (NULL != pLogFile)
+	{
+		pLogFile->DoLog (buffer);
+	}
+}

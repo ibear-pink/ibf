@@ -1,0 +1,507 @@
+AUDIT_HOME=/account/c000/pkg/src/cpp/AUDIT
+LOG_PATH=/account/c000/pkg/src/cpp/AUDIT
+className=$1
+echo $className
+typeset -u VARIABLE
+VARIABLE=$className
+echo $VARIABLE
+echo `date +%Y%m%d`|read SYSTIME
+
+#判断输入的类目录是否存在
+if [ ! -d "$className" ]; then
+	mkdir $className
+	echo "目录不存在，新建目录"
+else
+	echo "目录已存在"
+fi
+
+#生成Deal.h文件
+echo '
+/*
+ * 功能描述:
+ * 创建时间:'$SYSTIME'
+ * 编码人员:自动生成
+*/
+#ifndef _'$VARIABLE'_H_
+#define _'$VARIABLE'_H_
+
+#include "CPublicDeal.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class '$className'Deal : public CPublicDeal,public Object
+{
+	DECLARE_CLASS('$className'Deal)
+public:
+
+	'$className'Deal();
+	~'$className'Deal();
+	int Process(stSTOPMessage *stopMsg);
+	int InitStopCfgInfo(stSTOPMessage *stopMsg);
+};
+
+#endif
+' > $className/$className'Deal.h'
+
+#生成Deal.cpp文件
+echo '
+/*
+ * 功能描述:
+ * 创建时间:'$SYSTIME'
+ * 编码人员:自动生成
+*/
+#include "'$className'Deal.h"
+
+IMPLEMENT_CLASS('$className'Deal)
+
+'$className'Deal::'$className'Deal()
+{
+	
+}
+
+'$className'Deal::~'$className'Deal()
+{
+
+}
+
+int '$className'Deal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int '$className'Deal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+' > $className/$className'Deal.cpp'
+
+#生成Data.h文件
+echo '
+/*
+ * 功能描述:
+ * 创建时间:'$SYSTIME'
+ * 编码人员:自动生成
+*/
+#ifndef _'$VARIABLE'_DATA_H_
+#define _'$VARIABLE'_DATA_H_
+
+#include "CPublicData.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class '$className'Data:public CPublicData,public Object
+{
+	DECLARE_CLASS('$className'Data)
+public:
+
+	'$className'Data();
+	~'$className'Data();
+	int init(char *serverName, int serverType,CPublicDeal *stopDeal);
+	
+	int process(ibear *br,char *busiName,char *serverName,stAppCfg_System *pSystemInfo,stDealTask *pTask,stParseField *parseField,stSTOPMessage *stopMsg);
+	
+public:
+	
+};
+
+#endif
+
+' > $className/$className'Data.h'
+
+#生成Data.cpp文件
+echo '
+/*
+ * 功能描述:
+ * 创建时间:'$SYSTIME'
+ * 编码人员:自动生成
+*/
+#include "'$className'Data.h"
+#include "DynBase.h"
+
+IMPLEMENT_CLASS('$className'Data)
+
+'$className'Data::'$className'Data()
+{
+	
+}
+
+'$className'Data::~'$className'Data()
+{
+	
+}
+
+int '$className'Data::init(char *serverName,int serverType,CPublicDeal *stopDeal)
+{
+	return RET_OK;
+}
+
+int '$className'Data::process(ibear *br,char *busiName,char *serverName,stAppCfg_System *pSystemInfo,stDealTask *pTask,stParseField *parseField,stSTOPMessage *stopMsg)
+{
+	int iRet = 0,cRet = 0;
+	return iRet;
+}
+
+' > $className/$className'Data.cpp'
+
+
+#生成Mgr.h文件
+echo '
+/* 
+ * 功能描述: 
+ * 创建时间:'$SYSTIME'
+ * 编码人员:自动生成
+*/
+#ifndef _'$VARIABLE'_MANAGER_H_
+#define _'$VARIABLE'_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class '$className'Mgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS('$className'Mgr)
+public:
+	
+	'$className'Mgr();
+	~'$className'Mgr();
+    
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+	
+	int ProInterface(map<string,string> *values);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+	
+public:
+	
+};
+#endif
+
+'  > $className/$className'Mgr.h'
+
+#生成Mgr.cpp文件
+echo '
+/*
+ * 功能描述:
+ * 创建时间:'$SYSTIME'
+ * 编码人员:自动生成
+*/
+
+#include "'$className'Mgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS('$className'Mgr)
+
+'$className'Mgr::'$className'Mgr()
+{
+	
+}
+
+'$className'Mgr::~'$className'Mgr()
+{
+	
+}
+
+int '$className'Mgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int '$className'Mgr::process()
+{
+	int iRet = 0;	
+	return iRet;
+}
+
+int '$className'Mgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int '$className'Mgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+'  > $className/$className'Mgr.cpp'
+
+
+#生成main函数
+echo '
+/*********************
+* 功能描述:入口函数
+* 编码日期:'$SYSTIME'
+* 编码人员:自动生成
+*********************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include "CProServerManager.h"
+#include "Version.h"
+
+using namespace std;
+
+int g_runflag;//0: run  1：stop
+
+/**********************************************************
+function: getIBillingCmd
+description: 获取运行指令信息
+Input: argc: 运行指令个数
+       argv: 保存运行指令内容
+Output: chCfgPath 配置文件路径
+Return: 0 MY_SUCCEED 1 MY_FAIL
+others:
+***********************************************************/
+static int getIBillingCmd (char* chCfgPath, int argc, char * argv[])
+{
+	extern char *optarg;
+	int opt;
+
+	if(argc < 2)
+	{
+		fprintf( stderr, "\\n\\n[usage]: %s -c Cfgfile\\n\\tOr %s -v\\n\\n", argv[0], argv[0]);
+		return -1;
+	}
+
+	/* 获取运行命令 */
+	while( -1 != ( opt = getopt( argc, argv, "C:c:HhVv:Tt" ) ) )
+	{
+		/* 分析运行命令 */
+		switch( opt )
+		{
+			case '"'C'"':
+			case '"'c'"':
+				strcpy (chCfgPath, optarg);
+				break;
+			case '"'H'"':
+			case '"'h'"':
+				fprintf( stderr, "\\n\\n\\t[usage]: %s -c Cfgfile\\n\\n", argv[0]);
+				return 0;
+			case '"'V'"':
+			case '"'v'"':
+				fprintf( stderr, "\\n\\t%s v%s\\n\\n", PROGRAMMING_NAME, STOP_VERSION);
+				return 1;
+			default:
+				fprintf( stderr, "\\n\\n\\t[usage]: %s -c Cfgfile\\n\\tOr %s -v\\n\\n", argv[0], argv[0]);
+				return -1;
+		}
+	}
+
+	return 0;
+}
+
+/**********************************************************
+Function:		static void sig_quit(int signo)
+Description:	信号处理函数
+Input:			int signo, 信号编号
+Output:			无
+Return: 		无
+Others:			产生跳转
+**********************************************************/
+static void sig_quit(int signo)
+{
+	g_runflag = 1;
+}
+
+int main (int argc,char *argv[])
+{
+	printf("%s\t############# RealTimeStop Program Started ############\n",GetSysTime());	
+	int ret=0;
+	char fileName[1024] = {0};
+	char processName[1024] = {0};
+	map<string,string> classMap;
+	
+	classMap.insert(pair<string,string>(string("Mgr"),string("'$className'Mgr")));
+	classMap.insert(pair<string,string>(string("Data"),string("'$className'Data")));
+	classMap.insert(pair<string,string>(string("Deal"),string("'$className'Deal")));
+	
+	/*检查命令行参数的合法性，并获取合法配置文件名*/
+	if (0 != getIBillingCmd(fileName, argc, argv))
+	{
+		return RET_FAIL;
+	}
+	
+	printf("fileName=%s\n",fileName);
+	if (!App_ProServerManager::Instance()->Init (fileName,processName))
+	{
+		printf ("App_ProServerManager Init Is Failed.\n");
+		return RET_FAIL;
+	}
+	
+	if (!App_ProServerManager::Instance()->Start(classMap))
+	{
+		printf ("App_ProServerManager Start Is Exit.Please Check Log.\n");
+		return RET_FAIL;
+	}
+	
+	signal(SIGTERM, sig_quit);
+	signal(SIGINT, sig_quit);
+	signal(SIGQUIT, sig_quit);
+	signal(SIGPIPE, SIG_IGN);
+
+	while (g_runflag == 0)
+	{
+		if (App_ProServerManager::Instance()->GetServerSize() == 0)
+		{
+			break;
+		}
+
+		sleep(5);
+	}
+	
+	App_ProServerManager::Close();
+
+	return RET_OK;
+
+}
+' > $className/$className.cpp
+
+#生成makefile
+echo '
+include '${AUDIT_HOME}'/public/makefile.cfg
+
+OBJ = '$className'Data.o '$className'Mgr.o '$className'Deal.o '$className'.o
+
+BIN='$className'
+
+all:${BIN} install clean
+
+.cpp.o:
+	echo "Compiling the $<"
+	$(CC) -c ${CFLAGS} ${INCLUDE} $<
+.c.o:
+	echo "Compiling the $<"
+	$(CC) -c ${CFLAGS} ${INCLUDE} $<
+
+clean:
+	rm -f '$className'Data.o '$className'Mgr.o '$className'Deal.o '$className'.o
+
+######################################################################
+
+${BIN}: $(OBJ)
+	$(CC) ${CFLAGS} -o $@ $? ${LIB}
+
+######################################################################
+
+install:
+	
+	#mv ${BIN} ${ACCT_BIN}
+
+' > $className/makefile
+
+#mkdir ${AUDIT_HOME}/$className
+
+echo '
+[SYSTEM]
+#程序名称
+program_name='$className'
+#连接的数据库个数
+db_num=2
+db_id_0=1 #物理库billcolldev
+db_id_1=2 #内存库billing_data
+#采用DSCI连接数据库,请配置${DSCI_PATH}/cfg/db.cfg
+
+[SERVER_INFO]
+[PROC_SERVER]
+#执行方式：1.实时接口, 2.定时接口 3.自定义接口
+deal_type=3
+#是否需要数据分发：1，需要；0，不需要
+is_give=0
+#接口类型：1 文件接口，2 接口表
+interface_type=2
+#对应日志服务器名称
+server_name='$className'
+#接口表模式数据备份方式
+#备份模式（1：文件方式，2：表方式）
+tab_type=0
+
+[LOG_INFO]
+log_num=1
+[LOG]
+#日志服务器路径
+log_path='$LOG_PATH'/log
+#日志服务器名称
+log_name='$className'
+#log_thread_num=0时,各线程共享一个日志
+log_thread_num=1
+#日志服务器包含日志文件数目
+log_file_num=3
+#日志服务器类型，1000,1001,1002,1003,1004（日志类型以","进行分割)
+#1000:通用日志，1001:运行日志，1002:告警日志，1003:错误日志，1004:统计日志
+
+log_type1=1003
+#日志备份间隔时间（单位:秒）
+log_intervaltime1=0
+#日志备份大小（单位为：M）
+log_backupsize1=0
+#日志处理模式（1：同步方式，2：异步方式）
+log_procmode1=2
+#日志备份类型（1：日期，2：文件大小，3：时间间隔，4：小时）
+log_backuptype1=1
+
+log_type2=1001
+#日志备份间隔时间（单位:秒）
+log_intervaltime2=0
+#日志备份大小（单位为：M）
+log_backupsize2=0
+#日志处理模式（1：同步方式，2：异步方式）
+log_procmode2=2
+#日志备份类型（1：日期，2：文件大小，3：时间间隔，4：小时）
+log_backuptype2=1
+
+log_type3=1000
+#日志备份间隔时间（单位:秒）
+log_intervaltime3=0
+#日志备份大小（单位为：M）
+log_backupsize3=0
+#日志处理模式（1：同步方式，2：异步方式）
+log_procmode3=2
+#日志备份类型（1：日期，2：文件大小，3：时间间隔，4：小时）
+log_backuptype3=1
+
+' > ${AUDIT_HOME}/$className/test.conf
+echo '<?xml version="1.0" encoding="UTF-8"?>
+<sqlMapConfig>
+        <settings cacheModelsEnabled="true" 
+        				autoCommit="0"
+    						enhancementEnabled="true"
+                lazyLoadingEnabled="true" 
+                errorTracingEnabled="true" 
+                maxRequests="256"
+                maxSessions="64" 
+                maxTransactions="32" 
+                useStatementNamespaces="true" />
+        
+        <sqlMap resource="'${AUDIT_HOME}'/'$className'/data.xml" />
+</sqlMapConfig>
+' > ${AUDIT_HOME}/$className/sqlMapConfig.xml
+
+echo '
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SELTEST"  parameterClass="Map" resultNum="1" db_no="0">select sysdate from dual</select>
+</sqlMap>
+' > ${AUDIT_HOME}/$className/data.xml
+
+echo '
+export STOP_HOME='${AUDIT_HOME}'/'$className'
+export IBEAR_HOME='${AUDIT_HOME}'/'$className'
+export DSCI_PATH='${AUDIT_HOME}'/DSCI
+export LD_LIBRARY_PATH=$DSCI_PATH/lib:$LD_LIBRARY_PATH
+
+./'$className' -c ${STOP_HOME}/test.conf
+' > $className/go
+
+cd ${AUDIT_HOME}/$className
+make -f makefile
+sh go

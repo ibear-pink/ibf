@@ -1,0 +1,169 @@
+#include "ibear_db_conn.h"
+
+IBEAR_sql *db_PrepareSql (IBEAR *mpDSC, PRESQL *preSqls, char *sql, int db_no)
+{
+	int flag = 0;
+	IBEAR_sql *p_SQL;
+	//printf("sql=%s\n",sql);
+	/*p_SQL = &(preSqls->_sql[preSqls->_next_seq]);
+	#ifdef _DSCI_
+	if (DSCI_prepare_sql_f (mpDSC, p_SQL, sql, db_no) < 0)
+	{
+		return NULL;
+	}
+	#else
+	#endif*/
+	//printf("preSqls->_next_seq=%d\n",preSqls->_next_seq);
+	for (int i= 0;i<preSqls->_next_seq;i++)
+	{
+		p_SQL = &(preSqls->_sql[i]);
+		//printf("[%d]%s\n",i,preSqls->msql[i]);
+		if (strcmp(preSqls->msql[i],sql) == 0)
+		{
+			flag = 1;
+			return p_SQL;
+		}
+	}
+
+	//printf("flag=%d\n",flag);
+	if (flag == 0)
+	{
+		p_SQL = &(preSqls->_sql[preSqls->_next_seq]);
+		#ifdef _DSCI_
+		if (DSCI_prepare_sql_f (mpDSC, p_SQL, sql, db_no) < 0)
+		{
+			return NULL;
+		}
+		#else
+		#endif
+		strcpy(preSqls->msql[preSqls->_next_seq],sql);
+		
+		preSqls->_next_seq++;
+	}
+	return p_SQL;
+}
+
+int ibear_db_init (IBEAR_DbConner *DB_DSC,stSettings *set,char *err_msg)
+{
+	char msg[512] = {0};
+	#ifdef _DSCI_
+	if (0 != DSCI_init (msg, &(DB_DSC->mDSC)))
+	{
+		printf("\n[%s][%d]err_msg[%s]\n",__FILE__,__LINE__, msg);
+		strcpy(err_msg,msg);
+		return DB_FAIL;
+	}
+	#else
+	#endif
+
+	DB_DSC->mpDSC = &(DB_DSC->mDSC);
+	memset(&(DB_DSC->db_sqls), 0, sizeof(DB_DSC->db_sqls));
+  
+	//设为缓冲模式
+	#ifdef _DSCI_
+	DSCI_set_Buffer_flag (DB_DSC->mpDSC, 1);
+	
+	DSCI_set_auto_commit (DB_DSC->mpDSC, set->autoCommit);
+	#else
+	#endif
+
+	#ifdef _DSCI_
+	int looper = 0;
+	
+	#else
+	
+	#endif
+	
+	return 0;
+}
+
+void ibear_db_quit (IBEAR_DbConner *DB_DSC)
+{
+	if (DB_DSC->mpDSC != NULL)
+	{
+		#ifdef _DSCI_
+		DSCI_quit (DB_DSC->mpDSC);
+		#else
+		#endif
+	}
+	
+	DB_DSC->mpDSC = NULL;
+}
+
+#if 0
+/*
+内存库SQL执行过程
+*/
+int my_query_p(DSC *pDSC,DSC_SQL *pSQL)
+{
+	int iRet = 0;
+	int tmp_code = 0;
+	int iNum = 0;
+	
+	if(DSC_query_p(pDSC,pSQL) != iRet)
+	{
+		while(1)
+		{
+			if (tmp_code > 0 && tmp_code != 2099 ) /*主节点异常，重新预解析*/
+			{
+      	if(SqlPrepare () != 0) {
+      		if(iNum >= DMDBCONNNUM) {
+      			billlog("DMDB connect > max num:%d\n",DMDBCONNNUM);
+      			return -1;
+      		}
+      		iNum++;
+      		
+      		sleep(1);
+      		continue;
+      	}
+      	else
+      		return 0;
+    	}
+    	else
+    	{
+    		return iRet;	
+    	}
+		}
+	}
+	return 0;
+}
+
+int my_end_trans(DSC *pDSC,unsigned short flag)
+{
+	int iRet = 0;
+	int tmp_code = 0;
+	int iNum = 0;
+	
+	if(DSC_end_trans(pDSC,flag) != iRet)
+	{
+		while(1)
+		{
+			tmp_code = DSC_ecode(pDSC);
+			if ( tmp_code > 0 && tmp_code != 2099)
+			{
+				if(SqlPrepare () != 0) {
+      		if(iNum >= DMDBCONNNUM) {
+      			billlog("DMDB connect > max num:%d\n",DMDBCONNNUM);
+      			return -1;
+      		}
+      		iNum++;
+      		
+      		sleep(1);
+      		continue;
+	      }
+	     	else
+	     	{
+	     		return 0;
+	     	}
+			}
+			else 
+			{
+				return iRet;
+			}
+		}
+	}
+	
+	return 0;	
+}
+ 
+#endif

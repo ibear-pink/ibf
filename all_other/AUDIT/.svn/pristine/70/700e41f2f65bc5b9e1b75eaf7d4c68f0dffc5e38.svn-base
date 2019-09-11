@@ -1,0 +1,61 @@
+/**
+ * description:任务对象构造函数
+ * author:wangzhia
+ * create date:2013-10-28
+ */
+#include "Task.h"
+
+Task::Task()
+{
+	memset(m_buffer, 0, sizeof(m_buffer));
+	
+	m_length = 0;
+	
+	m_DispatchKey = 0;
+	
+	m_RequetBody = NULL;
+	
+	m_BusiType = 0;
+	
+	m_IsFileEnd = false;
+	
+	memset (m_FileHead, 0, sizeof(m_FileHead));
+	
+	memset (m_Msisdn, 0, sizeof(m_Msisdn));
+	
+	memset (m_FileName, 0, sizeof(m_FileName));
+}
+
+// 任务对象析构
+Task::~Task()
+{
+	if (NULL != m_RequetBody)
+	{
+		free (m_RequetBody);
+		
+		m_RequetBody = NULL;
+	}
+}
+
+Task & Task::operator = (Task &other)
+{
+	m_length = other.m_length;
+	
+	memcpy(m_buffer, other.m_buffer, m_length);
+	
+	m_DispatchKey = other.m_DispatchKey;
+	
+	strcpy (m_FileName, other.m_FileName);
+	
+	m_RequetBody = other.m_RequetBody;
+	
+	strcpy (m_FileHead, other.m_FileHead);
+	
+	strcpy (m_Msisdn, other.m_Msisdn);
+	
+	m_BusiType = other.m_BusiType;
+	
+	m_IsFileEnd = other.m_IsFileEnd;
+	
+	return *this;
+}

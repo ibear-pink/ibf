@@ -1,0 +1,26 @@
+include ./makefile.cfg
+
+OBJ = ibearpub.o ibear.o ibear_db_conn.o 
+
+all: libibear.a clean
+
+libibear.a:$(OBJ)
+	ar -rv libibear.a $(OBJ)
+
+	mv -f $@ ../lib
+
+	@echo "### $@ loaded ###\n"
+
+
+.cpp.o:
+#	echo $(INCLUDE)
+	echo "Compiling the $<"
+	$(CC) -c $(CFLAGS) $<
+.c.o:
+	echo "Compiling the $<"
+	$(CC) -c $(CFLAGS) $<
+
+clean:
+	rm -f *.o
+	rm -f *.lis
+

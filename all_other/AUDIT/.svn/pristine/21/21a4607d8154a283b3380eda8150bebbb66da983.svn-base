@@ -1,0 +1,138 @@
+#include "CPublicDeal.h"
+
+CPublicDeal::CPublicDeal()
+{
+	m_StopMsg = NULL;
+}
+
+CPublicDeal::~CPublicDeal()
+{
+	ibear_db_quit (&(m_dbDsc.db_connect));
+	Clear ();
+	printf ("CPublicDeal destructor.\n");
+}
+
+void CPublicDeal::Clear ()
+{
+	m_StopMsg = NULL;
+}
+
+int CPublicDeal::Init (ibear *br, int serverType, int dscNums[],stBakConfigInfo *pBakcfg,int thread_num,STOP_COMMON_CONF *conf_info)
+{
+	m_ibear = br;
+	m_ServerType = serverType;
+	m_ThreadNum = thread_num;
+	
+	memset (&m_dbDsc, 0, sizeof(DB_INFO));
+	m_dbDsc = br->m_dbDsc;
+	
+	char busiFunc[64] = {0};
+	
+	m_CommonConf = conf_info;
+	
+	printf("m_CommonConf->funcInfo.size[%d]\n",m_CommonConf->funcInfo.size);
+	for (int i = 0; i < m_CommonConf->funcInfo.size; i++)
+	{
+		BUSI_FUNCTION_INFO *pNode = &(m_CommonConf->funcInfo.busi_info[i]);
+		
+		int *iFuncList = new int[MAX_BUSINESS_FUNC];
+		
+		memset (iFuncList, 0, sizeof(int)*MAX_BUSINESS_FUNC);
+#ifdef _DEBUG_INFO_
+		printf ("func_key = %s\n", pNode->busi_func_key);
+		printf ("pNode->size = %d\n", pNode->size);
+#endif
+		for (int j = 0; j < pNode->size; j++)
+		{
+			memset (busiFunc, 0, sizeof(busiFunc));
+			strcpy (busiFunc, pNode->busi_func[j]);
+	#ifdef _DEBUG_INFO_
+		printf ("	busiFunc = %s\n", busiFunc);
+	#endif
+			if (strcmp (busiFunc, BUSINESS_FUNC_STOP_SYSTEM_PRODUCT) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_STOP_SYSTEM_PRODUCT] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_STOP_USER_PRODUCT) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_STOP_USER_PRODUCT] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_USER_FEE) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_USER_FEE] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_CONTRACT_FEE) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_CONTRACT_FEE] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_USER_STOP) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_USER_STOP] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_CONTRACT_STOP) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_CONTRACT_STOP] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_INSERT_AWOKE_HIS) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_INSERT_AWOKE_HIS] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_HOME_STOP) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_HOME_STOP] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_AWAKECFG_STOP) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_AWAKECFG_STOP] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_PAY_TYPE) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_PAY_TYPE] = 1;
+				strcpy(m_ServOpType,"2");
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_ACCT_ITEM_TYPE) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_ACCT_ITEM_TYPE] = 1;
+				strcpy(m_ServOpType,"1");
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_REALTIME_WRITEOFF) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_REALTIME_WRITEOFF] = 1;
+			}
+			else if (strcmp (busiFunc, BUSINESS_FUNC_DISTINCT_RESULT) == 0)
+			{
+				iFuncList[BUSINESS_FUNC_NO_DISTINCT_RESULT] = 1;
+			}
+			else
+			{
+				printf ("FILE[%s]LINE[%d]busiFunc<%s> is not exist.", __FILE__, __LINE__, busiFunc);
+				return RET_FAIL;
+			}
+		}
+		m_BusiLogicList.insert(pair<string, int *> (string(pNode->busi_func_key), iFuncList));
+	}
+	
+	App_ProDealFileBak::Instance()->Init(pBakcfg);
+	
+	App_ProDealFileBak::Instance()->Process();
+		
+	App_ProDealFileBakManager::Instance()->Init(pBakcfg);
+	
+	App_ProDealFileBakManager::Instance()->Process();
+	
+	return RET_OK;
+}
+
+int CPublicDeal::InitParseField (stAppCfg_ParseFile *parse_file)
+{
+	for (int i = 1; i <= parse_file->size; i++)
+	{
+		stParse_Field *pNode = &(parse_file->data[i]);
+		for (int j = 1; j <= pNode->size; j++)
+		{
+			m_ParseFile[pNode->file_type].fieldData.insert(pair<string, int>(string(pNode->field[j]), j));
+		}
+	}
+	
+	return RET_OK;
+}

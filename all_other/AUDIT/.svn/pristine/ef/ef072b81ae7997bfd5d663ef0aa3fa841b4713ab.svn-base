@@ -1,0 +1,586 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "RTOBMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(RTOBMgr)
+
+RTOBMgr::RTOBMgr()
+{
+	
+}
+
+RTOBMgr::~RTOBMgr()
+{
+	
+}
+
+int RTOBMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	memset(&m_szInData, 0, sizeof(m_szInData));
+	sprintf(m_szInData.busi_type,"%s","0");    /*子服务标识 没有的话统一填0*/
+	m_szInData.thread_id = 0;
+	int iRet = 0;
+	char app_pid[10+1] = {0};
+	m_CfgInfo = pServerCfg;
+	m_ProInfo = pInfo;
+	m_logFile = m_CfgInfo->logFile;
+	m_logMon = m_CfgInfo->logMon;
+	m_Ibear = br;
+	m_ServerExitFlag = false;
+	memset(m_TableName,0,sizeof(m_TableName));
+	sprintf(app_pid,"%d",getpid());
+	iRet = appStart(br,m_ProInfo->ipAddress,m_ProInfo->program_name,m_ProInfo->procUnikey,app_pid);
+	if (iRet != 0)
+	{
+  	printf("进程不允许启动[%s] \n",getErrInfo());
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"appStart失败[%d][%s,%s,%s,%s]!!!\n",iRet,pInfo->ipAddress,pInfo->procUnikey,pInfo->program_name,app_pid);
+  	m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程不允许启动[%s]",getErrInfo());
+  	return -1;
+	}
+	
+	//解析zk返回值，获得表名
+	if(0 != SplitString(m_TableName,processName,',',2))
+	{
+		strcpy(m_TableName,processName);
+	}
+	if(0 != SplitString(m_TableName,m_TableName,'=',2))
+	{
+		strcpy(m_TableName,processName);
+	}
+	
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"临时目录%s\n",m_CfgInfo->bak_cfg_info.tmpdir);
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"备份目录%s\n",m_CfgInfo->bak_cfg_info.bakdir);
+	
+	if (access(m_CfgInfo->bak_cfg_info.tmpdir,NULL) !=0)
+	{
+	#ifdef _DEBUG_INFO_
+		printf("临时目录%s不存在，程序进行创建\n",m_CfgInfo->bak_cfg_info.tmpdir);
+	#endif
+		if (mkdir(m_CfgInfo->bak_cfg_info.tmpdir,0755) == -1)
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"临时目录%s创建失败!!!\n",m_CfgInfo->bak_cfg_info.tmpdir);
+			return -1;
+		}
+	}
+	
+	//判断tmpdir下是否有文件
+	if (0 != dealTempFile())
+	{
+		m_Ibear->Rollback();
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"dealTempFile is ERROR \n");
+		return RET_FAIL;
+	}
+	if (0 != dealUnFlagData())
+	{
+		m_Ibear->Rollback();
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"dealUnFlagData is ERROR \n");
+		return RET_FAIL;
+	}
+	m_Ibear->Commit();
+	return iRet;
+}
+
+int RTOBMgr::getOrderListByFlag(char *table_name)
+{
+	int iRet = RET_OK;
+	char end[5+1] = {0};
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	char wsseq[25] = {0};
+	char notes[1024] = {0};
+	inParams.insert(pair<string,string>(string("TABLE_NAME"),string(table_name)));
+	iRet = m_Ibear->queryForList("SEL_MD_HIS_FLAG",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getOrderListByFlag ERR_MSG[%s %s]\n", __FILE__, __LINE__,table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stOrder *order = new stOrder();
+		
+		strcpy(order->batchsn,v_row[0].c_str());
+		strcpy(order->wsseq,v_row[1].c_str());
+		sprintf(order->notes,"%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@",v_row[0].c_str(),v_row[1].c_str(),v_row[2].c_str(),v_row[3].c_str(),v_row[4].c_str()
+						,v_row[5].c_str(),v_row[6].c_str(),v_row[7].c_str(),v_row[8].c_str(),v_row[9].c_str(),v_row[10].c_str(),v_row[11].c_str());
+		m_interfaceTable.push_back(order);
+	}
+  return iRet;
+}
+
+int RTOBMgr::getOrderBatchSn(char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	char end[5+1] = {0};
+	map<string,string> inParams;
+	vector<string> v_row;
+	char wsseq[25] = {0};
+	char notes[1024] = {0};
+	inParams.insert(pair<string,string>(string("TABLE_NAME"),string(table_name)));
+	iRet = m_Ibear->queryForObject("SEL_MD_BACTHSN",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[%s|%s]\n", table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	if (v_row.size()>0)
+	{
+		strcpy(batchsn,v_row[0].c_str());
+	}
+	else 
+	{
+		iRet = 1;
+	}
+	return iRet;
+}
+
+int RTOBMgr::getOrderList(char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	char end[5+1] = {0};
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	char wsseq[25] = {0};
+	char notes[1024] = {0};
+	inParams.insert(pair<string,string>(string("TABLE_NAME"),string(table_name)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->queryForList("SEL_MD_HIS",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[%s|%s]\n",table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+#ifdef _DEBUG_INFO_
+	printf("%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@\n",v_row[0].c_str(),v_row[1].c_str(),v_row[2].c_str(),v_row[3].c_str(),v_row[4].c_str(),v_row[5].c_str(),v_row[6].c_str(),v_row[7].c_str(),v_row[8].c_str(),v_row[9].c_str(),v_row[10].c_str(),v_row[11].c_str());
+#endif	
+		stOrder *order = new stOrder();
+		strcpy(order->batchsn,v_row[0].c_str());
+		strcpy(order->wsseq,v_row[1].c_str());
+		sprintf(order->notes,"%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@%s@",v_row[0].c_str(),v_row[1].c_str(),v_row[2].c_str(),v_row[3].c_str(),v_row[4].c_str()
+						,v_row[5].c_str(),v_row[6].c_str(),v_row[7].c_str(),v_row[8].c_str(),v_row[9].c_str(),v_row[10].c_str(),v_row[11].c_str());
+		m_interfaceTable.push_back(order);
+	}
+  return iRet;
+}
+
+int RTOBMgr::updateOrderByWs(char *table_name,char *wsseq)
+{
+	int iRet = RET_OK;
+	char end[5+1] = {0};
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("TABLE_NAME"),string(table_name)));
+	inParams.insert(pair<string,string>(string("WSSEQ"),string(wsseq)));
+	iRet = m_Ibear->DML("UPD_MD_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"FILE[%s]LINE[%d]ERR_MSG[%s %s]\n", __FILE__, __LINE__,table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+  return RET_OK;
+}
+
+int RTOBMgr::deleteOrderByBatchsn(char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	char end[5+1] = {0};
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("TABLE_NAME"),string(table_name)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->DML("DEL_MD_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[%s|%s]\n", table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	else if (iRet == 1) 
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"[%s]表[%s]数据未找到\n", table_name,batchsn);
+		iRet = RET_OK;
+	}
+  return iRet;
+}
+
+int RTOBMgr::deleteOrderByFlag(char *table_name)
+{
+	int iRet = RET_OK;
+	char end[5+1] = {0};
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("TABLE_NAME"),string(table_name)));
+	iRet = m_Ibear->DML("DEL_MD_HIS_FLAG",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[%s,%s]\n", table_name,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	else if (iRet == 1) 
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"deleteOrderByFlag数据为空[%s]\n", table_name);
+		iRet = RET_OK;
+	}
+  return iRet;
+}
+
+/*
+ * 检查tmp临时目录，若有临时文件，进行后续处理
+**/
+int RTOBMgr::dealTempFile()
+{
+	char srcfilename[1024] = {0};
+	char descfilename[1024] = {0};
+	char sysdate[18+1] = {0};
+	char bakName[1024] = {0};
+	getCurDateTime(sysdate,"hhmiss");
+#ifdef _SDFS_DEAL_FILE_
+	SDFS_GDF_FILE *file = new SDFS_GDF_FILE();
+#else
+	GDF_FILE *file = new GDF_FILE();
+#endif
+	if (0 != file->getFileList(m_CfgInfo->bak_cfg_info.tmpdir))
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getFileList error\n");
+		return RET_FAIL;
+	}
+	vector<stFileInfo*> m_FileList = file->mFileList;
+	//若没有，走正常流程
+	//若有文件，检查结尾是否有结束符
+		//若有，delete，mv
+		//若无，rm write delete mv
+	for (vector<stFileInfo*>::iterator it = m_FileList.begin();it<m_FileList.end();it++)
+	{
+		stFileInfo *f = *it;
+		char strBuff[4096] = {0};
+		sprintf(srcfilename,"%s/%s",m_CfgInfo->bak_cfg_info.tmpdir,f->sFileName);
+#ifdef _SDFS_DEAL_FILE_
+		SDFS data_file;
+		SFILE *pFile = sopen(srcfilename,"r",data_file);
+		while(sgets (strBuff, 4096, pFile) != NULL)
+		{
+		}
+		strcpy(strBuff,delN(strBuff));
+	#ifdef _DEBUG_INFO_
+		printf("%s %d",strBuff,strlen(strBuff));
+	#endif
+		if (strcmp(strBuff,DEF_FILE_END_FLAG) == 0)
+		{
+			//mv文件到bak目录下
+			sprintf(bakName,"%s.%s",f->sFileName, sysdate);
+			sprintf(descfilename,"%s/%s",m_CfgInfo->bak_cfg_info.bakdir,bakName);
+		#ifdef _DEBUG_INFO_
+			printf("srcfilename:%s\ndesc:%s\n",srcfilename,descfilename);
+		#endif	
+			if (0 != sclose (pFile))
+			{
+				sdestory( &data_file);
+				return RET_FAIL;
+			}
+			
+			pFile = NULL;
+			if (0 != deleteOrderByFlag(m_TableName))
+			{
+				return RET_FAIL;
+			}
+		}
+		else 
+		{
+			if (0 != sremove (srcfilename,&data_file))
+			{
+				sdestory( &data_file );
+				return RET_FAIL;
+			}
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"[%s]没有结束符，直接删除\n",srcfilename);
+			return RET_OK;
+		}
+#else
+		FILE *pFile = fopen(srcfilename,"r");
+		while(fgets (strBuff, 4096, pFile) != NULL)
+		{
+		}
+		
+		strcpy(strBuff,delN(strBuff));
+#ifdef _DEBUG_INFO_
+	printf("最后一行数据:%s\n",strBuff);
+#endif
+		if (strcmp(strBuff,DEF_FILE_END_FLAG) == 0)
+		{
+			//mv文件到bak目录下
+			sprintf(bakName,"%s.%s",f->sFileName, sysdate);
+			sprintf(descfilename,"%s/%s",m_CfgInfo->bak_cfg_info.bakdir,bakName);
+			
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"srcfilename:%s\ndesc:%s\n",srcfilename,descfilename);
+
+			if (0 != fclose (pFile))
+			{
+				return RET_FAIL;
+			}
+			
+			pFile = NULL;
+			if (0 != deleteOrderByFlag(m_TableName))
+			{
+				return RET_FAIL;
+			}
+		}
+		else 
+		{
+			remove (srcfilename);
+			m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"[%s]没有结束符，直接删除\n",srcfilename);
+			return RET_OK;
+		}
+#endif
+		move_file(srcfilename,descfilename);
+	}
+	return RET_OK;
+}
+
+int RTOBMgr::dealUnFlagData()
+{
+	char tmpFile[1024] = {0};
+	char tmpStr[4096] = {0};
+	char tmpName[1024] = {0};
+	char bakName[1024] = {0};
+	char sysdate[18+1] = {0};
+#ifdef _SDFS_DEAL_FILE_
+	SDFS_GDF_FILE *pFile = NULL;
+#else
+	GDF_FILE *pFile = NULL;
+#endif
+
+	getCurDateTime(sysdate,"hhmiss");
+	
+	//检查是否有未处理的flag=L的数据
+	if (getOrderListByFlag(m_TableName) != 0)
+	{
+		return RET_FAIL;
+	}
+	if (m_interfaceTable.size() > 0)
+	{
+		for (vector<stOrder*>::iterator iter = m_interfaceTable.begin(); iter != m_interfaceTable.end(); iter++)
+		{
+			stOrder *order = *iter;
+			strcpy (tmpFile, order->batchsn);
+			break;
+		}
+	#ifdef _DEBUG_INFO_
+		printf("批次:%s\n",tmpFile);
+	#endif
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"批次:%s",tmpFile);
+		//初始化文件系统
+#ifdef _SDFS_DEAL_FILE_
+		pFile = new SDFS_GDF_FILE (m_CfgInfo->bak_cfg_info.tmpdir, tmpFile);
+		if (0 != pFile->Open ("a+"))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File Is Failed.]\n");
+			return RET_FAIL;
+		}
+#else
+		pFile = new GDF_FILE (m_CfgInfo->bak_cfg_info.tmpdir, tmpFile);
+		if (0 != pFile->Open ("a+"))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File Is Failed.]\n");
+			return RET_FAIL;
+		}
+#endif
+		//直接写数据
+		for (vector<stOrder*>::iterator iter = m_interfaceTable.begin(); iter != m_interfaceTable.end(); iter++)
+		{
+			memset(tmpStr,0,sizeof(tmpStr));
+			stOrder *order = *iter;
+			sprintf(tmpStr,"%s\r\n",order->notes);
+			pFile->Write (tmpStr, strlen(tmpStr), 1);
+		}
+		//写入文件结尾
+		memset(tmpStr,0,sizeof(tmpStr));
+		strcpy(tmpStr,DEF_FILE_END_FLAG);
+		pFile->Write (tmpStr, strlen(tmpStr), 1);
+		//flush文件；
+		//delete 已处理数据
+		//清除集合
+		if (m_interfaceTable.size() > 0)
+		{
+			pFile->Fflush();
+			if (0 != deleteOrderByFlag(m_TableName))
+			{
+				return RET_FAIL;
+			}
+			clearDataList(m_interfaceTable);
+		}
+		//mv文件到备份目录
+		sprintf(tmpName,"%s/%s",m_CfgInfo->bak_cfg_info.tmpdir, tmpFile);
+		sprintf(bakName,"%s/%s.%s",m_CfgInfo->bak_cfg_info.bakdir, tmpFile, sysdate);
+	#ifdef _DEBUG_INFO_
+		printf("bakName=%s\n",bakName);
+	#endif
+		pFile->Move(tmpName,bakName);
+		pFile->Close();
+	}
+	//若没有，则进行正常流程，重新取工单数据
+	
+	return RET_OK;
+}
+
+int RTOBMgr::process()
+{
+	long t1 = 0,t2 = 0;
+	t1 = getUTime();
+	m_szInData.record_count = 0;
+	if (0 == isAppStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+	{
+		//可以停止
+		if (0 == appStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+		{
+	  	printf("进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+
+			exit(0);
+		}
+	}
+	int iRet = 0;
+	char batchsn[64] = {0};
+	char buff[1024] = {0};
+	char tmpFile[1024] = {0};
+	char tmpStr[4096] = {0};
+	char tmpName[1024] = {0};
+	char bakName[1024] = {0};
+	char sysdate[18+1] = {0};
+	
+	getCurDateTime(sysdate,"hhmiss");
+
+#ifdef _SDFS_DEAL_FILE_
+SDFS_GDF_FILE *pFile = NULL;
+#else
+GDF_FILE *pFile = NULL;
+#endif
+
+	if (m_interfaceTable.size() > 0)
+	{
+		clearDataList(m_interfaceTable);
+	}
+	iRet = getOrderBatchSn(m_TableName,batchsn);
+	if (0 != iRet && iRet != 1)
+	{
+    exit(0);
+		//return RET_FAIL;
+	}
+	else if (iRet == 1)
+	{
+		//查询接口数据为空
+		sleep(1);
+		return RET_OK;
+	}
+	if (0 != getOrderList(m_TableName,batchsn))
+	{
+    exit(0);
+		//return RET_FAIL;
+	}
+	if (m_interfaceTable.size() == 0)
+	{
+		sleep(1);
+		//查询接口数据为空
+		return 0;
+	}
+
+	strcpy (tmpFile, batchsn);
+	
+	//初始化文件系统
+#ifdef _SDFS_DEAL_FILE_
+	pFile = new SDFS_GDF_FILE (m_CfgInfo->bak_cfg_info.tmpdir, tmpFile);
+	if (0 != pFile->Open ("a+"))
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[%s][Open File Is Failed.]\n",m_CfgInfo->bak_cfg_info.tmpdir,tmpFile);
+    exit(0);
+		//return RET_FAIL;
+	}
+#else
+	pFile = new GDF_FILE (m_CfgInfo->bak_cfg_info.tmpdir, tmpFile);
+	if (0 != pFile->Open ("a+"))
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"ERR_MSG[Open File Is Failed.]\n");
+    exit(0);
+		//return RET_FAIL;
+	}
+#endif
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"批次号：%s",batchsn);
+	for (vector<stOrder*>::iterator iter = m_interfaceTable.begin(); iter != m_interfaceTable.end(); iter++)
+	{
+		memset(tmpStr,0,sizeof(tmpStr));
+		stOrder *order = *iter;
+		long tt1 = getUTime();
+		if (0 != updateOrderByWs(m_TableName,order->wsseq))
+		{
+    	exit(0);
+			//return RET_FAIL;
+		}
+		long tt2 = getUTime();
+		printf("%ld | %s \n",tt2-tt1,order->notes);
+		sprintf(tmpStr,"%s\r\n",order->notes);
+		pFile->Write (tmpStr, strlen(tmpStr), 1);
+		m_szInData.record_count ++;
+	}
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"性能数量|%ld|程序数量|%ld",m_szInData.record_count,m_interfaceTable.size());
+	//写入文件结尾
+	memset(tmpStr,0,sizeof(tmpStr));
+	strcpy(tmpStr,DEF_FILE_END_FLAG);
+	pFile->Write (tmpStr, strlen(tmpStr), 1);
+	//flush文件；
+	//delete 已处理数据
+	//清除集合
+	if (m_interfaceTable.size() > 0)
+	{
+	#ifdef _DEBUG_INFO_
+		printf("batchsn=%s\n",batchsn);
+	#endif
+		if (0 != deleteOrderByBatchsn(m_TableName,batchsn))
+		{
+			m_Ibear->Rollback();
+			pFile->Close();
+   	 	exit(0);
+			//return RET_FAIL;
+		}
+		clearDataList(m_interfaceTable);
+		m_Ibear->Commit();
+		pFile->Fflush();
+	}
+	//mv文件到备份目录
+	sprintf(tmpName,"%s/%s",m_CfgInfo->bak_cfg_info.tmpdir, tmpFile);
+	sprintf(bakName,"%s/%s.%s.%d",m_CfgInfo->bak_cfg_info.bakdir, tmpFile, sysdate, random(1000));
+#ifdef _DEBUG_INFO_
+	printf("%s,bakName=%s\n",sysdate,bakName);
+#endif
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"备份文件为:%s\n",bakName);
+	pFile->Move(tmpName,bakName);
+	pFile->Close();
+	t2 = getUTime();
+	m_szInData.time_cost = (t2-t1)/1000.000;
+	m_logMon->pushMonitorBaseInfo(m_szInData);
+	
+	return iRet;
+}
+
+int RTOBMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int RTOBMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}

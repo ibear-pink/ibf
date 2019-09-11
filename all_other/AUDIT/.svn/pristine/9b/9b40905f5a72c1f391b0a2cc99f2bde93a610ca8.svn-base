@@ -1,0 +1,90 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _RTOB_MERGER_MANAGER_H_
+#define _RTOB_MERGER_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+typedef struct 
+{
+	char batchsn[20+1];
+	char day_billcycl[8+1];
+	char region_code[11+1];
+	char audit_id[5+1];
+	long record;
+	long amount;
+	char rec_attr[2+1];
+} stMerge;
+
+typedef struct
+{
+	char audit_id[5+1];
+	char audit_name[10+1];
+	char dealcode_type[2+1];
+} stAuditCfg;
+
+typedef struct 
+{
+	char batchsn[64+1];
+	char merge_type[3+1];//分类标示
+	char day_billcycl[8+1];//日账期
+	char region_code[11+1];//地市
+	int idealNum ;//给下一环节的工单数sum(deal_code)
+	int vail_code_count ;//有效deal_code数量
+	int devail_code_count ;//无效deal_code数量
+	int record_count ;//文件条数
+	int recordf_count ;//优惠条数
+	int amount_sum ;//消费
+	int amountf_sum ;//优惠
+} stAuditContent;
+
+class RTOB_MERGERMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(RTOB_MERGERMgr)
+public:
+	
+	RTOB_MERGERMgr();
+	~RTOB_MERGERMgr();
+  
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+	
+	int ProInterface(map<string,string> *values);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+	
+	int selectMerge(char *table_name,char *batchsn,char *merge_type,char *day_billcycl,char *region_code,char *audit_id,int *count);
+	
+	int insertMerge(char *table_name,char *batchsn,char *merge_type,char *day_billcycl,char *region_code,char *audit_id,long record_count,long amount_sum);
+	
+	int updateMerge(char *table_name,char *batchsn,char *merge_type,char *day_billcycl,char *region_code,char *audit_id,long record_count,long amount_sum);
+
+	int ProFileContent(char *srcfilename,char *descfilename,map<string,stAuditContent *> *audit_contents);
+	
+	int getMergeType();
+	
+	int getAuditType();
+	
+public:
+	ibear *m_Ibear;
+	int m_InterfaceType;
+	stAppCfg_Proc_Server *m_CfgInfo;
+	stAppCfg_System *m_ProInfo;
+	vector<stFileInfo *> m_FileList;
+	map<string,string> m_MergeCfgs;
+	vector<stAuditCfg*> m_AuditCfgs;
+	char m_TableName[128+1];
+	DC_AxLogFile *m_logFile;
+	
+};
+#endif
+
+

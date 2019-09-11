@@ -1,0 +1,334 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "QYFBMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(QYFBMgr)
+
+QYFBMgr::QYFBMgr()
+{
+	
+}
+
+QYFBMgr::~QYFBMgr()
+{
+	
+}
+
+int QYFBMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	memset(&m_szInData, 0, sizeof(m_szInData));
+	sprintf(m_szInData.busi_type,"%s","0");    /*子服务标识 没有的话统一填0*/
+	m_szInData.thread_id = 0;
+	
+	int iRet = 0;
+	char app_pid[10+1] = {0};
+	memset(m_TableName,0,sizeof(m_TableName));
+	strcpy(m_TableName,processName);
+	m_Ibear = br;
+	m_CfgInfo = pServerCfg;	
+	m_logFile = m_CfgInfo->logFile;
+	m_InterfaceType = m_CfgInfo->interface_type;
+	SplitString(m_TableName,m_TableName,'=',2);
+	printf("%s,%s\n",m_TableName,processName);
+	m_ProInfo = pInfo;
+	sprintf(app_pid,"%d",getpid());
+	iRet = appStart(br,m_ProInfo->ipAddress,m_ProInfo->program_name,m_ProInfo->procUnikey,app_pid);
+	if (iRet != 0)
+	{
+  	printf("进程不允许启动[%s] \n",getErrInfo());
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"appStart失败[%d][%s,%s,%s,%s]!!!\n",iRet,pInfo->ipAddress,pInfo->procUnikey,pInfo->program_name,app_pid);
+  	m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程不允许启动[%s]",getErrInfo());
+  	return -1;
+	}
+	return iRet;
+}
+
+int QYFBMgr::getDisMergeTable(char *table_name,char *day_billcycl)
+{
+	int iRet = 0;
+	
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	char ym[6+1] = {0};
+	strncpy(ym,day_billcycl,6);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("YM_HIS"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE_HIS"),string(table_name)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL"),string(day_billcycl)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL_HIS"),string(day_billcycl)));
+
+	iRet = m_Ibear->queryForList("SEL_MERGE_DIS",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_MERGE_DIS:%s_%s is ERROR,ERRNO[%s]ERRMSG[%s]",table_name,ym,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator iter = list.begin();iter != list.end();iter++)
+	{
+		vector<string> v_row = *iter;
+		if (v_row.size() > 0)
+		{
+			stMerge *merge = new stMerge();
+			strcpy(merge->region_code,v_row[0].c_str());
+			strcpy(merge->audit_id,v_row[1].c_str());
+			strcpy(merge->day_billcycl,v_row[2].c_str());
+			strcpy(merge->merge_type,v_row[3].c_str());
+			
+			merge_list.push_back(merge);
+		}
+	}
+	return iRet;
+}
+
+int QYFBMgr::getMergeTable(char *table_name,stMerge *merge)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	vector<string> v_row;
+	char ym[6+1] = {0};
+	strncpy(ym,merge->day_billcycl,6);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge->merge_type)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL"),string(merge->day_billcycl)));
+	inParams.insert(pair<string,string>(string("REGION_CODE"),string(merge->region_code)));
+	inParams.insert(pair<string,string>(string("AUDIT_ID"),string(merge->audit_id)));
+
+	iRet = m_Ibear->queryForObject("SEL_MERGE_YM",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_MERGE_YM:%s_%s is ERROR,ERRNO[%s]ERRMSG[%s]",table_name,ym,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	if (v_row.size() > 0)
+	{
+		merge->record += atol(v_row[0].c_str());
+		merge->amount += atol(v_row[1].c_str());
+	}
+	
+	return iRet;
+}
+
+int QYFBMgr::getMergeHis(char *table_name,stMerge *merge)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	vector<string> v_row;
+	char ym[6+1] = {0};
+	strncpy(ym,merge->day_billcycl,6);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge->merge_type)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL"),string(merge->day_billcycl)));
+	inParams.insert(pair<string,string>(string("REGION_CODE"),string(merge->region_code)));
+	inParams.insert(pair<string,string>(string("AUDIT_ID"),string(merge->audit_id)));
+
+	iRet = m_Ibear->queryForObject("SEL_MERGE_HIS",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"SEL_MERGE_HIS:%s_%s is ERROR,ERRNO[%s]ERRMSG[%s]",table_name,ym,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	if (v_row.size() > 0)
+	{
+		merge->record += atol(v_row[0].c_str());
+		merge->amount += atol(v_row[1].c_str());
+	}
+	
+	return iRet;
+}
+
+int QYFBMgr::insMergeTable(char *table_name,stMerge *merge)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	vector<string> v_row;
+	char ym[6+1] = {0};
+	char srecord[18+1] = {0};
+	char samount[18+1] = {0};
+	strncpy(ym,merge->day_billcycl,6);
+	sprintf(srecord,"%ld",merge->record);
+	sprintf(samount,"%ld",merge->amount);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge->merge_type)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL"),string(merge->day_billcycl)));
+	inParams.insert(pair<string,string>(string("REGION_CODE"),string(merge->region_code)));
+	inParams.insert(pair<string,string>(string("AUDIT_ID"),string(merge->audit_id)));
+	inParams.insert(pair<string,string>(string("RECORD"),string(srecord)));
+	inParams.insert(pair<string,string>(string("AMOUNT"),string(samount)));
+	inParams.insert(pair<string,string>(string("REC_ATTR"),string("0")));
+	iRet = m_Ibear->DML("INS_AUDIT_LOG",inParams);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"INS_AUDIT_LOG:%s_%s is ERROR,ERRNO[%s]ERRMSG[%s]",table_name,ym,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	return iRet;
+}
+
+int QYFBMgr::delMergeTable(char *table_name,stMerge *merge)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	char ym[6+1] = {0};
+	strncpy(ym,merge->day_billcycl,6);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge->merge_type)));
+	inParams.insert(pair<string,string>(string("REGION_CODE"),string(merge->region_code)));
+	inParams.insert(pair<string,string>(string("AUDIT_ID"),string(merge->audit_id)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL"),string(merge->day_billcycl)));
+
+	iRet = m_Ibear->DML("DEL_AUDIT_YM",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"DEL_AUDIT_YM:%s_%s is ERROR,ERRNO[%s]ERRMSG[%s]",table_name,ym,m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+	}
+	return 0;
+}
+
+int QYFBMgr::process()
+{
+	long t1 = 0,t2 = 0;
+	t1 = getUTime();
+	m_szInData.record_count = 0;
+	if (0 == isAppStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+	{
+		//可以停止
+		if (0 == appStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+		{
+	  	printf("进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+
+			exit(0);
+		}
+	}
+	char start_hour[2+1] = {0};
+	char start_time[4+1] = {0};
+	getCurDateTime(start_hour,"hh");
+	getCurDateTime(start_time,"miss");
+	printf("--------%s%s\n",start_hour,start_time);
+	if (strcmp(start_time,m_CfgInfo->deal_time) != 0 || atoi(start_hour)%atoi(m_CfgInfo->time_rate) != 0)
+	{
+		usleep(100000);
+		return 0;
+	}
+	printf("奇数整点启动程序【%s:%s】\n",start_hour,start_time);
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"程序启动KPI汇总处理[%s:%s]",start_hour,start_time);
+	sleep(1);
+	int iRet = 0;
+	char sysdate[8+1] = {0};
+	char sysdate_new[8+1] = {0};
+	//strcpy(sysdate,"20160601");
+	getCurDateTime(sysdate,"yyyymmdd");
+	strcpy(sysdate_new,sysdate);
+	if (strncmp(sysdate+6,"01",2)==0)
+	{
+		addDays(sysdate,-1,sysdate_new);
+	}
+#ifdef _DEBUG_INFO_
+	printf("sysdate_new=%s\n",sysdate_new);
+#endif
+	if (merge_list.size()>0)
+	{
+		clearDataList(merge_list);
+	}
+	switch (m_InterfaceType)
+	{
+		case INTERFACE_TYPE_TABLE:
+		{
+			//和his的读取有先后顺序
+			if (0 != getDisMergeTable(m_TableName,sysdate_new))
+			{
+				m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getDisMerge_Table is error[%s,%s]\n",m_TableName,sysdate_new);
+				exit(0);
+			}
+
+			for (vector<stMerge*>::iterator iter = merge_list.begin();iter != merge_list.end();iter ++)
+			{
+				m_szInData.record_count ++;
+				stMerge *merge = *iter;
+				
+				if (0 != delMergeTable(m_TableName,merge))
+				{
+					m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"delMerge_Table is error[%s]\n",m_TableName);
+					m_Ibear->Rollback();
+					exit(0);
+				}
+				if (0 != getMergeTable(m_TableName,merge))
+				{
+					m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getMerge_Table is error[%s]\n",m_TableName);
+					m_Ibear->Rollback();
+					exit(0);
+				}
+#ifdef _DEBUG_INFO_
+	printf("1[%s]%s,%s,%s,%ld,%ld\n",merge->day_billcycl,merge->merge_type,merge->region_code,merge->audit_id,merge->amount,merge->record);
+#endif
+				if (0 != getMergeHis(m_TableName,merge))
+				{
+					m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"getMerge_His is error[%s]\n",m_TableName);
+					m_Ibear->Rollback();
+					exit(0);
+				}
+#ifdef _DEBUG_INFO_
+	printf("2[%s]%s,%s,%s,%ld,%ld\n",merge->day_billcycl,merge->merge_type,merge->region_code,merge->audit_id,merge->amount,merge->record);
+#endif
+				if (0 != insMergeTable(m_TableName,merge))
+				{
+					m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"insMerge_Table is error[%s]\n",m_TableName);
+					m_Ibear->Rollback();
+					exit(0);
+				}
+#ifdef _DEBUG_INFO_
+	printf("3[%s]%s,%s,%s,%ld,%ld\n",merge->day_billcycl,merge->merge_type,merge->region_code,merge->audit_id,merge->amount,merge->record);
+#endif
+				m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"[%s]%s,%s,%s,%ld,%ld\n",merge->day_billcycl,merge->merge_type,merge->region_code,merge->audit_id,merge->amount,merge->record);
+
+				m_Ibear->Commit();
+			}
+			
+			break;
+		}
+		default:
+			break;
+	}
+	if (merge_list.size()>0)
+	{
+		clearDataList(merge_list);
+	}
+	t2 = getUTime();
+	m_szInData.time_cost = (t2-t1)/1000.000;
+	m_logMon->pushMonitorBaseInfo(m_szInData);
+	
+	
+	return iRet;
+}
+
+int QYFBMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int QYFBMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

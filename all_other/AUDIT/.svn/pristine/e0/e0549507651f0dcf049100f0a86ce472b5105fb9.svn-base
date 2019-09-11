@@ -1,0 +1,59 @@
+
+/* 
+ * 功能描述: 
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _QYFB_MANAGER_H_
+#define _QYFB_MANAGER_H_
+
+#include "CPublicMgr.h"
+#include "DynBase.h"
+
+using namespace std;
+
+typedef struct 
+{
+	char merge_type[5+1];
+	char day_billcycl[8+1];
+	char region_code[11+1];
+	char audit_id[5+1];
+	long record;
+	long amount;
+} stMerge;
+
+class QYFBMgr:public CPublicMgr,public Object
+{
+	DECLARE_CLASS(QYFBMgr)
+public:
+	
+	QYFBMgr();
+	~QYFBMgr();
+    
+	int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num);
+
+	int process();
+
+	int getDisMergeTable(char *table_name,char *day_billcycl);
+	int delMergeTable(char *table_name,stMerge *merge);
+	int getMergeTable(char *table_name,stMerge *merge);
+	int insMergeTable(char *table_name,stMerge *merge);
+	int getMergeHis(char *table_name,stMerge *merge);
+	int ProInterface(map<string,string> *values);
+	
+	int UpdPoorStatus(stDealTask *pTask);
+	
+public:
+	ibear *m_Ibear;
+	stAppCfg_Proc_Server *m_CfgInfo;
+	int m_InterfaceType;
+	vector<stMerge*> merge_list;
+	char m_TableName[128+1];
+	DC_AxLogFile *m_logFile;
+	stAppCfg_System *m_ProInfo;
+	ComMonitor *m_logMon;
+	StrInData m_szInData;
+};
+#endif
+
+

@@ -1,0 +1,60 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+ 
+#ifndef _CLOG_MANAGER_H_
+#define _CLOG_MANAGER_H_
+
+#include <iostream>
+#include <map>
+#include "Singleton.h"
+#include "CLogFile.h"
+#include "Thread.h"
+#include "cfgfile.h"
+
+using namespace std;
+
+class CLogManager : public Thread
+{
+public:
+	CLogManager (void);
+	
+	~CLogManager(void);
+	
+	bool IsRun ();
+	
+	Ret Backup (void);
+	
+	bool Close (void);
+	
+	bool Init (stAppCfg *pCfgInfo);
+	
+	bool Init (stAppCfg *pCfgInfo,int processNum);
+	
+	void run (void);
+	
+	CLogFile *GetLogFile (const string m_StrLogName, UnInt32 nLogType);
+	
+	Ret RegisterLog (string m_StrLogName, CLogServer *pServer);
+	
+	Ret UnRegisterLog (string m_StrLogName, CLogServer *pServer);
+	
+private:
+	typedef map<string, CLogServer *> mapLogServer;
+	
+	mapLogServer m_LogServer;
+	
+	stAppCfg *m_AppCfg;
+	
+	int m_processNum;
+	
+	bool m_IsRun;
+};
+
+typedef GDF_Singleton<CLogManager> App_LogManager;
+
+extern void WriteLog (const string m_StrLogName, UnInt32 nLogType, UnInt32 nLevel, const char *fmt, ...);
+
+#endif

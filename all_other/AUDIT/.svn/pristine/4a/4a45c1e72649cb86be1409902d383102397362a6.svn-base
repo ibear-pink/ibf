@@ -1,0 +1,553 @@
+#ifndef _STOP_COM_TYPE_
+#define _STOP_COM_TYPE_
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <vector>
+#include <map>
+#include <list>
+
+#include "avltree.h"
+#include "Define.h"
+#include "jni.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+typedef struct stop_message
+{
+	int business_type;			/*业务类型*/
+	char busi_key[32];
+	long user_id;
+	char msisdn[40];
+	void *business_body_r;		/*业务体指针（请求）*/
+	void *business_body_s;		/*业务体指针（响应）*/
+	
+	UnInt32 state;				/*状态*/
+	char err_msg[128];			/*错误信息*/
+	char code_chg[10];			/*状态信息*/
+	char run_msg[MAX_LOG_LENGTH];			/*运行信息*/
+} stSTOPMessage;
+
+typedef struct
+{
+	int size;
+	int file_type;
+	char file_code[4+1];
+	char field[MAX_PARSE_FIEL_NUM][64];
+} stParseField;
+
+typedef struct
+{
+	int key;
+	char value[20];
+} stParseMap;
+
+typedef struct
+{
+	int size;
+	stParseField data[MAX_PARSE_FILE_NUM];
+} stParseFile;
+
+struct sKey
+{
+	char msisdn[40];
+	long contract_no;
+	bool operator==(const sKey& l) const
+	{
+		return strcmp(l.msisdn ,msisdn)==0 && l.contract_no == contract_no;
+		//return l.contract_no == contract_no;
+	}
+	bool operator<(const sKey& l) const
+	{
+		return strcmp(l.msisdn ,msisdn)<0 || l.contract_no < contract_no;
+		//return l.contract_no < contract_no;
+	}
+};
+
+//CDealData/CDealDataMgr所用
+typedef struct
+{
+	int interfaceType;
+	int busiType;
+	char seq[25];
+	char msisdn[20];
+	char strStartTime[24];
+	char strEndTime[24];
+	long lStart;
+	long lEnd;
+	long iInterval;			//时间间隔
+	int resultCode;
+} RecordStatInfo;
+
+//CDealData/CDealDataMgr所用
+typedef struct
+{
+	UnInt32 iBufLen;
+	int thread_num; //线程号
+	char seq[25+1];
+	char sBuff[MAX_BUFLEN];
+	UnInt32 iDispatchKey;
+	void *pRequestBody;
+	char sMsisdn[20];
+	int iBusiType;
+	bool isEnd;				//是否已经结束
+	char op_code[10];
+} stDealTask;
+
+//CDealData/CDealDataMgr所用
+typedef struct
+{
+	char buff[2048];
+	int resultCode;
+	char strStartTime[24];
+	char strEndTime[24];
+	long lStart;
+	long lEnd;
+	long iInterval;			//时间间隔
+	int iTotal;
+	int iError;
+	int iThreadType;		//1 主线程,2 业务线程, 3 在线业务
+} stDealFileResult;
+
+//CDealData/CDealDataMgr所用
+struct stStopFileInfo
+{
+	long user_id;
+	long contract_no;
+	char msisdn[40];
+	long should_pay;
+	char time[15];
+	int pay_flag;
+};
+
+struct vstSQLParam
+{
+	char type[64];
+	char value[64];
+};
+
+struct stOnLineFlags
+{
+	long begin_id;
+	long end_id;
+	int id_tail;
+	char online_flag[1+1];
+};
+
+/*用户信息结构体*/
+typedef struct
+{
+	long cust_id;
+	vector<long> stContracts;//所有代付账户（包含默认）
+	long contract_no;//默认账户
+	char msisdn[40];//信控用户手机号
+	long user_id;//信控用户id
+	long master_serv_id;
+	int cart_type;
+	char credit_code[3+1];//用户信用等级
+	char run_code[1+1];//用户当前状态
+	char stop_flag[2+1];//是否可停用户(红名单、节假日)
+	char user_stop_flag[2+1];//是否可停用户
+	char group_id[10];//
+	int owner_type;//
+	char user_grade_code[2+1];
+	char sm_code[6+1];//用户品牌
+	char list_type[20+1];
+	char red_user[2+1];//是否红名单用户
+	char region_code[9+1];//地市信息
+	char remind_flag[2+1];//是否可催用户
+	char price_product_id[256];//用户产品标示
+	char run_time[20];
+	char open_time[20];
+	char old_run[2+1];
+	char family_code[2+1];
+	char expire_day[14+1];
+	char holiday_stop_flag[2+1];/*节假日免停机 0：未申请 1：申请*/	
+	char owe_flag[2+1];/*是否开通欠费额度服务 0:开通 1：未开通*/
+	char valid_flag[2+1];/*是否启动信誉度 0:未启用信誉度 1：启用 2：强制设定等级*/
+	long limit_owe;
+	char relation_code[2+1];
+} stUserInfo;
+
+typedef struct
+{
+	long contract_no;
+	char pay_code[2+1];
+	char contractatt_type[2+1];
+	char account_type[2+1];
+	char bill_order[10+1];//是否为当前触发账户的默认账户
+} stContractInfo;
+
+/*系统级产品规则*/
+typedef struct
+{
+	char sm_code[256+1];//用户品牌
+	char list_type[5+1];//特殊用户类型
+	char group_user[10+1];//是否集团用户
+	char no_remind_user[2+1];//是否免催用户
+	char no_stop_user[2+1];//是否免停用户
+	char region_code[100+1];//地市信息
+	char run_code[50+1];//用户当前状态
+	char pay_code[50+1];//付费方式
+	char credit_code[50+1];//信用等级
+	char price_product_id[256+1];//用户产品标示
+} stStopSystemInfo;
+
+/*信控产品结构体*/
+typedef struct
+{
+	long stop_product_id;//信控产品id
+	char stop_product_name[20];//信控产品名称
+	char stop_product_type[10];//信控产品类型
+	char property1[50];
+	char property2[50];
+	char property3[50];
+	char eff_date[20];
+	char exp_date[20];
+	char op_date[20];//操作时间
+	char login_no[20];//操作工号
+	stStopSystemInfo stSystemInfo;//系统级产品属性
+} stStopProduct;
+
+/*信控策略*/
+typedef struct
+{
+	long stop_product_id;//产品id
+	long stop_section_id;//策略id
+	char stop_section_name[50+1];//策略名称
+	char module_id[10+1];//信控模板id
+	int section_rela;//策略优先级
+	int group_id;//分组id
+	char group_rela[4+1];//组关系
+	char stop_day[10+1];//信控周期
+	char stop_day_type[10+1];//信控周期单位
+	char stop_result_code[5+1];//信控后状态
+	char property1[50+1];
+	char property2[50+1];
+	char property3[50+1];
+	char eff_date[20+1];
+	char exp_date[20+1];
+} stStopSection;
+
+/*信控条件*/
+typedef struct
+{
+	long stop_rule_id;
+	char stop_ref_object[100];//参考对象左值
+	char operator_code[5+1];//条件运算符
+	char result_ref_object[100];//参考对象右值
+	char stop_group_type[5];//组件选择
+	char property1[50];
+	char property2[50];
+	char property3[50];
+} stStopRule;
+
+typedef struct
+{
+	long stop_result_id;
+	long stop_section_id;
+	char stop_result_type[2+1];
+	char stop_result_value[30+1];
+	char property1[50];
+	char property2[50];
+	char property3[50];
+} stStopResult;
+
+/*信控输出格式*/
+typedef struct
+{
+	long stop_result_id;
+	long stop_result_object_id;//
+	int field_position;
+	char split_separator[2];//
+	char property1[50];
+	char property2[50];
+	char property3[50];
+} stStopResultField;
+
+typedef struct
+{
+	long stop_ref_object;
+	char operator_code[2+1];//条件运算符
+} stStopCal;
+
+/*信控条件关联关系*/
+typedef struct
+{
+	long stop_rule_rela_id;
+	long stop_group_id;//组件对应标示
+	char stop_group_type[5];//组件选择
+	long stop_rule_id;//条件标示
+	char stop_group_code[5];//分组标识
+	char stop_rule_weight[5];//权重
+	char system_type[5];//业务类型
+	char priority[5];//优先级
+	char notes[100];//描述
+	char eff_date[20];
+	char exp_date[20];
+} stStopRuleRela;
+
+/*信控参数结构体*/
+typedef struct
+{
+	long stop_ref_object_id;//参考对象id
+	char ref_value[128];//对应数值
+	char property_code[32+1];//外部属性标识
+	char sql_param[1024];//配置SQL
+	char ref_value_type[10];//数值类型
+	int param_num;//参数个数
+	char property1[20];
+	char property2[20];
+} stStopRefObject;
+
+/*信控记录结构体*/
+typedef struct
+{
+	long stop_control_record_id;//流水
+	long user_id;//用户id
+	char phone_no[40];//
+	long contract_no;
+	char module_id[10];//提醒消息模板标识
+	long remine_fee;//实时余额
+	long limit_owe;//信誉度
+	char old_code[5+1];//原状态
+	char run_code[5+1];//变更后状态
+	char op_date[20];//生成时间
+	char op_code[10];//
+	int awoke_times;//次数
+} stStopControlRecord;
+
+typedef struct
+{
+	char h_stop_flag[2+1];
+	char stop_type[10+1];
+	char cj_flag[2+1];
+	char st_flag[2+1];
+	char credit_cj_flag[2+1];
+	char begin_time[25+1];
+	char end_time[25+1];
+} stStopHoliday;
+
+/*信控费用记录结构体*/
+/*信控记录结构体*/
+typedef struct
+{
+	long prepay_fee;//预存款
+	long owe_fee;//历史欠费（物理欠费）
+	long unbill_fee;//未出账话费
+	long cur_balance;//余额
+	long limit_owe;//信誉度
+	long awoke_fee;//余额催缴阀值
+	long owe_awoke_fee;//欠费催缴阀值
+	long group_owe;
+	long limit_high;
+	int	 restop_hours;//停机再停小时
+	int	 singlestop_days;//单停有效天数
+	int	 voicestop_days;//语音单停有效天数
+	int	 limit_days;//可透支有效天数
+	int  calling_times;//催缴次数
+	int  awake_times;//提醒次数
+	int  owe_awake_times;//透支提醒次数
+	char credit_awake_flag[2+1];//提醒标示
+	char credit_type[2+1];//用户停机属性
+	char credit_name[50+1];
+	char property1[20+1];
+	char property2[20+1];
+	char property3[20+1];
+} stStopFeeMsg;
+
+typedef struct
+{
+	char region_code[9+1];//地市
+	char sm_code[6+1];
+	char cart_type[5+1];
+	char credit_code[5+1];
+	char credit_name[50+1];
+	char special_list[5+1];
+	char family_code[10+1];
+	long limit_owe;//信誉度
+	long awoke_fee;//余额催缴阀值
+	long owe_awoke_fee;//欠费催缴阀值
+	int	 restop_hours;//停机再停小时
+	int	 singlestop_days;//单停有效天数
+	int	 voicestop_days;//语音单停有效天数
+	int	 limit_days;//可透支有效天数
+	int  calling_times;//催缴次数
+	int  awake_times;//提醒次数
+	int  owe_awake_times;//透支提醒次数
+	char credit_awake_flag[2+1];//提醒标示
+	char credit_type[2+1];//用户停机属性
+	int  priority;//优先级
+	char property1[20+1];
+	char property2[20+1];
+	char property3[20+1];
+}stStopAwakeConf;
+
+/*账单*/
+typedef struct 
+{
+		long    con;										/* 账户标识 */
+    long    id;                     /* 用户标识 */
+		int			bill_cycle;							/* 帐期年月 */
+		char		cycle_type[1+1];				/* 帐期（上下半月）*/
+		char		bill_type[3+1];					/* 帐期类型 */
+		char		acctItem[8+1];					/* 账目项 */
+		char		status[1+1];						/* 支付状态 */
+		long		should;									/* 应收 */
+		long    favour;									/* 优惠 */
+		long		owe;										/* 欠费 */
+		long		payed;						/* 已冲销金额 */
+}stPayOweDetail;
+
+/*账本*/
+typedef struct
+{
+		char		pay_type[5+1];					/* 账本类型 */
+		long		CurBalance;							/* 余额 		*/
+		long    PayedOwe;								/* 冲销金额 */
+		char		SpecialFlag[1+1]; 			/* 专款标识 0 普,1 专*/
+}stAcctBook;//stPayBalance_New
+
+/*账本服务对应关系*/
+typedef struct
+{
+		char		pay_type[5+1];					/* 账本类型 */
+		char		serv_id[10+1];
+}stServRela;//stPayBalance_New
+
+/*账本明细*/
+typedef struct
+{
+	vector<stAcctBook *> Balance;
+	long            lNorBalance;       	/* 普通账本总余额 */
+	long            lSpeBalance;				/* 专款账本总余额 */
+	long            lNorPayedOwe;				/* 普通账本冲销金额 */
+	long            lSpePayedOwe;				/* 专款账本冲销金额 */
+}stAcctBookDetail;//stStopFee_New;
+
+typedef struct
+{
+	char day_type[1+1];
+	char day_value[4+1];
+	char begin_time[6+1];
+	char end_time[6+1];
+}stSmsTime;
+
+typedef struct
+{
+	long inIdNo;
+	char inPhoneNo;
+	char inOwnerFlag;
+	char inNewRun;
+	char inOpenFlag;
+	char inFywFlag;
+	char sOtherData;
+	char inDBLabel;
+}stServOrder;
+
+typedef struct
+{
+	char sTemPlateId;
+	char sPhoneNo;
+	char sOpCode;
+  char sStringData;
+  bool bCheckFlag;
+  int inLevel;
+  int sSendFlag;
+}stMessage;
+typedef struct
+{
+	char sTableSource[128];
+	char sTableEnd[128];
+	char sOpSql[1024];
+  char sRequirement[256];
+}stDemolition;
+
+/*无主停机结构体*/
+typedef struct{
+     char  phoneNo[40+1];
+     char  shouldPay[13];
+     char  billTime[15];
+     char  childCode[3];
+}NoownerOweType;
+
+/*信誉度信息结构体*/
+typedef struct
+{
+	long id_no;
+	char phone_no[40];			//信控用户手机号
+  long online_lev;					//网龄分层 (0,6)=1  [6,12]=2  (12,)=3
+  char comm_flag[2+1];			//通信用户标识 1-是 0-否
+  long avg_arpu;            //月均ARPU
+  long avgarpu_score;       //月均ARPU得分
+  long user_online;         //网龄
+  long online_score;        //网龄得分
+  long extfamily_flag;      //亲情号码标识
+  long extfamily_score;     //亲情号码得分
+  long vpmnbind_flag;       //集团V网标识
+  long vpmnbind_score;      //集团V网得分
+  long happyfamily_flag;    //幸福家庭标识
+  long happyfamily_score;   //幸福家庭得分
+  long termbind_months;     //终端捆绑时长
+  long payback_months;      //缴费回馈时长
+  long bind_score;          //合约捆绑得分
+  long bankpay_cnts;        //银行卡绑定缴费次数
+  long entts_flag;          //集团托收客户标识
+  long paybind_score;       //是否绑定付费得分
+  long realname_flag;       //实名制标识
+  long realname_score;      //实名制得分
+  long stop_cnts ;          //双停(即全停)次数
+  long stop_score;          //双停得分
+  long base_score;          //基础得分
+  long add_score ;          //加分值
+  long less_score;          //减分值
+  long all_score;           //总分
+  char star_lev[20+1];      //客户星级
+  char desc_reason[64+1];   //描述
+  char start_time[6+1];     //评级生效
+  char end_time[6+1];       //评级失效
+  char belong_code[20+1];   //归属
+  char flag[2+1];	          //标识
+} stCreditInfo;
+
+/*remain结构体*/
+typedef struct
+{
+	long id_no;
+	long contract_no;
+	char phone_no[40];			//信控用户手机号
+	long prepay_fee;
+	long limit_owe;
+	long owe_fee;
+	long unbill_fee;
+	char op_time[14+1];
+	char run_code[1+1];
+} stRemainInfo;
+
+/*集团结构体*/
+typedef struct
+{
+	long id_no;						//用户
+	long contract_no;			//账户
+	long cust_id;					//客户
+	long unit_id;					//集团id
+	char prod_id[20];			//产品代码ur_userprc_info.prod_main_flag=‘0’
+	char credit_code[4];	//集团信誉等级 A B C	
+	char credit_name[60]; //等级名称
+} stCrpInfo;
+
+typedef struct
+{
+	//vector<int> fieldData;
+	map<string, int> fieldData;
+}stParseFieldInfo;
+
+
+#if defined(__cplusplus)
+}
+#endif
+
+#endif
+

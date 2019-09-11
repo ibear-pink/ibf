@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMapConfig>
+	<settings cacheModelsEnabled="false"
+			autoCommit="0"
+			defaultDBNum="0"
+			autoClearEnabled="TransationClear"
+			maxOverflaw="256"
+			performanceAnalyzeEnabled="true"
+			performanceLogPath="./"
+			performanceThreshold="1000"/>
+
+	<sqlMap resource="/app/boss/bossapp/work/wangzhia/bg_public/demo/chkbds_select_DB.xml" />
+</sqlMapConfig>
+

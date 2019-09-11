@@ -1,0 +1,59 @@
+/**
+ * function	:信控处理基类
+ * date		:2014/9/24 11:38:30
+ * author	:wangzhia
+ */
+#ifndef _CDEAL_REMIND_H_
+#define _CDEAL_REMIND_H_
+
+#include <iostream>
+#include <vector>
+#include <map>
+#include <set>
+#include <cstring>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "CDealFile.h"
+#include "ibear.h"
+#include "stop_db_conn.h"
+#include "stop_error.h"
+#include "cfgfile.h"
+#include "stop_com_type.h"
+#include "Define.h"
+#include "jni.h"
+
+using namespace std;
+
+class CPublicDeal
+{
+	public:
+		CPublicDeal();
+		virtual ~CPublicDeal();
+		virtual int Process (stSTOPMessage *stopMsg) = 0;
+		virtual int InitStopCfgInfo (stSTOPMessage *stopMsg) = 0;
+		
+	public:
+		//释放资源
+		void Clear ();
+		//初始化
+		int Init (ibear *br, int serverType, int dscNums[],stBakConfigInfo *pBakcfg,int thread_num,STOP_COMMON_CONF *conf_info);
+		//解析入口参数
+		int InitParseField (stAppCfg_ParseFile *pParseFile);
+		
+public:
+		ibear *m_ibear;
+		DB_INFO m_dbDsc;
+		stSTOPMessage *m_StopMsg;
+		STOP_COMMON_CONF *m_CommonConf;
+		stParseFieldInfo m_ParseFile[MAX_PARSE_FILE_NUM];
+		map<string, int *> m_BusiLogicList;
+
+		int m_mdb_num;
+		int m_ThreadNum;
+		int m_dsc_Num;
+		int  m_ServerType;
+		char m_ServOpType[2+1];
+};
+
+#endif

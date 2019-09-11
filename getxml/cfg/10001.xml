@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<EVENT_ID parameterClass="sigle">${EVENT_ID}$<EVENT_ID/>
+	<PHONE_NO parameterClass="sigle">${PHONE_NO}$<PHONE_NO/>
+	<FEEINFOS parameterClass="list">
+		<FEEINFO parameterClass="sigle">
+			<BILL_PRINCE_ID parameterClass="sigle">${BILL_PRINCE_ID}$<BILL_PRINCE_ID/>
+			<ALL_VALUE parameterClass="sigle">${ALL_VALUE}$<ALL_VALUE/>
+			<USED_VALUE parameterClass="sigle">${USED_VALUE}$<USED_VALUE/>
+		<FEEINFO/>
+	<FEEINFOS/>
+	<TIME parameterClass="sigle">${TIME}$<TIME/>
+</root>

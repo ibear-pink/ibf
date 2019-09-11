@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMapConfig>
+	<settings cacheModelsEnabled="false"
+				autoCommit="0"
+				defaultDBNum="0"
+				autoClearEnabled="TransationClear"
+				maxOverflaw="256"
+				performanceAnalyzeEnabled="true"
+				performanceLogPath="/app/boss/bossapp/work/wangzhia/log"
+				performanceThreshold="100"
+				reConnect="true"/>
+	
+        <sqlMap resource="./data.xml" />
+</sqlMapConfig>
+

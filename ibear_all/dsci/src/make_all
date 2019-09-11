@@ -1,0 +1,121 @@
+
+B_I=64
+B_HP="+DD64"
+B_SUN="-xarch=native64"
+
+if [ -d ${ORACLE_HOME}/lib64 ] ; then
+    B_LIB=lib64
+else
+    B_LIB=lib
+fi
+
+SSO="so"
+ALTILIB=odbccli_sl
+ADD_L=""
+CRYPT_LIB=""
+##################   不同主机的编译选项   ####################
+u_name=`uname -s 2>/dev/null`
+if [ "$u_name" = "AIX" ]     ## IBM机器使用
+then
+    CC="xlC -q${B_I} -O2 -g "
+    CCP=$CC
+    DEFINE=" -D IBM_AIX "
+    MLD="xlC -q${B_I} -g -G -lc -lC -bE:exp.f -o" 
+    PMLD="xlC -q${B_I} -g -G -lc -lC -o" 
+    ALTILIB=odbccli
+    ADD_L="-brtl"
+elif [ "$u_name" = "HP-UX" ]    ## HP机器使用
+then 
+    CC="cc $B_HP +O2 +z "
+    CCP="aCC $B_HP +O2 +z "
+    DEFINE=" -D HP_UX "
+    MLD="ld -b -o "
+    PMLD=$MLD
+    SSO="sl"
+elif [ "$u_name" = "SunOS" ]   ## SUN机器使用
+then 
+    CC="cc ${B_SUN} -lsocket -xO2 -g "
+    CCP="gcc -m64 -g "
+    DEFINE=" -D _REENTRANT -D SUN "
+    MLD="ld -G -lm -o "
+    PMLD=$MLD
+elif [ "$u_name" = "Linux" ]   ## LINUX机器使用
+then 
+    CC="gcc -m${B_I} -fpic -g"
+    CCP=$CC
+    DEFINE=" -D LINUX "
+    MLD="g++ -m${B_I} -shared -o"
+    PMLD=$MLD
+    CRYPT_LIB="-lcrypt"
+else
+    echo "invalid os param"
+    exit 1
+fi
+
+######################  判断本机上有哪些数据库 ###############################
+DSC_HH=""
+DSC_LL=""
+DSC_CC=""
+DSC_OO=""
+
+if [ -d ${ALTIBASE_HOME}/include ] ; then              ### Altibase
+  DSC_HH="$DSC_HH -DALTIBASE -I${ALTIBASE_HOME}/include"
+  DSC_LL="$DSC_LL -L${ALTIBASE_HOME}/lib -l${ALTILIB} ${CRYPT_LIB} -ldl -lrt"
+  DSC_CC="$DSC_CC DB_Odbc.c"
+  DSC_OO="$DSC_OO DB_Odbc.o"
+elif [ -d ${TIMESTEN_HOME}/include ] ; then            ### TimesTen
+  DSC_HH="$DSC_HH -DTIMESTEN -I${TIMESTEN_HOME}/include"
+  DSC_LL="$DSC_LL -L${TIMESTEN_HOME}/lib -ltten"
+  DSC_CC="$DSC_CC DB_Odbc.c"
+  DSC_OO="$DSC_OO DB_Odbc.o"
+fi
+
+if [ -d $DCI_HOME/dci/include ] ; then                 ### iMDB
+  DSC_HH="$DSC_HH -DIMDB -I$DCI_HOME/dci/include"
+  DSC_LL="$DSC_LL -L$DCI_HOME/dci/lib -lsi_dci"
+fi
+
+if [ -f $DSC_PATH/include/ddci.h ] ; then                 ### DMDB
+  DSC_HH="$DSC_HH -D DMDB -I$DSC_PATH/include"
+  DSC_LL="$DSC_LL -L$DSC_PATH/lib -lddci"
+fi
+
+if [ -d ${ORACLE_HOME}/rdbms/public ] || [ -d ${ORACLE_HOME}/sdk/include ] ; then           ### oracle
+  DSC_HH="$DSC_HH -DORACLE -I${ORACLE_HOME}/rdbms/demo -I${ORACLE_HOME}/rdbms/public -I${ORACLE_HOME}/sdk/include"
+  DSC_LL="$DSC_LL -L${ORACLE_HOME}/${B_LIB} -lclntsh"
+  DSC_CC="$DSC_CC DB_Ora.c"
+  DSC_OO="$DSC_OO DB_Ora.o"
+fi
+
+if [ -d /usr/include/mysql ] ; then           ### Mysql
+  DSC_HH="$DSC_HH -DMYSQLDB -I/usr/include/mysql"
+  DSC_LL="$DSC_LL -L/usr/lib64/mysql -lmysqlclient_r"
+  DSC_CC="$DSC_CC DB_Mysql.c"
+  DSC_OO="$DSC_OO DB_Mysql.o"
+fi
+
+rm -f *.o
+
+
+#######  编译  #########################
+${CC} -c dsc*.c ${DSC_CC} ${DSC_HH}
+
+cp -f dsci.h ../include/
+
+#######  C动态库 ########################
+rm -f libdsci.*
+rm -f ../lib/libdsci.*
+${MLD} libdsci.$SSO dsc*.o ${DSC_OO} ${DSC_LL}
+mv libdsci.$SSO ../lib
+
+#######  C++动态库 ########################
+${CCP} -c dscpp.cpp
+${PMLD} libdscpp.$SSO dscpp.o -L../lib -ldsci
+mv libdscpp.$SSO ../lib
+cp -f dscpp.h ../include/
+
+######### 工具 #########################
+${CC} -o dsci_tools mdsci_tools.c dsci_comm.o -I. -L../lib -ldsci $ADD_L
+mv dsci_tools ../lib
+
+rm -f *.o

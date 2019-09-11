@@ -1,0 +1,67 @@
+XML_PATH=../../xml2
+
+FILE_H="-I${DSCI_PATH}/include -I${DSCI_PATH}/src -I${XML_PATH}/include -I${DSC_PATH}/include "
+FILE_L="-L${DSCI_PATH}/lib -ldsci -L${XML_PATH}/lib -lxml2 -L${DSC_PATH}/lib/ -ldsc"
+FILE_C="ibearpub.cpp ibear.cpp ibear_db_conn.cpp ibear_db_pwd.cpp ibear_cache.cpp ibear_tools.cpp"
+FILE_O="ibearpub.o ibear.o ibear_db_conn.o ibear_db_pwd.o ibear_cache.o ibear_tools.o"
+IFLAGS="-DSS_64BIT_SERVER -D_REENTRANT -D_DEBUG_INFO_ -D_DSCI_ -D_DSCI_DB_"
+
+######################  判断本机上是否有oracle ###############################
+if [ -d ${ORACLE_HOME}/rdbms/public ] || [ -d ${ORACLE_HOME}/sdk/include ] ; then
+	FILE_H="$FILE_H -I${ORACLE_HOME}/precomp/public -I${ORACLE_HOME}/rdbms/demo -I${ORACLE_HOME}/rdbms/public -I${ORACLE_HOME}/sdk/include"
+	FILE_L="$FILE_L -L${ORACLE_HOME}/lib -lclntsh"
+	IFLAGS="$IFLAGS -DORACLE"
+fi
+
+if [ -d $SDFS_HOME/include ] ; then
+	FILE_H="$FILE_H -I${SDFS_HOME}/include -I${DSC_PATH}/include"
+	FILE_L="$FILE_L -L${SDFS_HOME}/lib -lsdfs -L${DSC_PATH}/lib/ -ldsc"
+fi
+
+######################  判断本机上是否有DMDB ###############################
+if [ -f $DSC_PATH/include/ddci.h ] ; then
+	FILE_H="$FILE_H -I$DSC_PATH/include"
+	FILE_L="$FILE_L -L$DSC_PATH/lib -lddci"
+	IFLAGS="$IFLAGS -DDMDB"
+fi
+
+######################  判断本机上是否有MySQL ###############################
+if [ -d /usr/include/mysql ] ; then
+	FILE_H="$FILE_H -I/usr/include/mysql"
+	FILE_L="$FILE_L -L/usr/lib64/mysql -lmysqlclient_r"
+	IFLAGS="$IFLAGS -DMYSQLDB"
+fi
+
+######################  判断本机上是否有ilog/ifile ###############################
+if [ -d $ILOG_PATH/ilog/include ] && [ -d $IFILE_PATH/ifile/include ]; then
+	FILE_H="$FILE_H -I${IFILE_PATH}/ifile/include -I${ILOG_PATH}/ilog/include"
+	FILE_L="$FILE_L -L${IFILE_PATH}/ifile/lib -lifile -L${ILOG_PATH}/ilog/lib -lilog"
+	IFLAGS="$IFLAGS -D_PERFORMANCE_"
+elif [ -d $IBF_PATH/ifile_all/ifile/include ] && [ -d $IBF_PATH/ilog_all/ilog/include ]; then
+	FILE_H="$FILE_H -I${IBF_PATH}/ifile_all/ifile/include -I${IBF_PATH}/ilog_all/ilog/include"
+	FILE_L="$FILE_L -L${IBF_PATH}/ifile_all/ifile/lib -lifile -L${IBF_PATH}/ilog_all/ilog/lib -lilog"
+	IFLAGS="$IFLAGS -D_PERFORMANCE_"
+fi
+
+echo $FILE_H
+echo $FILE_L
+echo $IFLAGS
+
+CCS="g++ -fPIC -m64 -g -O2 -fpermissive"
+CC="g++ -m64 -g  -lpthread  -ldl -O0 -fpermissive"
+INCLUDE="-I../include -I../src ${FILE_H}"
+
+#######  编译  #########################
+echo "Compiling the  *.cpp $<"
+${CCS} -c ${IFLAGS} ${FILE_C} ${INCLUDE}
+
+#######  C动态库 ########################
+echo "Compiling the  C动态库 $<"
+rm -f libibear.so
+rm -f ../lib/libibear.so
+g++ -shared -o libibear.so ${FILE_O}
+
+mv libibear.so ../lib
+
+${CC} -o ibear_tools ibear_tools.o ${INCLUDE} -L../lib -libear ${FILE_L}
+mv ibear_tools ../lib

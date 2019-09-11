@@ -1,0 +1,11 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="test">
+	<select id="SEL_MD_BACTHSN"  parameterClass="Map" resultNum="1" db_no="1">select batchsn from bdsadm.MD_APP_PROCWS_#TYPE#_HIS_CX#CLUS_NUM# limit 1</select>
+	<select id="SEL_MD_HIS"  parameterClass="Map" resultNum="12" db_no="1">select batchsn,wsseq,rlb_disp,status,id_no,phone_no,contract_no,day_billcycl,content,gen_time,deal_time,deal_code from bdsadm.MD_APP_PROCWS_#TYPE#_HIS_CX#CLUS_NUM# where batchsn=${BATCHSN|char} limit 10000</select>
+	<select id="SEL_MD_HIS_FLAG"  parameterClass="Map" resultNum="12" db_no="1">select batchsn,wsseq,rlb_disp,status,id_no,phone_no,contract_no,day_billcycl,content,gen_time,deal_time,deal_code from bdsadm.MD_APP_PROCWS_#TYPE#_HIS_CX#CLUS_NUM# where status='L'</select>
+	<update id="UPD_MD_HIS"  parameterClass="Map" db_no="1">update bdsadm.MD_APP_PROCWS_#TYPE#_HIS_CX#CLUS_NUM# set status='L' where wsseq=${WSSEQ|char}</update>
+	<delete id="DEL_MD_HIS_FLAG"  parameterClass="Map" db_no="1">delete from bdsadm.MD_APP_PROCWS_#TYPE#_HIS_CX#CLUS_NUM# where status='L'</delete>
+	<delete id="DEL_MD_HIS"  parameterClass="Map" db_no="1">delete from bdsadm.MD_APP_PROCWS_#TYPE#_HIS_CX#CLUS_NUM# where batchsn=${BATCHSN|char} and status='L'</delete>
+</sqlMap>
+

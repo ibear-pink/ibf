@@ -1,0 +1,33 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "inDataExpData.h"
+#include "DynBase.h"
+
+IMPLEMENT_CLASS(inDataExpData)
+
+inDataExpData::inDataExpData()
+{
+	
+}
+
+inDataExpData::~inDataExpData()
+{
+	
+}
+
+int inDataExpData::init(char *serverName,int serverType,CPublicDeal *stopDeal)
+{
+	return RET_OK;
+}
+
+int inDataExpData::process(ibear *br,char *busiName,char *serverName,stAppCfg_System *pSystemInfo,stDealTask *pTask,stParseField *parseField,stSTOPMessage *stopMsg)
+{
+	int iRet = 0,cRet = 0;
+	return iRet;
+}
+
+

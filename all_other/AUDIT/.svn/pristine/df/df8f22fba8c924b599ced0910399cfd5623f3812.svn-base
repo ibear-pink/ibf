@@ -1,0 +1,51 @@
+#!/bin/ksh
+AUDIT_HOME=/account/c000/pkg/src/cpp/AUDIT
+GET_HOME=/account/c000/pkg/src/cpp/AUDIT/data/outdir
+FTP_HOME_1=/acct/work/wangzhia/AUDIT
+FTP_HOME_2=/acct/work/wangzhia/AUDIT
+#FTP主机IP
+ADDRESS_IP_1=10.243.29.183
+ADDRESS_IP_2=10.243.29.183
+#FTP主机用户名
+USER_ID_1=acct
+USER_ID_2=acct
+nowdate=`date '+%Y%m%d'`
+nowtime=`date '+%Y%m%d%H%M%S'`
+type=$1
+
+if [ $# != 1 ] ; then
+echo "需要输入参数:sh put_data_data.sh type"
+echo "1:上传到一致性平台"
+echo "2:上传到云管理平台"
+exit
+fi
+
+#BDS_NAME表名
+cat ${AUDIT_HOME}/CAF/BDS_TABLENAME_EXP.cfg|while read BDS_NAME
+do
+	cd ${GET_HOME}/${BDS_NAME}_${type}
+	#检查是否有SUCCESS文件
+	suc=`ls ${BDS_NAME}${nowdate}_AUDIT_SUCCESS|wc -l`
+	if [ ${suc} = 0 ] ; then
+		#如果没有,进行下一个文件处理
+		continue
+	fi
+	
+	if [ ${type} = 1 ] ; then
+		##2.1.put文件
+		sftp ${USER_ID_1}@${ADDRESS_IP_1} <<-EOF
+		cd ${FTP_HOME_1}/${BDS_NAME}
+		mput ${BDS_NAME}_?${nowdate}????.repair
+		put ${BDS_NAME}${nowdate}_AUDIT_SUCCESS
+		bye
+		EOF
+	else
+		##2.2.put文件
+		sftp ${USER_ID_2}@${ADDRESS_IP_2} <<-EOF
+		cd ${FTP_HOME_2}/${BDS_NAME}
+		mput ${BDS_NAME}_?${nowdate}??????????.repair
+		put ${BDS_NAME}${nowdate}_AUDIT_SUCCESS
+		bye
+		EOF
+	fi
+done

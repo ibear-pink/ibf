@@ -1,0 +1,43 @@
+#!/bin/ksh
+ACCT_BIN=/account/cx00/pkg/bin
+COMMON_INCLUDE=-I/account/c000/pkg/include/cpp/sysmgr
+COMMON_OBJ=/account/c000/pkg/obj/cpp/public/sysmgr
+
+IFLAGS=-DSS_64BIT_SERVER -D_REENTRANT -D_DEBUG_INFO_
+
+INCLUDE=-I. ${COMMON_INCLUDE}
+
+LIB=-L. 
+
+CFLAGS = ${IFLAGS} ${INCLUDE}
+
+CC=g++ -m64 -g  -lpthread  -ldl -O0 -fpermissive
+
+OBJ = getpwd.o
+
+BIN=getpwd
+
+all:${BIN} install clean
+
+.cpp.o:
+	echo "Compiling the $<"
+	$(CC) -c ${CFLAGS} $<
+.c.o:
+	echo "Compiling the $<"
+	$(CC) -c ${CFLAGS} $<
+
+clean:
+	rm -f getpwd.o
+	
+######################################################################
+
+${BIN}: $(OBJ)
+	$(CC) ${CFLAGS} -o $@ $? ${COMMON_OBJ}/CommonFun.o ${COMMON_OBJ}/ComString.o ${COMMON_OBJ}/ComFile.o ${COMMON_OBJ}/ComDir.o ${COMMON_OBJ}/ComCfgFile.o ${COMMON_OBJ}/ComEncrypt.o ${LIB}
+
+######################################################################
+
+install:
+	
+	mv ${BIN} ${ACCT_BIN}
+
+

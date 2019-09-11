@@ -1,0 +1,270 @@
+
+/*
+ * 功能描述:将一致性比对结果落地
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "CAFMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(CAFMgr)
+
+CAFMgr::CAFMgr()
+{
+	
+}
+
+CAFMgr::~CAFMgr()
+{
+	
+}
+
+int CAFMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	int iRet = 0;
+	m_Ibear = br;
+	m_CfgInfo = pServerCfg;
+	strcpy(m_DataType,processName);
+	printf("outdir=%s\n",m_CfgInfo->out_cfg_info.outdir);
+	printf("tmpdir=%s\n",m_CfgInfo->out_cfg_info.tmpdir);
+	
+	return iRet;
+}
+
+int CAFMgr::process()
+{
+	int iRet = 0;
+	int num = 0;
+	int fileNum = 0;
+	char c_fileNum[4+1] = {0};
+	char ym[6+1] = {0};
+	char ymd[8+1] = {0};
+	char date[14+1] = {0};
+	char fileName[128] = {0};
+	char filePath[1024] = {0};
+	
+	getCurDateTime(ym,"yyyymm");
+	getCurDateTime(ymd,"yyyymmdd");
+	sprintf(date,"%s",CurrSysDate(16));
+	sprintf(c_fileNum,"%04d",fileNum);
+	iRet = getRepairDatas(m_DataType);
+	if (iRet != 0)
+	{
+		return iRet;
+	}
+	
+	GDF_FILE *pFile = NULL;
+	for(vector<stRepairData*>::iterator it = m_RepairDatas.begin();it!=m_RepairDatas.end();it++)
+	{
+		stRepairData *data = *it;
+		char note[1024] = {0};
+		if (strcmp(m_DataType,"1") == 0)
+		{
+			if (num == 0 || num == 10000)
+			{
+				if (pFile != NULL)
+				{
+					pFile->Close();
+					delete pFile;
+					pFile = NULL;
+				}
+				
+				num = 0;
+				fileNum++;
+				sprintf(filePath,"%s/%s_%s",m_CfgInfo->out_cfg_info.outdir,data->table_name,m_DataType);
+				sprintf(c_fileNum,"%04d",fileNum);
+				sprintf(fileName,"%s_%s_%s_%s.repair",data->table_name,ymd,data->check_type,c_fileNum);
+				printf("fileName[%s/%s]\n",filePath,fileName);
+				pFile = new GDF_FILE (filePath, fileName);
+				if (0 != pFile->Open ("a+"))
+				{
+					printf ("FILE[%s]LINE[%d]ERR_MSG[Open File Is Failed.]\n", __FILE__, __LINE__);
+					return RET_FAIL;
+				}
+			}
+			num++;
+			sprintf(note,"%ld|%s|%s|%s\n",data->check_sn,data->check_result,data->is_deal,data->deal_time);
+			printf("note[%s]\n",note);
+		}
+		else 
+		{
+			if (num == 0 || num == 10000)
+			{
+				if (pFile != NULL)
+				{
+					pFile->Close();
+					delete pFile;
+					pFile = NULL;
+				}
+				
+				num = 0;
+				fileNum++;
+				sprintf(filePath,"%s/%s_%s",m_CfgInfo->out_cfg_info.outdir,data->table_name,m_DataType);
+				sprintf(c_fileNum,"%04d",fileNum);
+				sprintf(fileName,"%s_%s_%s_%s.edit",data->table_name,date,data->check_type,c_fileNum);
+				printf("fileName[%s/%s]\n",filePath,fileName);
+				pFile = new GDF_FILE (filePath, fileName);
+				if (0 != pFile->Open ("a+"))
+				{
+					printf ("FILE[%s]LINE[%d]ERR_MSG[Open File Is Failed.]\n", __FILE__, __LINE__);
+					return RET_FAIL;
+				}
+			}
+			num++;
+			sprintf(note,"%s|%s|%s\n",data->key_id,data->is_deal,data->deal_time);
+			printf("note[%s]\n",note);
+		}
+		
+		pFile->Write (note, strlen(note), 1);
+		pFile->Fflush();
+		
+		iRet = insertRepairHis(ym,data->table_name,data->key_id);
+		if (iRet != 0)
+		{
+			break;
+		}
+		iRet = deleteRepairData(data->table_name,data->key_id);
+		if (iRet != 0)
+		{
+			break;
+		}
+		
+		if (iRet == 0)
+		{
+			m_Ibear->Commit();
+		}
+		else 
+		{
+			m_Ibear->Rollback();
+		}
+	}
+	
+	if (pFile != NULL)
+	{
+		pFile->Close();
+	}
+	
+	if (iRet != 0)
+	{
+		m_Ibear->Rollback();
+	}
+	if (m_RepairDatas.size() > 0)
+	{
+		clearDataList(m_RepairDatas);
+	}
+	for (vector<string>::iterator it = m_TableNames.begin();it!=m_TableNames.end();it++)
+	{
+		string table_name = *it;
+		sprintf(filePath,"%s/%s_%s",m_CfgInfo->out_cfg_info.outdir,table_name.c_str(),m_DataType);
+		sprintf(fileName,"%s%s_AUDIT_SUCCESS",table_name.c_str(),ymd);
+		pFile = new GDF_FILE (filePath, fileName);
+		if (0 != pFile->Open ("a+"))
+		{
+			printf ("FILE[%s]LINE[%d]ERR_MSG[Open File Is Failed.]\n", __FILE__, __LINE__);
+			return RET_FAIL;
+		}
+		pFile->Write ("", 1, 1);
+		pFile->Fflush();
+		if (pFile != NULL)
+		{
+			pFile->Close();
+			delete pFile;
+			pFile = NULL;
+		}
+	}
+	m_TableNames.clear();
+	
+	return iRet;
+}
+
+int CAFMgr::getRepairDatas(char *data_type)
+{
+	int iRet = 0;
+	vector<vector<string> > list;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("DATA_TYPE",data_type));
+	iRet = m_Ibear->queryForList("SEL_REPAIR",inParams,&list);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]SEL_REPAIR ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	for (vector<vector<string> >::iterator it=list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stRepairData *data = new stRepairData();
+		data->check_sn=atol(v_row[0].c_str());
+		strcpy(data->key_id,v_row[1].c_str());
+		strcpy(data->table_name,v_row[2].c_str());
+		strcpy(data->check_type,v_row[3].c_str());
+		strcpy(data->check_result,v_row[4].c_str());
+		strcpy(data->is_deal,v_row[5].c_str());
+		strcpy(data->deal_time,v_row[6].c_str());
+		m_RepairDatas.push_back(data);
+		int flag = 0;
+		for (vector<string>::iterator tn = m_TableNames.begin(); tn != m_TableNames.end(); tn++)
+		{
+			string table_name = *tn;
+			if (strcmp(table_name.c_str(),v_row[2].c_str()) == 0)
+			{
+				flag = 1;
+				break;
+			}
+		}
+		if (flag == 0)
+		{
+			m_TableNames.push_back(v_row[2]);
+		}
+	}
+	
+	return iRet;
+}
+
+int CAFMgr::deleteRepairData(char *table_name,char *key_value)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->DML("DEL_REPAIR",inParams);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]DEL_REPAIR ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+int CAFMgr::insertRepairHis(char *ym,char *table_name,char *key_value)
+{
+	int iRet = 0;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>("YM",ym));
+	inParams.insert(pair<string,string>("KEY_VALUE",key_value));
+	inParams.insert(pair<string,string>("CHECK_TABLE",table_name));
+	iRet = m_Ibear->DML("INS_REPAIR_HIS",inParams);
+	if (iRet != 0)
+	{
+		printf ("FILE[%s]LINE[%d]INS_REPAIR_HIS ERR_MSG[%s]\n", __FILE__, __LINE__,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	return iRet;
+}
+
+int CAFMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int CAFMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

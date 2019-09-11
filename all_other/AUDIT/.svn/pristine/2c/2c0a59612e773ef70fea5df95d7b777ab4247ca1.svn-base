@@ -1,0 +1,155 @@
+
+/*********************
+* 功能描述:入口函数
+* 编码日期:
+* 编码人员:自动生成
+*********************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include "CProServerManager.h"
+#include "Version.h"
+
+using namespace std;
+
+int g_runflag;//0: run  1：stop
+
+/**********************************************************
+function: getIBillingCmd
+description: 获取运行指令信息
+Input: argc: 运行指令个数
+       argv: 保存运行指令内容
+Output: chCfgPath 配置文件路径
+Return: 0 MY_SUCCEED 1 MY_FAIL
+others:
+***********************************************************/
+static int getIBillingCmd (char* chCfgPath, char *processName,int argc, char * argv[])
+{
+	extern char *optarg;
+	int opt;
+
+	if(argc < 2)
+	{
+		fprintf( stderr, "\n参数过少！！！[usage]: \n\t%s cx00 -p processName\n\t%s cx00\n\t%s -v a\n\n", argv[0], argv[0], argv[0]);
+		return -1;
+	}
+
+	/* 获取运行命令 */
+	while( -1 != ( opt = getopt( argc, argv, "S:s:P:p:HhVv:Tt" ) ) )
+	{
+		/* 分析运行命令 */
+		switch( opt )
+		{
+			case 'S':
+			case 's':
+				strcpy (chCfgPath, optarg);
+				break;
+			case 'P':
+			case 'p':
+				strcpy (processName, optarg);
+				break;
+			case 'H':
+			case 'h':
+				fprintf( stderr, "\n\n\t[usage]: %s cx00 -p processName\n\t%s cx00\n\t%s -v a\n\n", argv[0], argv[0], argv[0]);
+				return 0;
+			case 'V':
+			case 'v':
+				fprintf( stderr, "\n\t%s %s\n\n", argv[0], STOP_VERSION);
+				return 1;
+			default:
+				fprintf( stderr, "\n参数输入错误，请检查！！！[usage]: %s cx00 -p processName\n\t%s cx00\n\t%s -v a\n\n", argv[0], argv[0], argv[0]);
+				return -1;
+		}
+	}
+
+	return 0;
+}
+
+/**********************************************************
+Function:		static void sig_quit(int signo)
+Description:	信号处理函数
+Input:			int signo, 信号编号
+Output:			无
+Return: 		无
+Others:			产生跳转
+**********************************************************/
+static void sig_quit(int signo)
+{
+	g_runflag = 1;
+}
+
+int main (int argc,char *argv[])
+{
+	printf("%s\t############# RealTimeStop Program Started ############\n",GetSysTime());	
+	int ret=0;
+	char opr_Start[1024] = {0};
+	char fileName[1024] = {0};
+	char processName[1024] = {0};
+	map<string,string> classMap;
+	
+	classMap.insert(pair<string,string>(string("Mgr"),string("QYFBMgr")));
+	classMap.insert(pair<string,string>(string("Data"),string("QYFBData")));
+	classMap.insert(pair<string,string>(string("Deal"),string("QYFBDeal")));
+	
+	/*检查命令行参数的合法性，并获取合法配置文件名*/
+	if (0 != getIBillingCmd(opr_Start,processName, argc, argv))
+	{
+		return RET_FAIL;
+	}
+	
+	/*if (strcmp(opr_Start,"start") != 0)
+	{
+		printf("启动程序请增加程序入参:-s start\n");
+		return RET_OK;
+	}*/
+	string inputs[10];//0,进程唯一标示QYFB_CF01;1,集群名CF01（从进程名截取）;2,入参;
+	inputs[0] = string(argv[0]);
+	char host_id[32] = {0};
+	strcpy(host_id,argv[1]);
+	/*if (0 != SplitString(host_id,argv[0],'_',2))
+	{
+		printf ("%s 切分 Is Failed.\n",argv[0]);
+		return RET_FAIL;
+	}*/
+	inputs[1] = string(host_id);
+	if (processName!=NULL)
+	{
+		inputs[2] = string(processName);
+	}
+	sprintf(fileName,"/account/%s/pkg/cfg/accaudit/qyfb.conf",host_id);
+
+	if (!App_ProServerManager::Instance()->Init (fileName,inputs))
+	{
+		printf ("App_ProServerManager Init Is Failed.\n");
+		return RET_FAIL;
+	}
+	
+	if (!App_ProServerManager::Instance()->Start(classMap))
+	{
+		printf ("App_ProServerManager Start Is Exit.Please Check Log.\n");
+		return RET_FAIL;
+	}
+	
+	signal(SIGTERM, sig_quit);
+	signal(SIGINT, sig_quit);
+	signal(SIGQUIT, sig_quit);
+	signal(SIGPIPE, SIG_IGN);
+
+	while (g_runflag == 0)
+	{
+		if (App_ProServerManager::Instance()->GetServerSize() == 0)
+		{
+			break;
+		}
+
+		sleep(5);
+	}
+	
+	App_ProServerManager::Close();
+
+	return RET_OK;
+
+}
+

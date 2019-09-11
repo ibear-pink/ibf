@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMapConfig>
+	<settings cacheModelsEnabled="false"
+	autoCommit="0"
+	defaultDBNum="0"
+	autoClearEnabled="TransationClear"
+	maxOverflaw="256"/>
+	
+	<sqlMap resource="/app/boss/bossapp/work/wangzhia/CHKBDS/conf/chkbds_other.xml" />
+	<sqlMap resource="/app/boss/bossapp/work/wangzhia/CHKBDS/conf/chkbds_other.xml" />
+	<sqlMap resource="/app/boss/bossapp/work/wangzhia/CHKBDS/conf/chkbds_select_BDS.xml" />
+	<sqlMap resource="/app/boss/bossapp/work/wangzhia/CHKBDS/conf/chkbds_select_DB.xml" />
+	<sqlMap resource="/app/boss/bossapp/work/wangzhia/CHKBDS/conf/chkbds_insert.xml" />
+
+</sqlMapConfig>
+

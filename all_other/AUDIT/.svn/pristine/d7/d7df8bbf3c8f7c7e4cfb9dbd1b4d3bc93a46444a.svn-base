@@ -1,0 +1,17 @@
+/*
+	数据库连接接口
+*/
+
+#ifndef _STOP_DB_CONN_H__
+#define _STOP_DB_CONN_H__
+
+#include "stop_sql.h"
+
+/*加载stop_common.conf*/
+int load_common_conf (char * stop_common, STOP_COMMON_CONF *conf_info);
+
+/*初始化stop_common.conf*/
+int stop_common_init(char *stop_common,STOP_COMMON_CONF *conf_info);
+
+#endif
+

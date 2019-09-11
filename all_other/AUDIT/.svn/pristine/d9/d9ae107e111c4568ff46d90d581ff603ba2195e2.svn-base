@@ -1,0 +1,975 @@
+
+/*
+ * 功能描述:批次级KPI生成
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+
+#include "GETKPIMgr.h"
+#include "CDealData.h"
+
+IMPLEMENT_CLASS(GETKPIMgr)
+
+GETKPIMgr::GETKPIMgr()
+{
+	
+}
+
+GETKPIMgr::~GETKPIMgr()
+{
+	
+}
+
+int GETKPIMgr::init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)
+{
+	memset(&m_szInData, 0, sizeof(m_szInData));
+	sprintf(m_szInData.busi_type,"%s","0");    /*子服务标识 没有的话统一填0*/
+	m_szInData.thread_id = 0;
+	
+	int iRet = 0;
+	char app_pid[10+1] = {0};
+	m_CfgInfo = pServerCfg;	
+	m_logFile = m_CfgInfo->logFile;
+	m_Ibear = br;
+	
+	memset(m_pidCount,0,sizeof(m_pidCount));
+	memset(m_pidNum,0,sizeof(m_pidNum));
+	memset(m_tableName,0,sizeof(m_tableName));
+	
+	m_ProInfo = pInfo;
+	sprintf(app_pid,"%d",getpid());
+	iRet = appStart(br,m_ProInfo->ipAddress,m_ProInfo->program_name,m_ProInfo->procUnikey,app_pid);
+	if (iRet != 0)
+	{
+  	printf("进程不允许启动[%s] \n",getErrInfo());
+		//m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"appStart失败[%d][%s,%s,%s,%s]!!!\n",iRet,pInfo->ipAddress,pInfo->procUnikey,pInfo->program_name,app_pid);
+  	//m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程不允许启动[%s]",getErrInfo());
+  	return -1;
+	}
+
+	//add by wangzhia TEST  2016/8/15 10:44:31
+	//strcpy(processName,"PNUM=2,ALL=10,MODEL=OFRM");
+	//strcpy(processName,"PNUM=1,ALL=10,MODEL=OFAC");
+
+	//解析zk返回值，获得地址编码
+	if(0 != SplitString(m_pidNum,processName,',',1))
+	{
+		strcpy(m_pidNum,processName);
+	}
+	if(0 != SplitString(m_pidNum,m_pidNum,'=',2))
+	{
+		strcpy(m_pidNum,processName);
+	}
+	//解析zk返回值，获得总进程数
+	if(0 != SplitString(m_pidCount,processName,',',2))
+	{
+		strcpy(m_pidCount,processName);
+	}
+	if(0 != SplitString(m_pidCount,m_pidCount,'=',2))
+	{
+		strcpy(m_pidCount,processName);
+	}
+	//解析zk返回值，获得表名
+	if(0 != SplitString(m_tableName,processName,',',3))
+	{
+		strcpy(m_tableName,processName);
+	}
+	if(0 != SplitString(m_tableName,m_tableName,'=',2))
+	{
+		strcpy(m_tableName,processName);
+	}
+	
+	/*strcpy(m_tableName,"OFAC");
+	strcpy(m_pidCount,"1");
+	strcpy(m_pidNum,"0");*/
+	
+	if (m_AuditKPICfgs.size() != 0)
+	{
+		clearDataList(m_AuditKPICfgs);
+	}
+	if (0 != getAuditKPIStatic())
+	{
+		printf("getAuditKPIStatic is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	if (0 != getAuditcfg())
+	{
+		printf("getAuditcfg is ERROR!!!\n");
+		return RET_FAIL;
+	}
+	return iRet;
+}
+
+int GETKPIMgr::process()
+{
+	long t1 = 0,t2 = 0;
+	t1 = getUTime();
+	m_szInData.record_count = 0;
+	if (0 == isAppStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+	{
+		//可以停止
+		if (0 == appStop(m_ProInfo->ipAddress,m_ProInfo->program_name))
+		{
+	  	printf("进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+			//m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"进程停止[%s %s]\n",m_ProInfo->ipAddress,m_ProInfo->program_name);
+
+			exit(0);
+		}
+	}
+	int iRet = 0;
+	memset(m_YM,0,sizeof(m_YM));
+	getCurDateTime(m_YM,"yyyymm");
+	
+	clearDataList(VB);
+	//从B中获取待处理工单
+	if (0 != getAuditKPIProcws(m_pidCount,m_pidNum))
+	{
+  	printf("取接口表失败！！！进程停止[%s %s]\n",m_pidCount,m_pidNum);
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|取接口表失败！！！进程停止[%s %s]\n",SYSTEM_INTERFACE_IS_ERROR,m_pidCount,m_pidNum);
+		exit(0);
+	}
+	
+	if (VB.size() == 0)
+	{
+		sleep(1);
+		return 0;
+	}
+	
+	//根据VB的值，获取全部批次汇总表的详细数据，并更新VB的值
+	iRet = updFristAuditLock(m_YM, m_tableName,m_pidCount,m_pidNum);
+	if (0 != iRet)
+	{
+		m_Ibear->Rollback();
+		return RET_FAIL;
+	}
+	
+	if (0 != getFristAudit(m_YM, m_tableName))
+	{
+		m_Ibear->Rollback();
+		return RET_FAIL;
+	}
+	m_Ibear->Commit();
+	
+	//批次级
+	for(map<string,vector<stAuditKPIs*> >::iterator it = VB.begin();it!=VB.end();it++)
+	{
+		m_szInData.record_count ++;
+		//元素级
+		vector<stAuditKPIs*> VA = it->second;
+		if (VA.size() == 0)
+		{
+			continue;
+		}
+		char batchsn[64+1] = {0};
+		char date_ins[16+1] = {0};
+		char org_ins[16+1] = {0};
+		char status[1+1] = {0};
+		strcpy(batchsn,(it->first).c_str());
+		
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"根据批次[%s]判断所有公式是否平衡",batchsn);
+		//依次处理该批次涉及到的每个公式
+		iRet = ProBatchProcess(VA);
+		if (iRet != 0)
+		{
+			strcpy(status,"F");
+		}
+		else 
+		{
+			strcpy(status,"S");
+		}
+		if (iRet != 0)
+		{
+			m_Ibear->Rollback();
+			if (0 != updFristAuditUnLock(m_YM,m_tableName,batchsn))
+			{
+				iRet = RET_FAIL;
+			}
+		}
+		iRet = 0;
+		if (0 != insertAuditProcwsHis(m_YM,batchsn,status))
+		{
+			iRet = RET_FAIL;
+		}
+
+		if (0 != deleteAuditProcws(batchsn))
+		{
+			iRet = RET_FAIL;
+		}
+		
+		if (iRet != 0)
+		{
+			m_Ibear->Rollback();
+		}
+		else 
+		{
+			m_Ibear->Commit();
+		}
+	}
+	clearDataList(VB);
+	t2 = getUTime();
+	m_szInData.time_cost = (t2-t1)/1000.000;
+	m_logMon->pushMonitorBaseInfo(m_szInData);
+	
+	return iRet;
+}
+
+//取KPI配置数据
+int GETKPIMgr::getAuditKPIStatic()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	char wsseq[25] = {0};
+	char notes[1024] = {0};
+	iRet = m_Ibear->queryForList("SEL_KPI_CFG",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|SEL_KPI_CFG ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPICfg *order = new stAuditKPICfg();
+		
+		strcpy(order->Parameter,v_row[0].c_str());
+		strcpy(order->Audit_type,v_row[1].c_str());
+		strcpy(order->Dismension_bah,v_row[2].c_str());
+		strcpy(order->Dismension_org,v_row[3].c_str());
+		strcpy(order->Dismension_date,v_row[4].c_str());
+		strcpy(order->Audit_form,v_row[5].c_str());
+		
+		m_AuditKPICfgs.push_back(order);
+	}
+  return iRet;
+}
+
+//取工单数据
+int GETKPIMgr::getAuditKPIProcws(char *p_count,char * p_num)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	printf("%s,%s\n",p_count,p_num);
+	inParams.insert(pair<string,string>(string("P_COUNT"),string(p_count)));
+	inParams.insert(pair<string,string>(string("NUM"),string(p_num)));
+	
+	iRet = m_Ibear->queryForList("SEL_KPI_PROCWS",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|SEL_KPI_PROCWS[P_COUNT:%s,NUM:%s] ERR_MSG[%s]\n",m_Ibear->no_error,p_count,p_num,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		vector<stAuditKPIs*> VA;
+		VB.insert(pair<string,vector<stAuditKPIs*> >(v_row[0],VA));
+	}
+  return iRet;
+}
+
+//插入接口数据到历史表
+int GETKPIMgr::insertAuditProcwsHis(char *ym,char *batchsn,char *status)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	inParams.insert(pair<string,string>(string("STATUS"),string(status)));
+	iRet = m_Ibear->DML("INS_PROCWS_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|INS_PROCWS_HIS ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//删除接口数据
+int GETKPIMgr::deleteAuditProcws(char *batchsn)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->DML("DEL_KPI_PROCWS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|DEL_KPI_PROCWS ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//删除一次稽核数据
+int GETKPIMgr::deleteFristAudit(char *ym,char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->DML("DEL_FRIST",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|DEL_FRIST[%s_%s] ERR_MSG[%s]\n",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//修改一次稽核数据
+int GETKPIMgr::updateFristAudit(char *ym,char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->DML("UPD_FRIST",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|UPD_FRIST[%s_%s] ERR_MSG[%s]\n",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//一次稽核数据入his
+int GETKPIMgr::insertFirstStatusHis(char *ym,char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("TYPE1"),string(table_name)));
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("YM1"),string(ym)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->DML("INS_FRIST_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|INS_FRIST_HIS[%s_%s] ERR_MSG[%s]\n",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//删除KPI日志
+int GETKPIMgr::deleteKPILog(char *ym, char *bah_ins, char *org_ins,char *date_ins,char *parameter, char *audit_type)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("BAH_INS"),string(bah_ins)));
+	inParams.insert(pair<string,string>(string("ORG_INS"),string(org_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(parameter)));
+	inParams.insert(pair<string,string>(string("AUDIT_TYPE"),string(audit_type)));
+	iRet = m_Ibear->DML("DEL_KPI_LOG",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|DEL_KPI_LOG ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//记录KPI日志（KPI未做平）
+int GETKPIMgr::insertKPILog(char *ym,stAuditKPICfg *kpicfg,char *bah_ins,char *org_ins,char *date_ins,char *form_ins,long records,char *audit_type)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	map<string,string> inParams;
+
+	sprintf(crecords,"%ld",records);
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));	
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("AUDIT_TYPE"),string(audit_type)));
+	inParams.insert(pair<string,string>(string("BAH_INS"),string(bah_ins)));
+	inParams.insert(pair<string,string>(string("ORG_INS"),string(org_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("FORM_INS"),string(form_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	
+	iRet = m_Ibear->DML("INS_KPI_LOG",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|INS_KPI_LOG ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//记录KPI his
+int GETKPIMgr::insertKPIHis(char *ym,stAuditKPICfg *kpicfg,char *bah_ins,char *org_ins,char *date_ins,char *form_ins,long records,char *audit_type)
+{
+	int iRet = RET_OK;
+	char crecords[14+1] = {0};
+	sprintf(crecords,"%ld",records);
+	
+	map<string,string> inParams;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("PARAMETER"),string(kpicfg->Parameter)));
+	inParams.insert(pair<string,string>(string("AUDIT_TYPE"),string(audit_type)));
+	inParams.insert(pair<string,string>(string("BAH_INS"),string(bah_ins)));
+	inParams.insert(pair<string,string>(string("ORG_INS"),string(org_ins)));
+	inParams.insert(pair<string,string>(string("DATE_INS"),string(date_ins)));
+	inParams.insert(pair<string,string>(string("FORM_INS"),string(form_ins)));
+	inParams.insert(pair<string,string>(string("AUDIT_RECORDS"),string(crecords)));
+	
+	iRet = m_Ibear->DML("INS_KPI_HIS",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|INS_KPI_HIS ERR_MSG[%s]\n",m_Ibear->no_error,m_Ibear->sql_error);
+		return iRet;
+	}
+	
+  return 0;
+}
+
+//一次稽核数据上锁
+int GETKPIMgr::updFristAuditLock(char *ym, char *table_name,char *p_count,char * p_num)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("P_COUNT"),string(p_count)));
+	inParams.insert(pair<string,string>(string("NUM"),string(p_num)));
+	iRet = m_Ibear->DML("UPD_FRIST_LOCK",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|UPD_FRIST_LOCK[%s_%s] ERR_MSG[%s]\n",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+		return iRet;
+	}
+  return RET_OK;
+}
+
+//一次稽核数据解锁
+int GETKPIMgr::updFristAuditUnLock(char *ym, char *table_name,char *batchsn)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	iRet = m_Ibear->DML("UPD_FRIST_UNLOCK",inParams);
+	if (iRet != 0 && iRet != 1)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|UPD_FRIST_UNLOCK[%s_%s] ERR_MSG[%s]\n",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+		return iRet;
+	}
+  return RET_OK;
+}
+
+//获取一次稽核数据
+int GETKPIMgr::getFristAudit(char *ym, char *table_name)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	iRet = m_Ibear->queryForList("SEL_FRIST",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|SEL_FRIST[%s_%s] ERR_MSG[%s]\n",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		stAuditKPIs *order = new stAuditKPIs();
+		strcpy(order->bah_ins,v_row[0].c_str());
+		strcpy(order->merge_type,v_row[1].c_str());
+		strcpy(order->audit_id,v_row[2].c_str());
+		order->records = atol(v_row[3].c_str());
+		order->amount = atol(v_row[4].c_str());
+		strcpy(order->date_ins ,v_row[5].c_str());
+		strcpy(order->org_ins ,v_row[6].c_str());
+		map<string,vector<stAuditKPIs*> >::iterator itt = VB.find(v_row[0]);
+		
+		if (itt == VB.end())
+		{
+			vector<stAuditKPIs*> VA;
+			VA.push_back(order);
+			VB.insert(pair<string,vector<stAuditKPIs*> >(v_row[0],VA));
+		}
+		else 
+		{
+			(itt->second).push_back(order);
+		}
+	}
+  return iRet;
+}
+
+//根据批次判断所有公式是否平衡
+int GETKPIMgr::ProBatchProcess(vector<stAuditKPIs*> VA)
+{
+	int iRet = RET_OK;
+	bool isall_ok = true;//一个批次的公式是否全部平衡
+	//循环公式
+	char batchsn[64+1] = {0};
+	char org_ins[20+1] = {0};
+	char date_ins[20+1] = {0};
+	for (vector<stAuditKPIs*>::iterator it = VA.begin();it!=VA.end();it++ )
+	{
+		stAuditKPIs *kpis = *it;
+		strcpy(batchsn,kpis->bah_ins);
+		strcpy(org_ins,kpis->org_ins);
+		strcpy(date_ins,kpis->date_ins);
+		break;
+	}
+	for (vector<stAuditKPICfg*>::iterator it = m_AuditKPICfgs.begin();it!=m_AuditKPICfgs.end();it++)
+	{
+		stAuditKPICfg *kpicfg = *it;
+		//判断该公式是否与该批次有关
+		int isrelation = 0;
+		for (vector<stAuditKPIs*>::iterator it = VA.begin();it!=VA.end();it++ )
+		{
+			stAuditKPIs *kpis = *it;
+			if (strstr(kpicfg->Audit_form,kpis->audit_id) != NULL)
+			{
+				isrelation = 1;
+				break;
+			}
+		}
+		if (isrelation == 0)
+		{
+			continue;
+		}
+		m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"(%s)公式[%s],维度[%s,%s,%s]",kpicfg->Audit_type,kpicfg->Audit_form,kpicfg->Dismension_bah,kpicfg->Dismension_org,kpicfg->Dismension_date);
+#ifdef _DEBUG_INFO_
+	printf("(%s)公式[%s],维度[%s,%s,%s]\n",kpicfg->Audit_type,kpicfg->Audit_form,kpicfg->Dismension_bah,kpicfg->Dismension_org,kpicfg->Dismension_date);
+#endif
+		//判断地市级，批次级维度
+		vector<string> operation;//公式运算符
+		vector<vector<string> > values;//公式元素
+		
+		//解析公式
+		if (0 != SplitString (kpicfg->Audit_form,&operation,&values))
+		{
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|解析公式[%s]错误\n",SYSTEM_SPLIT_STRING_IS_ERROR, kpicfg->Audit_form);
+			printf("解析公式错误\n");
+			return RET_FAIL;
+		}
+		
+		long res_records = 0;
+		char form_records[255+1] = {0};
+		long res_amount = 0;
+		char form_amount[255+1] = {0};
+		//循环公式元素
+		iRet = ProFormObjectProcess(values,operation,VA,kpicfg->Audit_type,batchsn,org_ins,date_ins,&res_records,form_records,&res_amount,form_amount);
+		if (iRet != 0)
+		{
+			return iRet;
+		}
+		
+		if (strcmp(kpicfg->Audit_type,"A") == 0)
+		{
+			if (0 != ProFormDeal(res_records,form_records,batchsn,org_ins,date_ins,kpicfg,kpicfg->Audit_type,&isall_ok))
+			{
+				printf("ProFormDeal[A] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+		}
+		else if (strcmp(kpicfg->Audit_type,"B") == 0)
+		{
+			if (0 != ProFormDeal(res_amount,form_amount,batchsn,org_ins,date_ins,kpicfg,kpicfg->Audit_type,&isall_ok))
+			{
+				printf("ProFormDeal[B] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+		}
+		else if (strcmp(kpicfg->Audit_type,"C") == 0)
+		{
+			char type[2+1] = {0};
+			strcpy(type,"A");
+			if (0 != ProFormDeal(res_records,form_records,batchsn,org_ins,date_ins,kpicfg,type,&isall_ok))
+			{
+				printf("ProFormDeal[C record] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+			
+			strcpy(type,"B");
+			if (0 != ProFormDeal(res_amount,form_amount,batchsn,org_ins,date_ins,kpicfg,type,&isall_ok))
+			{
+				printf("ProFormDeal[C amount] is ERROR!!! \n");
+				return RET_FAIL;
+			}
+		}
+		else 
+		{
+			printf("AUDIT_TYPE配置错误[%s]，请检查！！！\n",kpicfg->Audit_type);
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|AUDIT_TYPE配置错误[%s]，请检查！！！",KPITG_AUDITTYPE_CONFIG_ERROR,kpicfg->Audit_type);
+			return RET_FAIL;
+		}
+	}
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"平衡情况[%d]",isall_ok);
+	//批次涉及的公式全部平衡，则删除该批次的值
+	if(isall_ok)
+	{
+		//一次稽核数据入his
+		if (0 != insertFirstStatusHis(m_YM, m_tableName,batchsn))
+		{
+			iRet = RET_FAIL;
+			return iRet;
+		}
+		//删除一次稽核数据
+		if (0 != deleteFristAudit(m_YM, m_tableName,batchsn))
+		{
+			iRet = RET_FAIL;
+			return iRet;
+		}
+	}
+	else 
+	{
+		//修改一次稽核数据
+		//增加稽核次数，修改下次稽核时间
+		if (0 != updateFristAudit(m_YM, m_tableName,batchsn))
+		{
+			iRet = RET_FAIL;
+			return iRet;
+		}
+	}
+	return iRet;
+}
+
+int GETKPIMgr::ProFormDeal(long res,char *form,char *batchsn,char *org_ins,char *date_ins,stAuditKPICfg *kpicfg,char *audit_type,bool *isall_ok)
+{
+	int iRet = 0;
+	//公式平衡
+	bool is_ok = true;
+	char audit_batch[21] = {0};
+	//解析数学公式，获得KPI结果
+#ifdef _DEBUG_INFO_
+	printf("结果 res=%ld\n",res);
+#endif
+	if (res != 0)
+	{
+		is_ok = false;
+	}
+	
+	m_logFile->WriteLog(LOG_FILE_LINE_INFO,LOG_THREAD_MAIN,"【%d】结果：%ld,公式：%s",is_ok,res,form);
+
+	//删除KPI日志
+	if (0 != deleteKPILog(m_YM,batchsn,org_ins,date_ins, kpicfg->Parameter, audit_type))
+	{
+		iRet = RET_FAIL;
+		return iRet;
+	}
+	//KPI未做平，记录KPI的值，并记入his中
+	if(!is_ok)
+	{
+		//记录KPI日志（KPI未做平）
+		if (0 != insertKPILog(m_YM,kpicfg,batchsn,org_ins,date_ins,form,res,audit_type))
+		{
+			iRet = RET_FAIL;
+			return iRet;
+		}
+		//记录KPI his
+		if (0 != insertKPIHis(m_YM,kpicfg,batchsn,org_ins,date_ins,form,res,audit_type))
+		{
+			iRet = RET_FAIL;
+			return iRet;
+		}
+		*isall_ok = false;
+	}
+	return RET_OK;
+}
+
+//执行一个KPI公式，返回该公式的KPI值
+int GETKPIMgr::ProFormObjectProcess(vector<vector<string> > values,vector<string> operation,vector<stAuditKPIs*> VA,char *audit_type,char *batchsn,char *org_ins,char *date_ins,long *res_records,char *form_records,long *res_amount,char *form_amount)
+{
+	int iRet = RET_OK;
+	long res_records_temp = 0,res_amount_temp = 0;
+	char form_records_temp[255+1] = {0};
+	char form_amount_temp[255+1] = {0};
+	char merge_type[100] = {0};
+	char audit_id[10] = {0};
+	vector<stAuditKPIs*> left_values;
+	int ys_num = 0;
+	//解析公式元素，获得每个元素的值
+	for(vector<vector<string> >::iterator it = values.begin();it!= values.end();it++)
+	{
+		int ys_count = 0;//公式中的元素个数
+		int isfind = 0;
+		vector<string> value = *it;
+		string merge_types[20];
+		if (value.size() == 1)
+		{
+			strcpy(audit_id,value[0].c_str());
+			strcpy(merge_type,"");
+#ifdef _DEBUG_INFO_
+	printf("audit_id:%s\n",audit_id);
+#endif
+		}
+		else 
+		{
+			strcpy(audit_id,value[0].c_str());
+			strcpy(merge_type,value[1].c_str());
+#ifdef _DEBUG_INFO_
+	printf("audit_id:%s,merge_type:%s\n",audit_id,merge_type);
+#endif
+			ys_count = SplitStringBySP(merge_type,',',merge_types);
+		}
+		char table_name[256] = {0};
+		map<string,string>::iterator tabit = m_AuditCfg.find(audit_id);
+		if (tabit !=m_AuditCfg.end())
+		{
+			strcpy(table_name,(tabit->second).c_str());
+#ifdef _DEBUG_INFO_
+	printf("table_name=%s\n",table_name);
+#endif
+		}
+		else 
+		{
+			printf("AUDIT_TYPE_CFG配置错误,audit_id[%s]\n",audit_id);
+			m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|AUDIT_TYPE_CFG配置错误,audit_id[%s]",KPITG_AUDITTYPE_CONFIG_ERROR,audit_id);
+			exit(0);
+		}
+		stAuditKPIs *left_kpis = new stAuditKPIs();
+		strcpy(left_kpis->merge_type,merge_type);
+		strcpy(left_kpis->audit_id,audit_id);
+		left_values.push_back(left_kpis);
+		
+#ifdef _DEBUG_INFO_
+	printf("ys_count:%d\n",ys_count);
+#endif
+		for (vector<stAuditKPIs*>::iterator it = VA.begin();it!=VA.end();it++ )
+		{
+			stAuditKPIs *kpis = *it;
+			//处理多个merge_types合并的情况
+			if (ys_count > 1)
+			{
+				for(int i = 0;i<ys_count;i++)
+				{
+#ifdef _DEBUG_INFO_
+	printf("ys_num:%d[%s.....%s]\n",ys_num,kpis->merge_type,merge_types[i].c_str());
+#endif
+					if (strcmp(audit_id,kpis->audit_id) == 0 && strcmp(kpis->merge_type,merge_types[i].c_str()) == 0)
+					{
+						left_values[ys_num]->records += kpis->records;
+						left_values[ys_num]->amount += kpis->amount;
+						isfind = 1;
+						break;
+					}
+					else if(strcmp(audit_id,kpis->audit_id) == 0)
+					{
+						isfind = 1;
+					}
+				}
+			}
+			else if (ys_count == 1)
+			{
+				if (strcmp(audit_id,kpis->audit_id) == 0 && strcmp(merge_type,kpis->merge_type) == 0)
+				{
+					left_values[ys_num]->records += kpis->records;
+					left_values[ys_num]->amount += kpis->amount;
+					isfind = 1;
+				}
+			}
+			else 
+			{
+				if (strcmp(audit_id,kpis->audit_id) == 0)
+				{
+					left_values[ys_num]->records += kpis->records;
+					left_values[ys_num]->amount += kpis->amount;
+					isfind = 1;
+				}
+			}
+		}
+		if (isfind == 0) 
+		{
+			long records_tmp = 0,amount_tmp = 0;
+			if (ys_count > 1)
+			{
+				for(int i = 0;i<ys_count;i++)
+				{
+					char merge_type_tmp[10+1] = {0};
+					strcpy(merge_type_tmp,merge_types[i].c_str());
+					iRet  = getFristAudit(m_YM,table_name,batchsn,merge_type_tmp,audit_id,date_ins,org_ins,&records_tmp,&amount_tmp);
+					if (iRet != 0)
+					{
+						return iRet;
+					}
+					left_values[ys_num]->records += records_tmp;
+					left_values[ys_num]->amount += amount_tmp;
+				}
+			}
+			else 
+			{
+				iRet  = getFristAudit(m_YM,table_name,batchsn,merge_type,audit_id,date_ins,org_ins,&records_tmp,&amount_tmp);
+				if (iRet != 0)
+				{
+					return iRet;
+				}
+				left_values[ys_num]->records = records_tmp;
+				left_values[ys_num]->amount = amount_tmp;
+			}
+		}
+#ifdef _DEBUG_INFO_
+	printf("%d|%ld,%ld\n",ys_num,left_values[ys_num]->records,left_values[ys_num]->amount);
+#endif
+		ys_num++;
+#ifdef _DEBUG_INFO_
+	printf("ys_num=%d\n",ys_num);
+#endif
+	}
+	
+	//执行KPI公式
+	int num = 0;
+	long left_records = 0,left_amount = 0;
+	for (vector<stAuditKPIs*>::iterator it = left_values.begin();it!=left_values.end();it++ )
+	{
+		stAuditKPIs *kpis = *it;
+		left_records = kpis->records;
+		left_amount = kpis->amount;
+#ifdef _DEBUG_INFO_
+	printf("left_records=%ld,left_amount=%ld\n",left_records,left_amount);
+#endif
+		if (num == 0)
+		{
+			res_records_temp = left_records;
+			res_amount_temp = left_amount;
+			sprintf(form_records_temp,"%ld",res_records_temp);
+			sprintf(form_amount_temp,"%ld",res_amount_temp);
+		}
+		else 
+		{
+			char opt[1+1] = {0};
+			strcpy(opt,operation[num-1].c_str());
+			if (strcmp(opt,"+") == 0)
+			{
+				res_records_temp += left_records;
+				res_amount_temp += left_amount;
+				sprintf(form_records_temp,"%s+%ld",form_records_temp,left_records);
+				sprintf(form_amount_temp,"%s+%ld",form_amount_temp,left_amount);
+			}
+			else if (strcmp(opt,"-") == 0)
+			{
+				res_records_temp -= left_records;
+				res_amount_temp -= left_amount;
+				sprintf(form_records_temp,"%s-%ld",form_records_temp,left_records);
+				sprintf(form_amount_temp,"%s-%ld",form_amount_temp,left_amount);
+			}
+			else 
+			{
+				iRet = RET_FAIL;
+				printf("公式配置错误!!!\n");
+				return iRet;
+			}
+		}
+		num++;
+	}
+	clearDataList(left_values);
+	if (strcmp(audit_type,"A") == 0)
+	{
+		*res_records = res_records_temp;
+		strcpy(form_records,form_records_temp);
+	}
+	else if (strcmp(audit_type,"B") == 0)
+	{
+		*res_amount = res_amount_temp;
+		strcpy(form_amount,form_amount_temp);
+	}
+	else if (strcmp(audit_type,"C") == 0)
+	{
+		*res_records = res_records_temp;
+		*res_amount = res_amount_temp;
+		strcpy(form_records,form_records_temp);
+		strcpy(form_amount,form_amount_temp);
+	}
+	else 
+	{
+		printf("AUDIT_TYPE配置错误[%s]，请检查！！！\n",audit_type);
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|AUDIT_TYPE配置错误[%s]，请检查！！！",KPITG_AUDITTYPE_CONFIG_ERROR,audit_type);
+		return RET_FAIL;
+	}
+	return iRet;
+}
+
+int GETKPIMgr::getFristAudit(char *ym, char *table_name,char *batchsn,char *merge_type,char *audit_id,char *day_billcycl,char *region_code,long *records,long *amount)
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<string> v_row;
+	inParams.insert(pair<string,string>(string("YM"),string(ym)));
+	inParams.insert(pair<string,string>(string("TYPE"),string(table_name)));
+	inParams.insert(pair<string,string>(string("BATCHSN"),string(batchsn)));
+	inParams.insert(pair<string,string>(string("AUDIT_ID"),string(audit_id)));
+	inParams.insert(pair<string,string>(string("DAY_BILLCYCL"),string(day_billcycl)));
+	inParams.insert(pair<string,string>(string("REGION_CODE"),string(region_code)));
+	if (strcmp(merge_type,"") != 0)
+	{
+		printf("merge_type:%s\n",merge_type);
+		inParams.insert(pair<string,string>(string("MERGE_TYPE"),string(merge_type)));
+	}
+	
+	iRet = m_Ibear->queryForObject("SEL_FRIST_REC",inParams,&v_row);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|SEL_FRIST_REC[%s_%s] ERR_MSG[%s]",m_Ibear->no_error,table_name,ym,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	if (v_row.size() > 0)
+		*records = atol(v_row[0].c_str());
+		*amount = atol(v_row[1].c_str());
+		
+  return iRet;
+}
+
+int GETKPIMgr::getAuditcfg()
+{
+	int iRet = RET_OK;
+	map<string,string> inParams;
+	vector<vector<string> > list;
+	iRet = m_Ibear->queryForList("SEL_AUDIT_CFG",inParams,&list);
+	if (iRet != 0)
+	{
+		m_logFile->WriteLog(LOG_FILE_LINE_ERROR,LOG_THREAD_MAIN,"%s|SEL_AUDIT_CFG ERR_MSG[%s]",m_Ibear->no_error,m_Ibear->sql_error);
+    iRet = RET_FAIL;
+		return iRet;
+	}
+	
+	for (vector<vector<string> >::iterator it = list.begin();it!=list.end();it++)
+	{
+		vector<string> v_row = *it;
+		m_AuditCfg.insert(pair<string,string>(v_row[0],v_row[1]));
+	}
+	
+  return iRet;
+}
+
+int GETKPIMgr::ProInterface(map<string,string> *values)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+int GETKPIMgr::UpdPoorStatus(stDealTask *pTask)
+{
+	int iRet = 0;
+	return iRet;
+}
+
+

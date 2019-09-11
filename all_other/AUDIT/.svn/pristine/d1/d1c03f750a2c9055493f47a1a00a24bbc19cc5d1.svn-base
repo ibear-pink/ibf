@@ -1,0 +1,84 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/3/1 14:59:14
+ * 编码人员:wangzhia
+*/
+
+#ifndef _CPUBLIC_MANAGER_H_
+#define _CPUBLIC_MANAGER_H_
+
+#include <algorithm>
+#include <signal.h>
+#include <iostream>
+#include <vector>
+#include <map>
+#include <set>
+#include <cstring>
+#include <string.h>
+#include <dirent.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <unistd.h>
+#include <time.h>
+#include <pthread.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/msg.h>
+#include <sys/types.h>
+#include <errno.h>
+
+#include "CDealData.h"
+#include "stop_db_conn.h"
+#include "cfgfile.h"
+#include "Define.h"
+#include "stop_error.h"
+#include "stop_com_type.h"
+#include "CDealFile.h"
+#include "jni.h"
+#include "httpclient.h"
+#include "cJSON.h"
+#include "avltree.h"
+#include "Task.h"
+#include "Thread.h"
+#include "CMutexLock.h"
+#include "CLogManager.h"
+#include "poor.h"
+
+using namespace std;
+
+class CPublicMgr
+{
+public:
+	CPublicMgr();
+	~CPublicMgr();
+	
+	//个性化-初始化
+	virtual int init(ibear *br,stAppCfg_Proc_Server *pServerCfg, stAppCfg_System *pInfo, stAppCfg_ParseFile *pParseFile, STOP_COMMON_CONF *conf_info, char *processName,int processNum,int log_thread_num)=0;
+	//个性化-接口类型处理
+	virtual int process()=0;
+	//个性化-获取数据源
+	virtual int ProInterface(map<string,string> *values)=0;
+	//个性化-修改池标示
+	virtual int UpdPoorStatus(stDealTask *pTask)=0;
+	
+	int selectAppRun(char *host_id,char *app_id,char *app_ctrl,char *load_static);
+	int updateAppRun(char *app_name);
+	int updateAppRunStart(char *host_id,char *app_id,char *app_name,char *app_pid);
+	int updateAppRunStop(char *host_id,char *app_id);
+	
+	int appStart(ibear *br,char *host_id,char *app_id,char *app_name,char *app_pid);
+	int isAppStop(char *host_id,char *app_id);
+	int appStop(char *host_id,char *app_id);
+	char *getErrInfo();
+	
+	char m_szErrInfo[1024];
+	bool m_bIsAppStart;
+	ibear *m_Ibear;
+};
+
+#endif

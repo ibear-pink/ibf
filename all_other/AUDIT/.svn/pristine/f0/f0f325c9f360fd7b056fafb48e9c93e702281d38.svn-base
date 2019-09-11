@@ -1,0 +1,2973 @@
+/**************************
+* 服务名称:rtStopPub
+* 功能描述:公共文件
+* 程序版本:V1.0
+* 编码日期:2011/11/09
+* 编码人员:
+**************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/time.h>
+#include "rtStopPub.h"
+
+#ifndef _DEBUG_
+#define _DEBUG_
+#endif 
+char curSysDatetime[18];
+
+/******************* zhangdg add 20130703 ************************\
+*  函 数 名  :         *CurrSysDate
+*  程序功能  :         通过内部函数获取当前时间的不同展现形式
+*  输    入  :         表达式选项option
+*  输    出  :         成功:1 失败:<0
+*  返    回  :         日期字符串
+\*****************************************************************/
+char* CurrSysDate(int option)
+{
+   struct tm timeptr;
+   time_t now;
+   static char now_date[50];
+   static char now_time[50];
+   static char now_datetime[100];
+   char temptime[15];
+
+   memset(now_date,0,sizeof(now_date));
+   memset(now_time,0,sizeof(now_time));
+   memset(now_datetime,0,sizeof(now_datetime));
+
+   time(&now);
+   timeptr=*localtime(&now);
+   if(option==0) /*YYYY-MM-DD*/
+   {
+      sprintf(now_date,"%04d-%02d-%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday);
+      return now_date;
+   }
+   if(option==1) /*YYYY/MM/DD*/
+   {
+      sprintf(now_date,"%04d/%02d/%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday);
+      return now_date;
+   }
+   if(option==2) /*YYYY.MM.DD*/
+   {
+      sprintf(now_date,"%04d.%02d.%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday);
+      return now_date;
+   }
+
+   if(option==3) /*HH:MM:SS*/
+   {
+      sprintf(now_time,"%02d:%02d:%02d",timeptr.tm_hour,timeptr.tm_min,timeptr.tm_sec);
+      return now_time;
+   }
+   if(option==4) /*HHMMSS*/
+   {
+      sprintf(now_time,"%02d%02d%02d",timeptr.tm_hour,timeptr.tm_min,timeptr.tm_sec);
+      return now_time;
+   }
+   if(option==5) /*YYYY-MM-DD HH:MM:SS*/
+   {
+      sprintf(now_datetime,"%04d-%02d-%02d %02d:%02d:%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday,timeptr.tm_hour,timeptr.tm_min,timeptr.tm_sec);
+      return now_datetime;
+   }
+   if(option==13) /*YYYY/MM/DD HH:MM:SS*/
+   {
+      sprintf(now_datetime,"%04d/%02d/%02d %02d:%02d:%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday,timeptr.tm_hour,timeptr.tm_min,timeptr.tm_sec);
+      return now_datetime;
+   }
+   if(option==14) /*YYYY-MM-DDHHMMSS*/
+   {
+      memset(temptime,0,15);
+      strcpy(temptime,CurrSysDate(0));
+      strcat(temptime,CurrSysDate(4));
+      strcpy(now_datetime,temptime);
+   }
+   if(option==15) /*YYYYMMDD*/
+   {
+      sprintf(now_datetime,"%04d%02d%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday);
+   }
+   if(option==16) /*YYYYMMDDHHMMSS*/
+   {
+      sprintf(now_datetime,"%04d%02d%02d",1900+timeptr.tm_year,timeptr.tm_mon+1,timeptr.tm_mday);
+      memset(temptime,0,15);
+      strcpy(temptime,CurrSysDate(15));
+      strcat(temptime,CurrSysDate(4));
+      strcpy(now_datetime,temptime);
+   }
+   if(option==17)
+   {
+      sprintf(now_time,"%02d",timeptr.tm_hour);
+      return now_time;
+   }
+   return now_datetime;
+}
+
+
+/*add by huanghl 去空格*/
+char *Trim(char *S)
+{
+  int I = 0, i = 0, L = 0;
+  if (S == NULL)
+  {
+    return S;
+  }
+  L = strlen(S) - 1;
+  I = 0;
+  while ( (I <= L) && (S[I] <= ' ') && (S[I] > 0) )
+  {
+    I ++;
+  }
+  if (I > L)
+  {
+    S[0] = '\0';
+  }
+  else
+  {
+    while ( (S[L] <= ' ')  && (S[L] > 0 ) )
+    {
+      L --;
+    }
+    strncpy(S, S + I, L + 1);
+    S[L + 1 - I] = '\0';
+  }
+  return S;
+}
+
+char * Ltrim(char *str)
+{
+  char *tmp_ptr;
+
+  if(str[0]==0)
+  return str;
+
+  tmp_ptr=str;
+  while(*tmp_ptr==' ' ||*tmp_ptr=='\t')
+  	tmp_ptr++;
+  return strcpy(str,tmp_ptr);
+}
+
+char * Rtrim(char * str)
+{
+  int i;
+
+  if(str[0]==0)
+  return str;
+
+  i=strlen(str)-1;
+
+  while(str[i]==' ' || str[i]=='\t'){
+    i--;
+    if(i<0)
+    break;
+  }
+  str[i+1]=0;
+  return str;
+}
+
+/*add jiahh 20120606*/
+/*实现从doble型转为long型*/
+/*此函数实现类型转换并且扩大100倍*/
+long round_L(double source, int num)
+{
+  char tmpstr[64+1];
+  char tmp1[12+1];
+  long tmpdouble = 0;
+
+  memset(tmpstr, 0, sizeof(tmpstr));
+  memset(tmp1, 0, sizeof(tmp1));
+
+  sprintf(tmp1, "%%12.%df", num);
+  /*rtLog("----jiahh----%.2f",source);*/
+  source=source*100;
+  sprintf(tmpstr, tmp1, source);
+  tmpdouble = atof(tmpstr);
+  return tmpdouble;
+}
+
+/*add by huanghl 2011/11/11 11:29:48*/
+int stradd(char *s)
+{
+  int cur,num,len;
+
+  if(s==NULL)
+    return RET_OK;
+
+  len=strlen(s);
+
+  for(cur=0,num=0;num<len;num++)
+  {
+    if(s[num]!=' ' && s[num]!='\t')
+    {
+      s[cur++]=s[num];
+    }
+  }
+  s[cur]=0;
+  return cur;
+}
+
+int getCurDate(){
+  struct tm *p;
+  time_t t;
+  int curDate;
+
+  t = time(NULL);
+  p = localtime(&t);
+  curDate=(p->tm_year+1900)*10000+(p->tm_mon+1)*100+p->tm_mday;
+  return curDate;
+}
+
+/*add by huanghl获取时间yyyymmdd hh:mi:ss*/
+char *GetSysTime(){
+  struct tm *p;
+  time_t t;
+  memset(curSysDatetime,0,sizeof(curSysDatetime));
+  t = time(NULL);
+  p = localtime(&t);
+  snprintf(curSysDatetime,18,"%d%02d%02d %02d:%02d:%02d",p->tm_year+1900,p->tm_mon+1,p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec);
+  curSysDatetime[17]= '\0';
+  return curSysDatetime;
+}
+
+
+/*
+输入日期偏移addmonth个月
+yearmonth:YYYYMM
+return:YYYYMM
+*/
+int AddMonth(int yearmonth,int addmonth)
+{
+  int i = 0;
+  int one_ym = 0;
+  one_ym = yearmonth;
+  if (addmonth >= 0)
+  {
+    for(i=0;i<addmonth;i++)
+    {
+      one_ym = one_ym + 1;
+      if (one_ym%100==13)
+        one_ym = (one_ym/100+1)*100+1;
+    }
+  }
+  else
+  {
+    for(i=0;i>addmonth;i--)
+    {
+      one_ym = one_ym - 1;
+      if (one_ym%100==0)
+        one_ym = (one_ym/100-1)*100+12;
+    }
+  }
+  return one_ym;
+
+}
+
+/*************************************************************
+Function:       int charpos（const char* source,const char target）
+Description:    找出字符在字符串中首次出现的位置
+Input:          const char* source  需要进行搜索的字符串
+                const char target   需要搜索的字符
+Return:         int   字符出现的位置，返回-1表示没有找到
+Others:
+********************************************************************/
+int charpos(const char* source,const char target)
+{
+    int len,i;
+
+    if (source==NULL||!(len=strlen(source)))
+        return RET_FAIL;
+
+    for(i=0; i<len; i++)
+    {
+        if(source[i]==target)
+            return i;
+    }
+
+    return RET_FAIL;
+}
+
+/**
+
+**/
+int strsplit(char* split_str, char* src_str, const char split_char)
+{
+    int slen = 0, pos;
+    char tmp[INTER_MAX_REGEX_LEN];
+
+    if((slen = strlen(src_str)) < 1)
+        return -2;
+
+    if(slen > INTER_MAX_REGEX_LEN - 1)
+        return RET_FAIL;
+
+    if(split_char == 0)
+        return RET_FAIL;
+
+    pos = charpos(src_str, split_char);
+
+    if(pos < 0)
+    {
+        strcpy(split_str, src_str);
+        src_str[0] = 0;
+        return RET_OK;
+    }
+
+    strcpy(tmp, src_str);
+
+    if(pos > 0)
+    {
+        snprintf(split_str, pos + 1, "%s", tmp);
+    }
+    else
+    {
+        split_str[0] = 0;
+    }
+
+    sprintf(src_str, "%s", tmp + pos + 1);
+
+    return RET_OK;
+}
+/*
+*   参数替换
+*/
+void replaceParam(char *strbuf,char *param_id,char *param_value)
+{
+    char  *p=NULL;       /*指向每次搜索到"param_id"的位置*/
+    char  *head=strbuf;  /*指向未搜索串的头*/
+    char  new_str[1024];     /*参数替换后的串*/
+    memset(new_str, 0, sizeof(new_str));
+
+    int len=strlen(param_id);       /*替换参数标识的长度*/
+
+    while(p=strstr(head,param_id)){
+        *p = '\0';
+        strcat(new_str,head);
+        strcat(new_str,param_value);
+        head=p+len;
+        p=NULL;
+    }
+
+    strcat(new_str,head);
+
+    memset(strbuf, 0, sizeof(strbuf));
+    strcpy(strbuf,new_str);
+
+    return;
+}
+
+/*替换参数模板*/
+int payReplaceParam(char *strbuf,char *pBusiTemplate,char *pXMLFinal)
+{
+    char lsColumnName[30+1];/*存放解析后的字段名*/
+    char lsColumnNameTmp[30+1];/*存放解析后的字段名加"<>"*/
+    char lsSplitTmp[256+1];/*临时存放解析出来的串值*/
+#ifdef _DEBUG_INFO_
+    printf("参数串[%s]\n",strbuf);
+#endif
+    while((strchr(strbuf,',')||strchr(strbuf,'='))!=0)
+    {
+        memset(lsColumnName,0,sizeof(lsColumnName));
+        memset(lsColumnNameTmp,0,sizeof(lsColumnNameTmp));
+        memset(lsSplitTmp,0,sizeof(lsSplitTmp));
+        if(strsplit(lsSplitTmp, strbuf, ',') < 0)
+        {
+          return RET_FAIL;
+        }
+        else
+        {
+            if(strsplit(lsColumnNameTmp, lsSplitTmp, '=') < 0)  /*lsColumnNameTmp:字段名，lsSplitTmp字段值*/
+            {
+                return RET_FAIL;
+            }
+            else
+            {
+                Trim(lsColumnNameTmp);
+                Trim(lsSplitTmp);
+                sprintf(lsColumnName,"${%s}",lsColumnNameTmp);
+                replaceParam(pBusiTemplate,lsColumnName,lsSplitTmp);
+            }
+        }
+
+    }
+
+    /*判断参数个数*/
+    if(strstr(pBusiTemplate,"${")!=0)
+    {
+        printf("入参个数与模板中参数个数不匹配,请检查");
+        return RET_FAIL;
+    }
+
+    strcpy(pXMLFinal,pBusiTemplate);
+#ifdef _DEBUG_INFO_
+    printf("替换成功后，pXMLFinal[%s]\n",pXMLFinal);
+#endif
+    return RET_OK;
+}
+
+
+int getIndex(char *phoneNo){
+  char tmp[5];
+
+  int  i,j;
+  j=0;
+  for(i=7;i<=12;i++){
+    tmp[j]=phoneNo[i];
+    j++;
+  }
+  return(atoi(tmp));
+}
+
+int getFileSize(char *filename){
+  struct stat fstat;
+
+  if(access(filename,F_OK) != 0){
+    return RET_FAIL;
+  }
+  if(stat(filename,&fstat) < 0){
+    return -2;
+  }
+  return(fstat.st_size);
+}
+
+/********************************************************** 
+Function:		copy_file()
+Description:	复制文件  
+Input:			 源文件名 目标文件名
+Output:			 
+Return: 		0 正确；1错误
+Others:			
+**********************************************************/
+#ifdef _SDFS_DEAL_FILE_
+int copy_file(const char *src_file, const char *des_file,SDFS *file)
+{
+	SFILE* des_f = NULL;
+	SFILE* src_f = NULL;
+	int len=0;
+	char buf[BEST_BUF + 4];
+
+	if(!strcmp(src_file,des_file))
+		return 0;
+	if((src_f=sopen(src_file,"rb",file))==NULL)
+	{
+		printf("Can not open file -- %s.\n",src_file);
+		return 1;
+	}
+	if((des_f=sopen(des_file,"wb",file))==NULL)
+	{
+		printf("Can not open file -- %s.\n",src_file);
+		sclose(src_f);
+		return 1;
+	}
+	while(!seof(src_f))
+	{
+		memset(buf,0,sizeof(buf));
+		sread(&buf, BEST_BUF,1,src_f);
+		len = strlen(buf);
+		if(len<1)
+			continue;
+		if(swrite(&buf,len,1,des_f)!=1)
+		{
+			printf("Copy file |%s| to |%s| error!\n",src_file,des_file);
+			sclose(des_f);
+			sclose(src_f);
+			return 1;
+		}
+	}
+
+	sclose(des_f);
+	sclose(src_f);
+	return 0;
+}
+#else
+int copy_file(const char *src_file, const char *des_file)
+{
+	FILE* des_f = NULL;
+	FILE* src_f = NULL;
+	int len=0;
+	char buf[BEST_BUF + 4];
+
+	if(!strcmp(src_file,des_file))
+		return 0;
+	if((src_f=fopen(src_file,"r"))==NULL)
+	{
+		printf("Can not open file -- %s.\n",src_file);
+		return 1;
+	}
+	if((des_f=fopen(des_file,"w"))==NULL)
+	{
+		printf("Can not open file -- %s.\n",src_file);
+		fclose(src_f);
+		return 1;
+	}
+	while(!feof(src_f))
+	{
+		memset(buf,0,sizeof(buf));
+		fread(&buf, BEST_BUF,1,src_f);
+		len = strlen(buf);
+		if(len<1)
+			continue;
+		if(fwrite(&buf,len,1,des_f)!=1)
+		{
+			printf("Copy file |%s| to |%s| error!\n",src_file,des_file);
+			fclose(des_f);
+			fclose(src_f);
+			return 1;
+		}
+	}
+
+	fclose(des_f);
+	fclose(src_f);
+	return 0;
+}
+#endif
+
+/********************************************************** 
+Function:		move_file()
+Description:	移动文件  
+Input:			 源文件名 目标文件名
+Output:			 
+Return: 		0 正确；1错误
+Others:			
+**********************************************************/
+#ifdef _SDFS_DEAL_FILE_
+int move_file(const char *src_file, const char *des_file,SDFS *file)
+{
+	if(strcmp(src_file,des_file)==0)
+		return 0;
+	if( srename(src_file,des_file,file) != 0 )
+	{
+    if(copy_file(src_file,des_file,file))
+			return 1;
+
+		sremove(src_file,file);		
+	}	
+	return 0;
+}
+#else
+int move_file(const char *src_file, const char *des_file)
+{
+	if(strcmp(src_file,des_file)==0)
+		return 0;
+	if( rename(src_file,des_file) != 0 )
+	{
+    if(copy_file(src_file,des_file))
+			return 1;
+
+		remove(src_file);		
+	}	
+	return 0;
+}
+#endif
+
+/*
+去掉换行符
+*/
+char * delN(char * a){
+	int l;
+	l=strlen(a);
+	if (a[l-1] == '\n')
+		a[l-1]='\0';
+	return a;
+}
+
+void getCurDateTime (char *sDateTime)
+{
+	struct tm tDateTime;
+	time_t lSeconds;
+	time( &lSeconds );
+	localtime_r( &lSeconds, &tDateTime );
+	
+	sprintf (sDateTime, "%04d%02d%02d%02d%02d%02d", tDateTime.tm_year + 1900, tDateTime.tm_mon + 1, tDateTime.tm_mday,\
+ 			tDateTime.tm_hour, tDateTime.tm_min, tDateTime.tm_sec);
+ 			
+ 	sDateTime[14] = '\0';
+}
+
+void getCurDate (char *sDateTime)
+{
+	struct tm tDateTime;
+	time_t lSeconds;
+	time( &lSeconds );
+	localtime_r( &lSeconds, &tDateTime );
+	
+	sprintf (sDateTime, "%04d%02d%02d", tDateTime.tm_year + 1900, tDateTime.tm_mon + 1, tDateTime.tm_mday);
+ 			
+ 	sDateTime[8] = '\0';
+}
+
+long getUTime()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (((unsigned long)tv.tv_sec) * 1000*1000 + ((unsigned long)tv.tv_usec)); 
+}
+
+void getCurUTime( char *sDateTime )
+{
+	struct tm tDateTime;
+	struct timeval tuDateTime;
+	time_t lSeconds;
+	time( &lSeconds );
+	localtime_r( &lSeconds, &tDateTime );
+	gettimeofday( &tuDateTime, NULL );
+	localtime_r( &tuDateTime.tv_sec, &tDateTime );
+	
+	sprintf( sDateTime, "%04d%02d%02d%02d%02d%02d.%06ld", tDateTime.tm_year + 1900, tDateTime.tm_mon + 1, tDateTime.tm_mday,	tDateTime.tm_hour, tDateTime.tm_min, tDateTime.tm_sec, tuDateTime.tv_usec );
+}
+
+int isInStr(char *tmpStr,char *lValue)
+{
+	int i = 0, end = 0, begin = 0, size = 0;
+	bool exist = false, out = false;
+	char temp[1024] = {0}, tStr1[10] = {0};
+	
+	if (tmpStr[0] == '!')
+	{
+		out = true;
+		strcpy(temp,tmpStr+1);
+	}
+	else
+	{
+		strcpy(temp,tmpStr);
+	}
+	int len = strlen(temp);
+	//printf("len=%d\n",len);
+	if (len == 0)
+	{
+		return 1;
+	}
+	if (temp[len-1] != '|')
+	{
+		temp[len] = '|';
+		len ++;
+	}
+	
+	//printf("tmpStr【%s】|temp【%s】\n",tmpStr,temp);
+	
+	while (temp[i] != '\0' && i <= len)
+	{
+		if (temp[i] == '|')
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		size++;
+		
+		memcpy (tStr1, temp+begin, end - begin);
+		tStr1[end-begin] = '\0';
+		//printf("tStr1=%s,lValue=%s\n",tStr1,lValue);
+		if (strcmp (tStr1, lValue) == 0)
+		{
+			exist = true;
+			break;
+		}
+		
+		begin = i;
+	}
+	
+	//printf("exist=%d,out=%d\n",exist,out);
+	//无"!":存在，返回0
+	//有"!":不存在，返回0
+	//其他:返回1
+	if ((out && !exist) || (!out && exist))
+		return 0;
+	else
+		return 1;
+}
+
+int sms_build(char *tpl_content,char *smscontent,int args, ... )
+{
+	int iRet = 0;
+	int  number=0;
+	va_list vaList;
+	char *param=NULL;
+	char repedStr[20+1];
+	char smsOutStr[1024+1];
+	char smsInStr[1024+1];
+	
+	memset(smsInStr,0,sizeof(smsInStr));
+	memset(smsOutStr,0,sizeof(smsOutStr));
+
+//	smsInStr 这个字符串的值，最开始从数据库里面选择出来的短信模板
+//  例如：尊敬的客户(用户号码${1})，截止${2}月${3}日${4}时${5}分，您的帐户余额已低于${6}元，登陆www.10010.com，轻松缴话费，也可发送短信"CZ#充值卡密码"到10010充值或到联通营业厅缴费,以免影响您的正常使用.
+	strcpy(smsInStr,tpl_content);
+	
+	va_start( vaList, args);
+  for(number=1;number<=args;++number) 
+  { 
+		param=va_arg(vaList,char*); 
+		if(strcmp(param,"") == 0) 
+		{
+			va_end( vaList );
+			return RET_FAIL;
+		}
+		memset(repedStr,0,sizeof(repedStr));
+		sprintf(repedStr,"${%d}",number);
+		memset(smsOutStr,0,sizeof(smsOutStr));
+		
+		#ifdef _DEBUG_INFO_
+			printf("repedStr=[%s],param=[%s]\n", repedStr,param);
+		#endif
+		
+		if( NULL==sms_strrep((char *)smsInStr,(char *)smsOutStr,repedStr,param))
+		{
+			return RET_FAIL;
+		}
+		memset(smsInStr,0,sizeof(smsInStr));
+		strcpy(smsInStr,smsOutStr);
+  } 
+  va_end( vaList );
+  
+  if(args==0)
+  {
+  	memset(smsOutStr,0,sizeof(smsOutStr));
+  	strcpy((char *)smsOutStr,smsInStr);   //此时的smsOutStr字符串就是根据传入参数替换后的短信内容	
+  }
+  strcpy(smscontent,smsOutStr);
+  
+  return RET_OK;
+}
+
+char * sms_strrep(char *pInput, char *pOutput, char *pSrc, char *pDst)
+{
+  char *pi, *po, *p;
+  int nSrcLen, nDstLen, nLen;
+	if(pInput==NULL
+	||pOutput==NULL
+	||pSrc==NULL
+	||pDst==NULL)
+	{      
+		return NULL;
+	}
+  /* 指向输入字符串的游动指针.*/
+  pi = pInput;
+  /* 指向输出字符串的游动指针.*/
+  po = pOutput;
+  /* 计算被替换串和替换串的长度.*/
+  nSrcLen = strlen(pSrc);
+  nDstLen = strlen(pDst);
+
+  /* 查找pi指向字符串中第一次出现替换串的位置,并返回指针(找不到则返回null).*/
+  p = strstr(pi, pSrc);
+	if(p) {
+        /* 找到.*/
+        while(p) {
+              /* 计算被替换串前边字符串的长度.*/
+            nLen = (int)(p - pi);
+              /* 复制到输出字符串.*/
+            memcpy(po, pi, nLen);
+            memcpy(po + nLen, pDst, nDstLen);
+              /* 跳过被替换串.*/
+            pi = p + nSrcLen;
+              /* 调整指向输出串的指针位置.*/
+            po = po + nLen + nDstLen;
+              /* 继续查找.*/
+            p = strstr(pi, pSrc);
+        }
+        /* 复制剩余字符串.*/
+       strcpy(po, pi);
+  }
+  else
+  {
+		/* 没有找到则原样复制.*/
+		strcpy(po, pi);
+	}
+	return pOutput;
+}
+
+void PrintDataStream(const unsigned char *pBuf, UnInt32 nLen)
+{
+	printf("-------------------------------------------------------\n");
+	printf("Func[PrintRecData]-->>数据流[Data_Len:%d]--<", nLen);
+	for(int i = 0; i < nLen; i++)
+	{
+		printf("%02x ", pBuf[i]);
+	}
+	printf(">");
+	printf("\n-------------------------------------------------------\n");
+}
+
+void getCurDateTime( char *sDateTime, const char *pattern )
+{
+	char year[5] = {0};
+	char month[3] = {0};
+	char day[3] = {0};
+	char hour[3] = {0};
+	char minute[3] = {0};
+	char second[3] = {0};
+	char week[1+1] = {0};
+	
+	struct tm tDateTime;
+	time_t lSeconds;
+	time( &lSeconds );
+	localtime_r( &lSeconds, &tDateTime );
+	
+	sprintf( year, "%04d", tDateTime.tm_year + 1900);
+	sprintf( month, "%02d", tDateTime.tm_mon + 1 );
+	sprintf( day, "%02d", tDateTime.tm_mday );
+	sprintf( hour, "%02d", tDateTime.tm_hour );
+	sprintf( minute, "%02d", tDateTime.tm_min );
+	sprintf( second, "%02d", tDateTime.tm_sec );
+	sprintf( week, "%d", tDateTime.tm_wday );
+
+	char *loc;
+	char systime[50] = {0};
+	strcpy( systime, pattern );
+	
+	loc = strstr( systime, "yyyy" );
+	if( loc )
+		memcpy( loc, year, 4 );
+
+	loc = strstr( systime, "YY" );
+	if( loc ) 	        
+		memcpy( loc, year + 2, 2 );
+
+	loc = strstr( systime, "mm" );
+	if( loc )
+		memcpy( loc, month, 2 );  	        
+
+	loc = strstr( systime, "dd" );
+	if( loc )
+		memcpy( loc, day, 2 );	        
+	        
+	loc = strstr( systime, "hh" );
+	if( loc )
+		memcpy( loc, hour, 2 );	        
+
+	loc = strstr( systime, "mi" );
+	if( loc )
+		memcpy( loc, minute, 2 );
+
+	loc = strstr( systime, "ss" );
+	if( loc )
+		memcpy( loc, second, 2 );
+	
+	loc = strstr( systime, "w" );
+	if( loc )
+		memcpy( loc, week, 1 );
+
+	strcpy( sDateTime, systime );
+}
+
+void getSysDatetoStr (char *sysDate)
+{
+	time_t sec;
+	struct tm t;
+
+	sec = time(NULL);
+	localtime_r(&sec,&t);
+	sprintf (sysDate,"%04d-%02d-%02d %02d:%02d:%02d",\
+		t.tm_year+1900,t.tm_mon+1,t.tm_mday,\
+		t.tm_hour,t.tm_min,t.tm_sec);
+	
+	sysDate[20] = '\0';
+}
+
+int get_ascii_value_by_pos (char *buff, int pos, char *value)
+{
+	char tmpBuf[4096] = {0};
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	sprintf (tmpBuf, "%s", buff);
+	
+	int len = strlen(tmpBuf);
+
+	tmpBuf[len-1] = '|';
+	tmpBuf[len] = '\0';
+	
+	int i = 0, end = 0, begin = 0, size = 0;
+	
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == '|')
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		size++;
+	
+		if (size == pos)
+		{
+			
+			memcpy (value, tmpBuf+begin, end - begin);
+			value[end-begin] = '\0';
+		
+			break;
+		}
+	
+		begin = i;
+	}
+	
+	return RET_OK;
+}
+
+/******************************************************************************
+功能:	取src中的日期偏移added_mon个月的日期，
+参数：	src		输入日期yyyymmdd
+	  	added_mon	偏移月数
+	  	desc 输出偏移后的日期yyyymm
+返回值：成功	SUCCESS
+		失败	FAIL
+*******************************************************************************/
+int addMonths(char *src,char *desc,int added_mon)
+{
+	char yyyy[4+1] = {0};
+	char mm[2+1] = {0};
+	char dd[2+1] = {0};
+	strncpy(yyyy,src,4);
+	strncpy(mm,src+4,2);
+	strncpy(dd,src+6,2);
+	if( atoi(dd) < 1 ||  atoi(dd) > 31 )
+	{
+		memset(dd,0,sizeof(dd));
+		strcpy(dd,"01");
+	}
+	
+	int year = atoi(yyyy) + (atoi(mm)+added_mon-1)/12;
+	int mon = ((atoi(mm)+added_mon-1)%12)+1;
+	int day = atoi(dd);
+
+ 	while( check_valid_date(year,mon,day) < 0 )
+	{
+		day = day - 1;
+		if( day == 0 )
+		{
+			day = 31;
+			mon = mon - 1;
+			if( mon == 0 )
+			{
+				mon = 12;
+				year = year - 1;
+			}
+		}
+	}
+	
+	sprintf(desc,"%d%02d",year,mon);
+	return RET_OK;
+}
+
+/******************************************************************************
+功能: 检验 year年mon月day日是否是合法的日期
+参数： year 年
+   mon 月
+day 日
+返回值：成功 SUCCESS 0
+失败 FAIL    -1
+*******************************************************************************/
+int check_valid_date(int year,int mon,int day)
+{
+	int MonthLastDay[13]= {0,31,28,31,30,31,30,31,31,30,31,30,31};
+	//简单的check日 和 月的合法性
+	if( day < 1 || mon > 12 || mon < 1 )
+	{
+		return RET_FAIL;
+	}
+	 
+	if( (year%4==0&&year%100!=0) || year%400==0 ) //闰年
+	{
+		if( mon == 2 && day > 29 )
+		{
+			return RET_FAIL;
+		}
+		else
+		{
+			if( day > MonthLastDay[mon] )
+				return RET_FAIL;
+		}
+	}
+	else //非闰年
+	{
+		if( day > MonthLastDay[mon] )
+			return RET_FAIL;
+	}
+	 
+	return RET_OK;
+}
+
+int getArea(char * user,char * area)
+{
+	if(strncmp(user,"11",2) == 0)
+	{
+		strncpy(area,"A",1);
+	}
+	else if(strncmp(user,"12",2) == 0)
+	{
+		strncpy(area,"B",1);
+	}
+	else if(strncmp(user,"13",2) == 0)
+	{
+		strncpy(area,"C",1);
+	}
+	else if(strncmp(user,"14",2) == 0)
+	{
+		strncpy(area,"D",1);
+	}
+	else if(strncmp(user,"15",2) == 0)
+	{
+		strncpy(area,"E",1);
+	}
+		else if(strncmp(user,"16",2) == 0)
+	{
+		strncpy(area,"F",1);
+	}
+	else if(strncmp(user,"17",2) == 0)
+	{
+		strncpy(area,"G",1);
+	}
+	else if(strncmp(user,"18",2) == 0)
+	{
+		strncpy(area,"H",1);
+	}
+	else if(strncmp(user,"19",2) == 0)
+	{
+		strncpy(area,"J",1);
+	}
+	else if(strncmp(user,"20",2) == 0)
+	{
+		strncpy(area,"K",1);
+	}
+	else if(strncmp(user,"21",2) == 0)
+	{
+		strncpy(area,"L",1);
+	}
+	else if(strncmp(user,"22",2) == 0)
+	{
+		strncpy(area,"M",1);
+	}
+	else if(strncmp(user,"23",2) == 0)
+	{
+		strncpy(area,"N",1);
+	}
+	else if(strncmp(user,"24",2) == 0)
+	{
+		strncpy(area,"P",1);
+	}
+	else if(strncmp(user,"25",2) == 0)
+	{
+		strncpy(area,"Q",1);
+	}
+	else if(strncmp(user,"26",2) == 0)
+	{
+		strncpy(area,"R",1);
+	}
+	else if(strncmp(user,"27",2) == 0)
+	{
+		strncpy(area,"S",1);
+	}
+	return RET_OK;
+}
+
+int char_replace(char* fstr, const char target, const char rp)
+{
+    int len = strlen(fstr);
+
+    if (len < 1)
+    {
+		return RET_QUIT;
+	}
+
+    for (int i = 0; i < len; i++)
+    {
+		if(fstr[i] == target)
+		{
+			fstr[i] = rp;
+		}
+    }
+
+    return RET_OK;
+}
+
+/* 根据原日期加上时间秒计算当前日期  */
+char * getEndDate(char * endDate,char * startDate,int s)
+{
+	time_t sec;
+	struct tm t;
+	
+	if( strlen(startDate) == 14 )
+		sec = getSec2(startDate) + s;
+	else    
+		sec = getSec2(startDate,(char *)"120000") + s;
+	localtime_r(&sec,&t);
+	sprintf(endDate,"%04d%02d%02d%02d%02d%02d",t.tm_year+1900,t.tm_mon+1,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
+	endDate[14]='\0';
+	return endDate;
+}
+
+/* 根据14位日期计算从1970年00:00:00以来的秒数 */
+time_t getSec2(char * callDate)
+{
+	char sTmp[4+1];
+	int  y,m,d,h,n,s;
+	time_t sec;
+	struct tm t;
+	
+	if( strncmp(callDate,"2030",4) > 0 ) return 1609430399;
+	if( strncmp(callDate,"2000",4) < 0 ) return 946656000;
+	
+	subStrCpy(sTmp,callDate,0,4);
+	y=atoi(sTmp);
+	subStrCpy(sTmp,callDate,4,2);
+	m=atoi(sTmp);
+	subStrCpy(sTmp,callDate,6,2);
+	d=atoi(sTmp);
+	subStrCpy(sTmp,callDate,8,2);
+	h=atoi(sTmp);
+	subStrCpy(sTmp,callDate,10,2);
+	n=atoi(sTmp);
+	subStrCpy(sTmp,callDate,12,2);
+	s=atoi(sTmp);
+	
+	sec=time(NULL);
+	localtime_r(&sec,&t);
+	
+	t.tm_year = y - 1900;
+	t.tm_mon  = m - 1;
+	t.tm_mday = d;
+	t.tm_hour = h;
+	t.tm_min  = n;
+	t.tm_sec  = s;
+	
+	sec = mktime(&t);
+	return sec;
+}
+
+/* 根据14位日期计算从1970年00:00:00以来的秒数 */
+time_t getSec2(char * callDate,char * callTime)
+{
+	char sTmp[4+1];
+	int  y,m,d,h,n,s;
+	time_t sec;
+	struct tm t;
+	
+	if( strncmp(callDate,"2030",4) > 0 ) return 1609430399;
+	if( strncmp(callDate,"2000",4) < 0 ) return 946656000;
+	
+	subStrCpy(sTmp,callDate,0,4);
+	y=atoi(sTmp);
+	subStrCpy(sTmp,callDate,4,2);
+	m=atoi(sTmp);
+	subStrCpy(sTmp,callDate,6,2);
+	d=atoi(sTmp);
+	subStrCpy(sTmp,callTime,0,2);
+	h=atoi(sTmp);
+	subStrCpy(sTmp,callTime,2,2);
+	n=atoi(sTmp);
+	subStrCpy(sTmp,callTime,4,2);
+	s=atoi(sTmp);
+	
+	sec=time(NULL);
+	localtime_r(&sec,&t);
+	
+	t.tm_year = y - 1900;
+	t.tm_mon  = m - 1;
+	t.tm_mday = d;
+	t.tm_hour = h;
+	t.tm_min  = n;
+	t.tm_sec  = s;
+	
+	sec = mktime(&t);
+	return sec;
+}
+
+/*  字符串截断拷贝  */
+char * subStrCpy(char * o,char * s,int startLocation,int length)
+{
+	memset(o,0,length+1);
+	memcpy(o,s+startLocation,length);
+	o[length]='\0';
+	return o;
+}
+
+int is_leap_year(const int year)
+{
+  if(year%400==0||(year%4==0&&year%100!=0))
+		return RET_QUIT;
+
+  return RET_OK;
+}
+
+int get_month_day(const int year, const int month)
+{
+  if(month==2)
+  {
+          if(is_leap_year(year))
+                  return 29;
+          else
+                  return 28;
+  }
+
+  if((month<8&&month%2==0)||(month>7&&month%2!=0))
+          return 30;
+
+  return 31;
+}
+
+
+void addday (int year, int month, int day, int spareDay, int *d_year, int *d_month, int *d_day)
+{
+	*d_year = year;
+	*d_month = month;
+	*d_day = day;
+	
+	int spare = 0;
+	
+	int v[13]={0,31,29,31,30,31,30,31,31,30,31,30,31};
+	int u[13]={0,31,28,31,30,31,30,31,31,30,31,30,31};
+	
+	int checkYear = 0;
+	
+	if ((year % 4 == 0 && year % 100 != 0 ) || year % 400 == 0) 
+	{
+		checkYear = 1;
+	}
+	
+	if (spareDay >= 0)
+	{
+		if (checkYear == 1)
+		{
+			spare = day + spareDay - v[*d_month];
+			if (spare <= 0)
+			{
+				*d_day = day + spareDay;
+				return;
+			}
+			else
+			{
+				month++;
+				day = 0;
+				if (month > 12)
+				{
+					year++;
+					month = 1;
+				}
+				*d_year = year;
+				*d_month = month;
+				
+				addday (year, month, day, spare, d_year, d_month, d_day);
+			}
+		}
+		else
+		{
+			spare = day + spareDay - u[*d_month];
+			if (spare <= 0)
+			{
+				*d_day = day + spareDay;
+				return;
+			}
+			else
+			{
+				month++;
+				day = 0;
+				if (month > 12)
+				{
+					year++;
+					month = 1;
+				}
+				*d_year = year;
+				*d_month = month;
+				
+				addday (year, month, day, spare, d_year, d_month, d_day);
+			}
+	    }
+	}
+	else
+	{
+		if (checkYear == 1)
+		{
+			spare = day + spareDay;
+			if (spare > 0)
+			{
+				*d_day = spare;
+				return;
+			}
+			else if (spare == 0)
+			{
+				month--;
+				if (month <= 0)
+				{
+					year--;
+					month = 12;
+				}
+	
+				*d_year = year;
+				*d_month = month;
+				*d_day = v[month];
+				return;
+			}
+			else
+			{
+				month--;
+				day = v[month];
+				if (month <= 0)
+				{
+					year--;
+					month = 12;
+				}
+			
+				addday (year, month, day, spare, d_year, d_month, d_day);
+			}
+		}
+		else
+		{
+			spare = day + spareDay;
+			if (spare > 0)
+			{
+				*d_day = spare;
+				return;
+			}
+			else if (spare == 0)
+			{
+				month--;
+				day = u[month];
+				if (month <= 0)
+				{
+					year--;
+					month = 12;
+				}
+
+				*d_year = year;
+				*d_month = month;
+				*d_day = u[month];
+				return;
+			}
+			else
+			{
+				month--;
+				day = u[month];
+				if (month <= 0)
+				{
+					year--;
+					month = 12;
+				}
+
+				addday (year, month, day, spare, d_year, d_month, d_day);
+			}
+	  }
+	}
+}
+
+void addDays (char *src, int days, char *des)
+{
+	int year = 0, month = 0, day = 0;
+	int d_year = 0, d_month = 0, d_day = 0;
+	char s_year[4+1] = {0};
+	char s_month[2+1] = {0};
+	char s_day[2+1] = {0};
+	
+	strncpy (s_year, src, 4);
+	s_year[4] = '\0';
+	strncpy (s_month, src+4, 2);
+	s_month[2] = '\0';
+	strncpy (s_day, src+6, 2);
+	s_day[2] = '\0';
+	
+	year = atoi (s_year);
+	month = atoi (s_month);
+	day = atoi (s_day);
+
+	addday (year, month, day, days, &d_year, &d_month, &d_day);
+	long tmpdate = d_year*10000 + d_month*100 + d_day;
+	sprintf (des, "%ld", tmpdate);
+
+	return;
+}
+
+int SplitString (const char *buff, char *tStr1, char *tStr2)
+{
+	int size = 0;
+	
+	char tmpBuf[1024];
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	
+	strcpy (tmpBuf, buff);
+	
+	int len = strlen(tmpBuf);
+
+	tmpBuf[len] = '^';
+	tmpBuf[len+1] = '\0';
+	
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == '^')
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		size++;
+		
+		if (size == 1)
+		{
+			memcpy (tStr1, tmpBuf+begin, end - begin);
+			tStr1[end-begin] = '\0';
+		}
+		
+		if (size == 2)
+		{
+			memcpy (tStr2, tmpBuf+begin, end - begin);
+			tStr2[end-begin] = '\0';
+		}
+			
+		begin = i;
+	}
+	
+	return RET_OK;
+}
+
+
+int SplitString (const char *buff,string key[])
+{
+	int size = 0;
+	char str[100] = {0};
+	char content[1024];
+	
+	memset (content, 0, sizeof(content));
+	
+	strcpy (content, buff);
+	
+	int len = strlen(content);
+
+	content[len] = '\0';
+#ifdef _DEBUG_INFO_
+	printf("%s\n",content);
+#endif
+	int i = 0, end = 0, begin = 0, flag = 0;
+	while (content[i] != '\0' && i < len)
+	{
+		if (content[i] == '{' && flag != 1)
+		{
+			begin = i;
+			i++;
+			flag = 1;
+			continue;
+		}
+		else if (flag == 1)
+		{
+			//什么都不做
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		if (content[i] == '}')
+		{
+			end = i;
+			i++;
+			flag = 0;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		memset(str,0,sizeof(str));
+		strncpy (str, content+begin+1, end - begin - 1);
+#ifdef _DEBUG_INFO_
+		printf("str=%s,end=%d,begin=%d\n",str,end,begin);
+#endif
+		key[size] = string(str);
+		size++;
+	}
+	return size;
+}
+
+/* 计算两个日期相差时间，
+type=day：天数
+type=hour：小时
+默认：天数*/
+double getDiffDates(char * endDate,char * startDate,char *type)
+{
+	time_t sec1,sec2;
+	struct tm t;
+	
+	sec1 = getSec2(startDate);
+	sec2 = getSec2(endDate);
+	if (strcmp(type,"day")==0)
+		return difftime(sec2,sec1)/86400;
+	else if (strcmp(type,"hour")==0)
+		return difftime(sec2,sec1)/3600;
+	else
+		return difftime(sec2,sec1)/86400;
+}
+
+int createJavaVM()
+{
+	return 0;
+}
+
+/*
+调用服务开通：
+入参：
+id_no 				:用户
+phone_no 			:手机号码
+LOGIN_NO			:操作工号
+OP_CODE				:操作标识
+ORDER_ID			:模板
+owner_flag 		:有主无主标示，必传?'1'为非批量有主，'2'为非批量无主,'3'为批量有主,'4'为批量无主
+run_code 			:新的运行状态
+open_flag 		:服务开通标识，必传?0--只服务开通 1--只更改用户状态 2--即开通又更改用户状态
+fyw_flag 			:分业务停开机标识 0:暂停SVC 1:恢复SVC 2:单停GPRS 3:单停WLAN 4:单停WIFI 5:4G
+string_date 	:参数串: LOGIN_NO=xxxxx,CONTACT_ID=10001234,OP_TIME=20140101125959,OP_CODE=0000
+db_label：		:数据库标签，暂时设置传入字符"DB_A1"
+flag					:运行情况 1工单  2是服务开通
+
+工单：BusiMsgCPP  CPP_opPubOdrSndInter
+CONTACT_ID		:统一流水
+LOGIN_NO			:操作工号
+OP_CODE				:操作标识
+ORDER_ID			:工单模板
+OWNER_FLAG		:1非批量有主 2批量有无主 3批量有主 4批量无主
+STRING_DATA		:工单参数 PHONE_NO=111,NEW_RUN=...
+inDBLabel			:数据库标签
+局拆工单：SvcOrderCpp CPP_opArearStatuInter
+lIdNo					:用户
+sPhoneNo			:手机号码
+sRunCode			:新的运行状态
+sBlackFlag		:是否黑名单
+sOtherData 		:参数串 LOGIN_NO=xxxxx,CONTACT_ID=10001234,OP_TIME=20140101125959,OP_CODE=0000
+inDBLabel			:数据库标签
+服务开通：SvcOrderCpp CPP_opUserStatuInter
+inIdNo 				:用户
+inPhoneNo 		:手机号码
+inOwnerFlag 	:有主无主标示，必传?'1'为非批量有主，'2'为非批量无主,'3'为批量有主,'4'为批量无主
+inNewRun 			:新的运行状态
+inOpenFlag 		:服务开通标识，必传?0--只服务开通 1--只更改用户状态 2--即开通又更改用户状态
+inFywFlag 		:分业务停开机标识 0:暂停SVC 1:恢复SVC 2:单停GPRS 3:单停WLAN 4:单停WIFI 5:4G
+inSvcStr			:0是暂停SVC 1恢复SVC
+sOtherData 		:参数串: LOGIN_NO=xxxxx,CONTACT_ID=10001234,OP_TIME=20140101125959,OP_CODE=0000
+inDBLabel：		:数据库标签，暂时设置传入字符"DB_A1"
+
+*/
+int dealJavaInter(map<int,string> mResult,char* serv_flag)
+{
+	return RET_OK;
+}
+
+int dealJavaInter_LOG(map<int,string> mResult,char* serv_flag,int m_ThreadNum)
+{
+	
+	return RET_OK;
+}
+
+/*
+解析${}数据
+入参：需要解析的串，
+出参：解析后拼接正常的串,参数value值，防止硬解析
+
+int build_sql(map<string,string> m_objectSql,char *tpl_content,char *smscontent,vector<stSQLParam*> *bindParams)
+{
+	int iRet = 0;
+	int  number=0;
+	char param[128] = {0};
+	char repedStr[20+1];
+	char smsOutStr[1024+1];
+	char smsInStr[1024+1];
+	char *p=NULL;
+	int num = 0;
+	int q = 0;
+	int len_str = 0;
+	int len1 = 0;
+	char flag[1+1] = {0};
+	vector<stSQLParam*> tmpBindParams;
+	
+	memset(smsInStr,0,sizeof(smsInStr));
+	memset(smsOutStr,0,sizeof(smsOutStr));
+	
+	strcpy(smsInStr,tpl_content);
+	len_str = strlen(smsInStr);
+	strcpy(flag,"?");
+	stSQLParam *sql_param = NULL;
+  for(map<string,string>::iterator iter = m_objectSql.begin();iter != m_objectSql.end();iter++) 
+  {
+  	sql_param = new stSQLParam();
+  	memset(param,0,sizeof(param));
+		memset(repedStr,0,sizeof(repedStr));
+		string key = iter->first;
+		char ckey[20] = {0};
+		strcpy(ckey ,key.c_str());
+		//printf("ckey=%s\n",ckey);
+		sprintf(repedStr,"${%s}",key.c_str());
+  	p = strstr(smsInStr, repedStr);
+  	if (p != NULL)
+		{
+			len1 = strlen(p);
+			q = len_str-len1;
+			//printf("len1=%d,len_str=%d\n",len1,len_str);
+			if (checkType(ckey) == 1)
+			{
+				strcpy(sql_param->type,SQL_PARAM_CHAR);
+			}
+			else
+			{
+				strcpy(sql_param->type,SQL_PARAM_LONG);
+			}
+			string value = iter->second;
+			strcpy(param ,value.c_str());
+		}
+		else
+		{
+			delete sql_param;
+			sql_param = NULL;
+			//printf("[%s]NULL[%s]--------\n",smsInStr,repedStr);
+			continue;
+		}
+		#ifdef _DEBUG_INFO_
+			printf("repedStr=[%s],param=[%s]\n", repedStr,param);
+		#endif
+		
+		memset(smsOutStr,0,sizeof(smsOutStr));
+		if( NULL==sms_strrep((char *)smsInStr,(char *)smsOutStr,repedStr,flag))
+		{
+			delete sql_param;
+			sql_param = NULL;
+			return RET_FAIL;
+		}
+		memset(smsInStr,0,sizeof(smsInStr));
+		strcpy(smsInStr,smsOutStr);
+		num++;
+		strcpy(sql_param->value,param);
+		tmpBindParams.push_back(sql_param);
+  }
+	*bindParams = tmpBindParams;
+  strcpy(smscontent,smsOutStr);
+	if ( 0 != tmpBindParams.size() )
+	{
+		tmpBindParams.clear();
+	}
+  return RET_OK;
+}
+*/
+/*
+解析${}数据
+入参：需要解析的串，
+出参：解析后拼接正常的串
+*/
+int build_sql(map<string,string> m_objectSql,char *tpl_content,char *smscontent)
+{
+	int iRet = 0;
+	int  number=0;
+	char param[128] = {0};
+	char repedStr[20+1];
+	char smsOutStr[1024+1];
+	char smsInStr[1024+1];
+	char *p=NULL;
+	
+	memset(smsInStr,0,sizeof(smsInStr));
+	memset(smsOutStr,0,sizeof(smsOutStr));
+
+	strcpy(smsInStr,tpl_content);
+	
+  for(map<string,string>::iterator iter = m_objectSql.begin();iter != m_objectSql.end();iter++) 
+  {
+  	memset(param,0,sizeof(param));
+		memset(repedStr,0,sizeof(repedStr));
+		string key = iter->first;
+		sprintf(repedStr,"${%s}",key.c_str());
+  	p = strstr(smsInStr, repedStr);
+  	if (p != NULL)
+		{
+			string value = iter->second;
+			strcpy(param ,value.c_str());
+		}
+		else
+		{
+			//printf("[%s]NULL[%s]--------\n",smsInStr,repedStr);
+			continue;
+		}
+		#ifdef _DEBUG_INFO_
+			//printf("repedStr=[%s],param=[%s]\n", repedStr,param);
+		#endif
+		
+		memset(smsOutStr,0,sizeof(smsOutStr));
+		if( NULL==sms_strrep((char *)smsInStr,(char *)smsOutStr,repedStr,param))
+		{
+			return -1;
+		}
+		memset(smsInStr,0,sizeof(smsInStr));
+		strcpy(smsInStr,smsOutStr);
+  }
+  strcpy(smscontent,smsOutStr);
+  
+  return 0;
+}
+
+
+int checkType(char *key)
+{
+	if (strcmp(key,"phone_no") == 0)
+		return 1;
+	else if (strcmp(key,"run_code") == 0)
+		return 1;
+	else if (strcmp(key,"credit_class") == 0)
+		return 1;
+	else if (strcmp(key,"sm_code") == 0)
+		return 1;
+	else
+		return 0;
+}
+
+int initStructMemberValue(map<string,string>& m_UserIO,void *p,char *className)
+{
+	char value[100] = {0};
+	if (strcmp(className,"stUserInfo") == 0)
+	{
+		stUserInfo *p1 = (stUserInfo*)p;		
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.msisdn",(string)(p1->msisdn)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.valid_flag",(string)(p1->valid_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.stop_flag",(string)(p1->stop_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.credit_code",(string)(p1->credit_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.run_code",(string)(p1->run_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.sm_code",(string)(p1->sm_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.list_type",(string)(p1->list_type)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.red_user",(string)(p1->red_user)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.region_code",(string)(p1->region_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.remind_flag",(string)(p1->remind_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.group_id",(string)(p1->group_id)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.user_grade_code",(string)(p1->user_grade_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.price_product_id",(string)(p1->price_product_id)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.run_time",(string)(p1->run_time)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.open_time",(string)(p1->open_time)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.old_run",(string)(p1->old_run)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.family_code",(string)(p1->family_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.expire_day",(string)(p1->expire_day)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.holiday_stop_flag",(string)(p1->holiday_stop_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.owe_flag",(string)(p1->owe_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.user_stop_flag",(string)(p1->user_stop_flag)));
+		sprintf(value,"%ld",p1->user_id);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.id_no",(string)value));
+		sprintf(value,"%ld",p1->contract_no);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.contract_no",(string)(value)));
+		sprintf(value,"%ld",p1->cust_id);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.cust_id",(string)(value)));
+		sprintf(value,"%d",p1->cart_type);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.cart_type",(string)(value)));
+		sprintf(value,"%d",p1->owner_type);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.owner_type",(string)(value)));
+		sprintf(value,"%ld",p1->master_serv_id);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.master_serv_id",(string)(value)));
+		sprintf(value,"%ld",p1->limit_owe);
+		m_UserIO.insert(pair<string ,string>((string)"stUserInfo.limit_owe",(string)(value)));
+	}
+	else if (strcmp(className,"stStopFeeMsg") == 0)
+	{
+		stStopFeeMsg *p1 = (stStopFeeMsg*)p;
+		sprintf(value,"%ld",p1->prepay_fee);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.prepay_fee",(string)(value)));
+		sprintf(value,"%ld",p1->owe_fee);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.owe_fee",(string)(value)));
+		sprintf(value,"%ld",p1->unbill_fee);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.unbill_fee",(string)(value)));
+		sprintf(value,"%ld",p1->cur_balance);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.cur_balance",(string)(value)));
+		sprintf(value,"%ld",p1->limit_owe);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.limit_owe",(string)(value)));
+		sprintf(value,"%ld",p1->awoke_fee);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.awoke_fee",(string)(value)));
+		sprintf(value,"%ld",p1->owe_awoke_fee);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.owe_awoke_fee",(string)(value)));
+		sprintf(value,"%ld",p1->group_owe);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.group_owe",(string)(value)));
+		sprintf(value,"%ld",p1->limit_high);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.limit_high",(string)(value)));
+		sprintf(value,"%d",p1->restop_hours);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.restop_hours",(string)(value)));
+		sprintf(value,"%d",p1->singlestop_days);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.singlestop_days",(string)(value)));
+		sprintf(value,"%d",p1->voicestop_days);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.voicestop_days",(string)(value)));
+		sprintf(value,"%d",p1->limit_days);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.limit_days",(string)(value)));
+		sprintf(value,"%d",p1->calling_times);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.calling_times",(string)(value)));
+		sprintf(value,"%d",p1->awake_times);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.awake_times",(string)(value)));
+		sprintf(value,"%d",p1->owe_awake_times);
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.owe_awake_times",(string)(value)));
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.credit_awake_flag",(string)(p1->credit_awake_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.credit_type",(string)(p1->credit_type)));
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.credit_name",(string)(p1->credit_name)));
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.property1",(string)(p1->property1)));
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.property2",(string)(p1->property2)));
+		m_UserIO.insert(pair<string ,string>((string)"stStopFeeMsg.property3",(string)(p1->property3)));
+	}
+	/*else if (strcmp(className,"stCurUserInfo") == 0)
+	{
+		stUserInfo *p1 = (stUserInfo*)p;		
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.msisdn",(string)(p1->msisdn)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.valid_flag",(string)(p1->valid_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.stop_flag",(string)(p1->stop_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.credit_code",(string)(p1->credit_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.run_code",(string)(p1->run_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.sm_code",(string)(p1->sm_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.list_type",(string)(p1->list_type)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.red_user",(string)(p1->red_user)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.region_code",(string)(p1->region_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.remind_flag",(string)(p1->remind_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.group_id",(string)(p1->group_id)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.user_grade_code",(string)(p1->user_grade_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.price_product_id",(string)(p1->price_product_id)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.run_time",(string)(p1->run_time)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.open_time",(string)(p1->open_time)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.old_run",(string)(p1->old_run)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.family_code",(string)(p1->family_code)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.expire_day",(string)(p1->expire_day)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.holiday_stop_flag",(string)(p1->holiday_stop_flag)));
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.owe_flag",(string)(p1->owe_flag)));
+		sprintf(value,"%ld",p1->user_id);
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.id_no",(string)value));
+		sprintf(value,"%ld",p1->contract_no);
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.contract_no",(string)(value)));
+		sprintf(value,"%ld",p1->cust_id);
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.cust_id",(string)(value)));
+		sprintf(value,"%d",p1->cart_type);
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.cart_type",(string)(value)));
+		sprintf(value,"%d",p1->owner_type);
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.owner_type",(string)(value)));
+		sprintf(value,"%ld",p1->master_serv_id);
+		m_UserIO.insert(pair<string ,string>((string)"stCurUserInfo.master_serv_id",(string)(value)));
+	}*/
+	else
+	{
+		printf("initStructMemberValue ERROR !className[%s]未配置!!!\n",className);
+		return RET_FAIL;
+	}
+	return RET_OK;
+}
+
+int getStrucMemberValue(map<string,string>& m_UserIO,char *name,string& value)
+{
+	map<string ,string>::iterator pt = m_UserIO.find(name);
+	if (pt != m_UserIO.end())
+	{
+		value = pt->second;
+	}
+	else
+	{
+		return RET_FAIL;
+	}
+	return RET_OK;
+}
+
+
+int PublicEsb(string url,string post,char *flag_out)
+{
+	return RET_OK;
+}
+
+
+/*
+输入sql语句，和条件号，输出该条件的类型
+入参：sql_param：sql语句
+			num：where的第几个条件
+出参：属性类型（LONG、CHAR）
+*/
+int checkSQLType(char *sql_param,int num,char *type)
+{
+	char *p = NULL,*q = NULL;
+	int max_num = 0,rule_num = 0;
+	char tmpSQL[1024] = {0};
+	char ruleSQL[1024] = {0};
+	char rule[1024] = {0};
+	char key[1024] = {0};
+	
+	max_num = strlen(sql_param);
+	//printf("sql_param[%s]max_num[%d]\n",sql_param,max_num);
+	strcpy(tmpSQL,sql_param);
+	p = strstr(tmpSQL,"where");
+	//printf("tmpSQL[%s]p[%s]\n",tmpSQL,p);
+	strcpy(ruleSQL,p+6);
+	
+	q = strstr(ruleSQL,"and");
+	if (q==NULL)
+	{
+		if (strsplit(key,ruleSQL,'=') < 0)
+		{
+			return RET_FAIL;
+		}
+		//printf("key:%s\n",key);
+		checkSQLParamType(key,type);
+		//printf("key[%s]type[%s]\n",key,type);
+		return RET_OK;
+	}
+	int i = 1;
+	while(q)
+	{
+		if (num > 1)
+		{
+			strcpy(ruleSQL,q+4);
+			if (i==1)
+				i++;
+		}
+		if (strsplit(key,ruleSQL,'=') < 0)
+		{
+			return RET_FAIL;
+		}
+		//printf("key:%s;ruleSQL=%s\n",key,ruleSQL);
+		if (num==i)
+		{
+			break;
+		}
+		else
+		{
+			i++;
+		}
+	}
+	
+	checkSQLParamType(key,type);
+	//printf("key[%s]type[%s]\n",key,type);
+	
+	return RET_OK;
+}
+
+int checkSQLParamType(char *param,char *type)
+{
+	if (strcasecmp(param,"contract_no") == 0)
+	{
+		strcpy(type,"LONG");
+	}
+	else if (strcasecmp(param,"BILL_ACCEPT") == 0)
+	{
+		strcpy(type,"LONG");
+	}
+	else if (strcasecmp(param,"id_no") == 0)
+	{
+		strcpy(type,"LONG");
+	}
+	return RET_OK;
+}
+
+/*	strcpy(types[0],"CHAR");
+		strcpy(types[1],"LONG");
+		strcpy(types[2],"CHAR");
+		strcpy(types[3],"CHAR");
+		strcpy(types[4],"CHAR");
+		strcpy(types[5],"CHAR");
+		strcpy(types[6],"CHAR");
+		strcpy(types[7],"CHAR");
+		strcpy(types[8],"CHAR");
+*/
+int checkTableParamType(char *table_name, char ***types,char **sqlTemp)
+{
+	return RET_OK;
+}
+
+/*
+l_values=l_values "opr" l_value
+l_values=1;l_value=2;opr="+"
+则l_values=1+2
+*/
+int dealCal(char *result,char *value,char *opr)
+{
+#ifdef _DEBUG_INFO_
+	//printf("\t[%s][%s][%s]\n",result,opr,value);
+#endif
+	if (strcmp(opr,"^")==0  || strcmp(opr,"$")==0 )
+	{
+		strcpy(result,value);
+		return RET_OK;
+	}
+	long l_result = atol(result);
+	long l_value = atol(value);
+	if (strcmp(opr ,"+") == 0)
+	{
+		l_result += l_value;
+	}
+	else if(strcmp(opr ,"-") == 0)
+	{
+		l_result -= l_value;
+	}
+	else if(strcmp(opr ,"*") == 0)
+	{
+		l_result = l_result * l_value;
+	}
+	else if(strcmp(opr ,"/") == 0)
+	{
+		double d_result = atof(result);
+		double d_value = atof(value);
+		if (d_value != 0)
+		{
+			d_result = d_result / d_value;
+		}
+		else
+		{
+			printf ("FILE[%s]LINE[%d]ERR_MSG[被除数不能为0]\n", __FILE__, __LINE__);
+			return -2;
+		}
+		sprintf(result,"%.2f",d_result);
+		return RET_OK;
+	}
+	else
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[运算符[%s]暂不可用]\n", __FILE__, __LINE__,opr);
+		return RET_FAIL;
+	}
+	sprintf(result,"%ld",l_result);
+	return RET_OK;
+}
+
+/*
+stop_ref_object=100001+100002-100003
+m_StopObjects={100001,100002,100003}
+*/
+int spliteCal(char *stop_ref_object,vector<stStopCal *> *m_StopObjects)
+{
+	char tmpBuf[1024] = {0};
+	vector<stStopCal *> StopObjects;
+	strcpy (tmpBuf, stop_ref_object);
+	
+	int len = strlen(tmpBuf);
+	int size = 0;
+	
+	tmpBuf[len] = '$';
+	tmpBuf[len+1] = '\0';
+#ifdef _DEBUG_INFO_
+//printf("spliteCal:[%s],[%d],[%s]\n",tmpBuf,len,stop_ref_object);
+#endif
+	int i = 0, end = 0, begin = 0;
+	stStopCal *pStopCal = NULL;
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		char tStr1[1024] = {0};
+		char sOp[2] = {0};
+		if (begin > 0)
+			sprintf(sOp ,"%c",tmpBuf[begin-1]);
+		else
+			sprintf(sOp ,"^");
+		if (tmpBuf[i] == '+'||tmpBuf[i] == '-'||tmpBuf[i] == '*'||tmpBuf[i] == '/'||tmpBuf[i] == '$')
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		size++;
+		
+		memcpy (tStr1, tmpBuf+begin, end - begin);
+		begin = i;
+		pStopCal = new stStopCal();
+		pStopCal->stop_ref_object = atol(tStr1);
+		strcpy(pStopCal->operator_code ,sOp);
+		
+#ifdef _DEBUG_INFO_
+	//printf("\t[%s],[%s]\n",tStr1,sOp);
+#endif
+		
+		StopObjects.push_back(pStopCal);
+	}
+	*m_StopObjects = StopObjects;
+	StopObjects.clear();
+	
+	return RET_OK;
+}
+
+int getUserRegionLogin(char *region_id,char *login_no)
+{
+	char region_code[9+1] = {0};
+	memset(region_code,0,sizeof(region_code));
+	strcpy(region_code,region_id);
+	if (strcmp(region_code,"2201")==0)
+	{
+		strcpy(login_no,"aadmin");
+	}
+	else if (strcmp(region_code,"2202")==0)
+	{
+		strcpy(login_no,"badmin");
+	}
+	else if (strcmp(region_code,"2203")==0)
+	{
+		strcpy(login_no,"cadmin");
+	}
+	else if (strcmp(region_code,"2204")==0)
+	{
+		strcpy(login_no,"dadmin");
+	}
+	else if (strcmp(region_code,"2205")==0)
+	{
+		strcpy(login_no,"eadmin");
+	}
+	else if (strcmp(region_code,"2206")==0)
+	{
+		strcpy(login_no,"fadmin");
+	}
+	else if (strcmp(region_code,"2207")==0)
+	{
+		strcpy(login_no,"gadmin");
+	}
+	else if (strcmp(region_code,"2208")==0)
+	{
+		strcpy(login_no,"hadmin");
+	}
+	else if (strcmp(region_code,"2209")==0)
+	{
+		strcpy(login_no,"iadmin");
+	}
+	else
+	{
+		strcpy(login_no,"admin");
+	}
+	return RET_OK;
+}
+
+int InitMapInfoOrder(map<int ,string> *Result,stUserInfo *pUser,char *string_data,long sys_accept,char *order_id,char *op_code,char *run_code,char *owner,char *open,char *serv_flag,char *db_laber)
+{
+	map<int ,string> mResult;
+	char c_user_id[25] = {0};
+	char c_contract_id[25] = {0};	
+	char phone_no[40+1] = {0};	
+	char new_run[2+1] = {0};
+	char black_flag[2+1] = {0};
+	char db_flag[10+1] = {0};
+	char accept[20+1] = {0};
+	char login_no[6+1] = {0};
+	char owner_flag[2+1] = {0};
+	char c_op_code[4+1] = {0};
+	char c_order_id[5+1] = {0};
+	char c_open_flag[5+1] = {0};
+	char c_fyw_flag[5+1] = {0};
+	char c_svc_str[10+1] = {0};
+	
+	memset(c_user_id,0,sizeof(c_user_id));
+	memset(c_contract_id,0,sizeof(c_contract_id));
+	memset(phone_no,0,sizeof(phone_no));
+	memset(new_run,0,sizeof(new_run));
+	memset(black_flag,0,sizeof(black_flag));
+	memset(db_flag,0,sizeof(db_flag));
+	memset(accept,0,sizeof(accept));
+	memset(login_no,0,sizeof(login_no));
+	memset(owner_flag,0,sizeof(owner_flag));
+	memset(c_op_code,0,sizeof(c_op_code));
+	memset(c_order_id,0,sizeof(c_order_id));
+	memset(c_open_flag,0,sizeof(c_open_flag));
+	memset(c_fyw_flag,0,sizeof(c_fyw_flag));
+	memset(c_svc_str,0,sizeof(c_svc_str));
+	
+
+	sprintf(c_user_id,"%ld",pUser->user_id);
+	sprintf(c_contract_id,"%ld",pUser->contract_no);	
+	sprintf(phone_no,"%s",pUser->msisdn);
+	sprintf(new_run,"%s",run_code);
+	strcpy(black_flag,"1");
+	//strcpy(db_flag,"A1");
+	sprintf(db_flag,"%s",db_laber);
+	sprintf(accept,"%ld",sys_accept);
+	strcpy(login_no,"system");
+	sprintf(owner_flag,"%s",owner);
+	sprintf(c_op_code,"%s",op_code);
+	sprintf(c_order_id,"%s",order_id);
+	sprintf(c_open_flag,"%s",open);//2 及服务开通又状态变更 0只服务开通
+	strcpy(c_fyw_flag,"-1");//分业务停机开机标识 -1为不用该字段
+	strcpy(c_svc_str,"0");
+	
+	if (mResult.size()!=0)
+	{
+		mResult.clear();
+	}			
+	/*1.服务开通 3.工单 4.局拆工单*/
+	if (strcmp(serv_flag ,JAVA_INTERFACE_SERV_ORD) == 0)
+	{	
+		/*
+		inIdNo 				:用户
+		inPhoneNo 		:手机号码
+		inOwnerFlag 	:有主无主标示，必传?'1'为非批量有主，'2'为非批量无主,'3'为批量有主,'4'为批量无主
+		inNewRun 			:新的运行状态
+		inOpenFlag 		:服务开通标识，必传?0--只服务开通 1--只更改用户状态 2--即开通又更改用户状态
+		inFywFlag 		:分业务停开机标识 0:暂停SVC 1:恢复SVC 2:单停GPRS 3:单停WLAN 4:单停WIFI 5:4G
+		inSvcStr			:0是暂停SVC 1恢复SVC
+		sOtherData 		:参数串: LOGIN_NO=xxxxx,CONTACT_ID=10001234,OP_TIME=20140101125959,OP_CODE=0000
+		inDBLabel：		:数据库标签，暂时设置传入字符"DB_A1"
+		*/	
+		mResult.insert(pair<int,string>(0,string(c_user_id)));		
+		mResult.insert(pair<int,string>(1,string(phone_no)));
+		mResult.insert(pair<int,string>(2,string(owner_flag)));
+		mResult.insert(pair<int,string>(3,string(new_run)));
+		mResult.insert(pair<int,string>(4,string(c_open_flag)));
+		mResult.insert(pair<int,string>(5,string(c_fyw_flag)));
+		mResult.insert(pair<int,string>(6,string(c_svc_str)));	
+		mResult.insert(pair<int,string>(7,string(string_data)));	
+		mResult.insert(pair<int,string>(8,string(db_flag)));			
+	}
+	else if (strcmp(serv_flag ,JAVA_INTERFACE_ORDER) == 0)
+	{
+		/*
+		CONTACT_ID		:统一流水
+		LOGIN_NO			:操作工号
+		OP_CODE				:操作标识
+		ORDER_ID			:工单模板
+		OWNER_FLAG		:1非批量有主 2批量有无主 3批量有主 4批量无主
+		STRING_DATA		:工单参数 PHONE_NO=111,NEW_RUN=...
+		inDBLabel			:数据库标签
+		*/
+		mResult.insert(pair<int,string>(0,string(accept)));		
+		mResult.insert(pair<int,string>(1,string(login_no)));
+		mResult.insert(pair<int,string>(2,string(c_op_code)));
+		mResult.insert(pair<int,string>(3,string(c_order_id)));
+		mResult.insert(pair<int,string>(4,string(owner_flag)));
+		mResult.insert(pair<int,string>(5,string(string_data)));
+		mResult.insert(pair<int,string>(6,string(db_flag)));			
+	}	
+	else if (strcmp(serv_flag ,JAVA_INTERFACE_B_ORDER) == 0)
+	{
+		/*lIdNo					:用户
+		sPhoneNo			:手机号码
+		sRunCode			:新的运行状态
+		sBlackFlag		:是否黑名单
+		sOtherData 		:参数串 LOGIN_NO=xxxxx,CONTACT_ID=10001234,OP_TIME=20140101125959,OP_CODE=0000
+		inDBLabel			:数据库标签		*/
+		mResult.insert(pair<int,string>(0,string(c_user_id)));		
+		mResult.insert(pair<int,string>(1,string(phone_no)));
+		mResult.insert(pair<int,string>(2,string(new_run)));
+		mResult.insert(pair<int,string>(3,string(black_flag)));
+		mResult.insert(pair<int,string>(4,string(string_data)));
+		mResult.insert(pair<int,string>(5,string(db_flag)));
+	}	
+	else
+	{
+		printf("参数，请检查\n");
+		/*add jiahh*/
+		if (mResult.size()!=0)
+		{
+			mResult.clear();
+		}		
+		return STOP_ERROR_NOR_STOP_JAVA_INTERFACE_FLAG_NOT_CONFIG;
+	}
+	*Result = mResult;
+	/*add jiahh*/
+	if (mResult.size()!=0)
+	{
+		mResult.clear();
+	}
+	return RET_OK;
+}
+
+
+/*
+解析${}数据
+入参：需要解析的串，
+出参：解析后拼接正常的串,参数value值，防止硬解析
+
+int build_sql(vector<vstSQLParam*> m_objectSql_1,char *tpl_content,char *smscontent,vector<stSQLParam*> *bindParams)
+{
+	int iRet = 0;
+	int  number=0;
+	char param[128] = {0};
+	char repedStr[20+1];
+	char smsOutStr[1024+1];
+	char smsInStr[1024+1];
+	char *p=NULL;
+	int num = 0;
+	int q = 0;
+	int len_str = 0;
+	int len1 = 0;
+	char flag[1+1] = {0};
+	vector<stSQLParam*> tmpBindParams;
+	
+	memset(smsInStr,0,sizeof(smsInStr));
+	memset(smsOutStr,0,sizeof(smsOutStr));
+	
+	strcpy(smsInStr,tpl_content);
+	len_str = strlen(smsInStr);
+	strcpy(flag,"?");
+	stSQLParam *sql_param_1 = NULL;
+  //for(map<string,string>::iterator iter = m_objectSql.begin();iter != m_objectSql.end();iter++) 
+  for (vector<vstSQLParam*>::iterator iter = m_objectSql_1.begin();iter != m_objectSql_1.end();iter++) 
+  {
+  	//sql_param = new stSQLParam();
+  	vstSQLParam *sql_param = *iter;
+  	memset(param,0,sizeof(param));
+		memset(repedStr,0,sizeof(repedStr));
+		//string key = sql_param->type;
+		char ckey[20] = {0};
+		strcpy(ckey ,sql_param->type);
+		printf("ckey=%s\n",ckey);
+		sprintf(repedStr,"${%s}",sql_param->type);
+  	p = strstr(smsInStr, repedStr);
+  	if (p != NULL)
+		{
+			len1 = strlen(p);
+			q = len_str-len1;
+			printf("len1=%d,len_str=%d\n",len1,len_str);
+			if (checkType(ckey) == 1)
+			{
+				strcpy(sql_param_1->type,SQL_PARAM_CHAR);
+			}
+			else
+			{
+				strcpy(sql_param_1->type,SQL_PARAM_LONG);
+			}
+			//string value = iter->second;
+			strcpy(param ,sql_param_1->value);
+		}
+		else
+		{
+			printf("[%s]NULL[%s]--------\n",smsInStr,repedStr);
+			continue;
+		}
+		#ifdef _DEBUG_INFO_
+			printf("repedStr=[%s],param=[%s]\n", repedStr,param);
+		#endif
+		
+		memset(smsOutStr,0,sizeof(smsOutStr));
+		if( NULL==sms_strrep((char *)smsInStr,(char *)smsOutStr,repedStr,flag))
+		{
+			return RET_FAIL;
+		}
+		memset(smsInStr,0,sizeof(smsInStr));
+		strcpy(smsInStr,smsOutStr);
+		num++;
+		//strcpy(sql_param->value,param);
+		tmpBindParams.push_back(sql_param_1);
+  }
+	*bindParams = tmpBindParams;
+  strcpy(smscontent,smsOutStr);
+	if ( 0 != tmpBindParams.size() )
+	{
+		tmpBindParams.clear();
+	}
+  
+  return RET_OK;
+}*/
+
+/*
+解析${}数据
+入参：需要解析的串，
+出参：解析后拼接正常的串,参数value值，防止硬解析
+说明：
+m_objectSql 为所有可能出现的参数的 map
+m_objectSql_order 为具体的每一个sql用到的参数的顺序（不能有重复且必须根据sql中？的顺序配置）
+
+int build_sql(map<string, string> m_objectSql, char *tpl_content, char *smscontent, vector<stSQLParam*> *bindParams, map<string, int> m_objectSql_order)
+{
+	int iRet = 0;
+	int  number = 0;
+	char param[128] = {0};
+	char repedStr[20 + 1];
+	char smsOutStr[1024 + 1];
+	char smsInStr[1024 + 1];
+	char ckey_order[20] = {0};
+	char *p = NULL;
+	int num = 0;
+	int q = 0;
+	int len_str = 0;
+	int len1 = 0;
+	int max_num = 0;
+	int i = 0;
+	int order = 0;
+	char flag[1 + 1] = {0};
+	vector<stSQLParam*> tmpBindParams;
+
+	memset(smsInStr, 0, sizeof(smsInStr));
+	memset(smsOutStr, 0, sizeof(smsOutStr));
+
+	strcpy(smsInStr, tpl_content);
+	len_str = strlen(smsInStr);
+	strcpy(flag, "?");
+	stSQLParam *sql_param = NULL;
+	max_num = m_objectSql_order.size();
+	for (i = 0; i <= max_num; i++)
+	{
+		for (map<string, int>::iterator iter_order = m_objectSql_order.begin(); iter_order != m_objectSql_order.end(); iter_order++)
+		{
+			order = iter_order->second;
+			if (i != order)
+			{
+				continue;
+			}
+			memset(ckey_order, 0, sizeof(ckey_order));
+			string key_order = iter_order->first;
+			strcpy(ckey_order, key_order.c_str());
+			for (map<string, string>::iterator iter = m_objectSql.begin(); iter != m_objectSql.end(); iter++)
+			{
+				sql_param = new stSQLParam();
+				memset(param, 0, sizeof(param));
+				memset(repedStr, 0, sizeof(repedStr));
+				string key = iter->first;
+				char ckey[20] = {0};
+				strcpy(ckey, key.c_str());
+				if (0 != strcmp(ckey_order, ckey))
+				{
+					//printf("变量不对循环下一条\n");
+					delete(sql_param);
+					sql_param = NULL;
+					continue;
+				}
+				sprintf(repedStr, "${%s}", key.c_str());
+				p = strstr(smsInStr, repedStr);
+				if (p != NULL)
+				{
+					len1 = strlen(p);
+					q = len_str - len1;
+					if (checkType(ckey) == 1)
+					{
+						strcpy(sql_param->type, SQL_PARAM_CHAR);
+					}
+					else
+					{
+						strcpy(sql_param->type, SQL_PARAM_LONG);
+					}
+					string value = iter->second;
+					strcpy(param, value.c_str());
+				}
+				else
+				{
+					delete(sql_param);
+					continue;
+				}
+				memset(smsOutStr, 0, sizeof(smsOutStr));
+				if (NULL == sms_strrep((char *)smsInStr, (char *)smsOutStr, repedStr, flag))
+				{
+					if (tmpBindParams.size() != 0)
+					{
+						clearDataList(tmpBindParams);
+					}
+
+					delete(sql_param);
+					sql_param = NULL;
+
+					return RET_FAIL;
+				}
+				memset(smsInStr, 0, sizeof(smsInStr));
+				strcpy(smsInStr, smsOutStr);
+				num++;
+				strcpy(sql_param->value, param);
+				tmpBindParams.push_back(sql_param);
+				break;
+			}
+		}
+	}
+
+	*bindParams = tmpBindParams;
+	if ( 0 != tmpBindParams.size() )
+	{
+		clearDataList(tmpBindParams);
+		//tmpBindParams.clear();
+	}
+	
+	strcpy(smscontent, smsOutStr);
+	return RET_OK;
+}*/
+
+/*
+将str中的ch去掉
+*/
+void del_char(char *str,char ch)
+{
+	char *p = str;
+	char *q = str;
+	while(*q)
+	{
+		if (*q != ch)
+		{
+			*p++ = *q;
+		}
+		q++;
+	}
+	*p = '\0';
+}
+
+
+/*账单落地接口*/
+int UnBillQueryDown(long id_no,long contract_no,const char *ip,const long port,char *op_type)
+{
+    int sockfd, recvbytes;
+    struct MSG_BILLQUERYDATA_ bill_data;
+    int  ret=0;
+    int  len=0;
+    char out[1024]={0};
+    char status[1+1]={0};
+    struct hostent *host;
+    struct sockaddr_in serv_addr;
+		/*1.客户端:构造通讯SOCKET,流式SOCKET.*/
+    if (( sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket error!");
+        close(sockfd);
+        exit(1);
+    }
+    /*2.绑定地址*/
+    //bzero(&serv_addr,sizeof(serv_addr));
+    memset(&serv_addr,0,sizeof(serv_addr));
+    serv_addr.sin_family    = AF_INET;
+    serv_addr.sin_port      = htons(port);
+    serv_addr.sin_addr.s_addr= inet_addr(ip);        
+		/*3.客户端:请求与服务端连接.*/
+    if (connect(sockfd, (struct sockaddr *)&serv_addr,sizeof(struct sockaddr)) == -1) {
+    		close(sockfd);
+        perror("connect error!");
+        return -1;
+    }
+		sprintf( bill_data.Version, "%-16s", "iBoss1.0" ); 
+		sprintf(bill_data.ID_NO, "%032ld", id_no); 
+		sprintf(bill_data.Contract_NO, "%032ld", contract_no); 
+		sprintf(bill_data.QueryType, "%03d", 4); 
+		sprintf(bill_data.Reserv, "%-16s", "system" ); 
+    printf("bill_data.Version=%s\nbill_data.ID_NO=%s\nbill_data.Contract_NO=%s\nbill_data.QueryType=%s\nbill_data.Reserv=%s\n",bill_data.Version,bill_data.ID_NO,bill_data.Contract_NO,bill_data.QueryType,bill_data.Reserv);
+    /*
+    发送数据:send(Client_Sock,buf, ...)
+    接收数据:recv(Client_Sock,buf, ...)    
+    */    
+   if ((recvbytes = send(sockfd, &bill_data, MAXDATASIZE,0)) == -1) {
+   			close(sockfd);
+        perror("recv error!");
+        return -4;
+    }  
+   while ( STATUS> strlen(out) )
+  	{
+   		if ((recvbytes = recv(sockfd, out+len, MAXDATASIZE,0)) == -1) {
+   			close(sockfd);
+        perror("recv error!");
+        return -5;
+    	}
+    	len=strlen(out);		
+  	}
+
+    printf("out: %s\n",out);
+    strncpy(status,out+80,1);
+    printf("out.Status: %s\n",status);
+    strcpy(op_type,status);
+    if (strcmp(status,"1")==0||strcmp(status,"2")==0)
+    {
+    	printf("调用接口正常结束\n");
+    }
+    else 
+    {
+    	close(sockfd);
+    	printf("3：系统达到最大连接数 6：业务不支持7：请求非法8：通讯包错误9：处理错误 \n");
+    	ret = (-1)*atoi(status);
+    	return ret;
+    }
+    /*客户端:关闭SOCKET.*/
+    close(sockfd);
+	return 0;
+}
+
+
+int InitStopObjectInfo(stUserInfo *pUser,stContractInfo *pCon,map<string,string> *stObjectSql)
+{
+	map<string,string> pObjectSql;
+	char c_user_id[25] = {0};
+	char c_contract_id[25] = {0};
+	char c_user_id_1[2] = {0};
+	char c_user_id_2[3] = {0};
+	char c_contract_id_1[2] = {0};
+	char c_contract_id_2[3] = {0};
+	sprintf(c_user_id,"%ld",pUser->user_id);
+	sprintf(c_user_id_1,"%ld",pUser->user_id%10);
+	sprintf(c_user_id_2,"%ld",pUser->user_id%100);
+	sprintf(c_contract_id,"%ld",pCon->contract_no);
+	sprintf(c_contract_id_1,"%ld",pCon->contract_no%10);
+	sprintf(c_contract_id_2,"%ld",pCon->contract_no%100);
+	
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_PHONE_NO),string(pUser->msisdn)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_ID_NO),string(c_user_id)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_CONTRACT_NO),string(c_contract_id)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_ID_NO_1),string(c_user_id_1)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_ID_NO_2),string(c_user_id_2)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_CONTRACT_NO_1),string(c_contract_id_1)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_CONTRACT_NO_2),string(c_contract_id_2)));
+	pObjectSql.insert(pair<string,string>(string(OBJECT_SQL_PARAM_SM_CODE),string(pUser->sm_code)));
+	
+	*stObjectSql = pObjectSql;
+	pObjectSql.clear();
+	
+	return RET_OK;
+}
+
+int split_vector(char *result_value, map<int ,string> *mResult)
+{
+	int size = 0;
+	
+	char tmpBuf[1024] = {0};
+	char tStr1[255+1] = {0};
+	map<int ,string> mResult_tmp;
+	
+	strcpy (tmpBuf, result_value+1);
+	int len = strlen(tmpBuf);
+	tmpBuf[len] = '$';
+	tmpBuf[len+1] = '\0';
+	
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == '$')
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memcpy (tStr1, tmpBuf+begin, end - begin);
+		tStr1[end-begin] = '\0';
+		mResult_tmp.insert(pair<int,string>(size,string(tStr1)));
+		size++;
+		begin = i;
+	}
+	*mResult = mResult_tmp;
+	mResult_tmp.clear();
+	
+	return RET_OK;
+}
+
+/*
+*获取服开数据库实例标示
+*服开接口的最后一个in_db_label参数取值请调用该函数
+*入参:
+*			user_id--用户ID_NO
+*			db_num--DSC数据库标示
+*			op_code--业务编码op_code
+*出参:
+*			in_db_label
+*/
+int getInDBLabel(long user_id,int db_num,char *op_code,char *in_db_label)
+{
+	if (db_num == ORACLE_DB_A || db_num == ORACLE_DB_BAK_A)
+	{
+		if ((user_id/100000000000000)%10 == 1 )
+		{
+			strcpy(in_db_label,"A1");
+		}
+		else if ((user_id/100000000000000)%10 == 7 || (user_id/100000000000000)%10 == 8)
+		{
+			strcpy(in_db_label,"A2");
+		}
+		else
+		{
+			strcpy(in_db_label,"A1");
+		}
+	}
+	else if (db_num == ORACLE_DB_B || db_num == ORACLE_DB_BAK_B)
+	{
+		if ((user_id/100000000000000)%10 == 2 || (user_id/100000000000000)%10 == 4 || (user_id/100000000000000)%10 == 9)
+		{
+			strcpy(in_db_label,"B1");
+		}
+		else if ((user_id/100000000000000)%10 == 5 || (user_id/100000000000000)%10 == 3 || (user_id/100000000000000)%10 == 6)
+		{
+			strcpy(in_db_label,"B2");
+		}
+		else
+		{
+			strcpy(in_db_label,"B1");
+		}
+	}
+	return RET_OK;
+}
+
+int BytesToUtf8(char* src, char* dst, int* nout) {
+    size_t n_in = strlen(src);
+    size_t n_out = *nout;
+    iconv_t c = iconv_open("UTF-8", "GB2312");
+    if (c == (iconv_t)-1) {
+    	cerr << strerror(errno) << endl;
+    	return NULL;
+    }
+	char* inbuf = new char [n_in + 1];  
+	if (!inbuf) {  
+		iconv_close(c);  
+		return NULL;  
+	}
+
+	strcpy(inbuf, src);  
+	memset(dst, 0, n_out);  
+	char* in = inbuf;  
+	char* out = dst;  
+	if (iconv(c, &in, &n_in, &out, &n_out) == (size_t)-1) {  
+		cerr << strerror(errno) << endl;  
+		out = NULL;  
+	}  
+	else {  
+		n_out = strlen(dst);  
+		out = dst;  
+	}
+	iconv_close(c);  
+	*nout = n_out;  
+	delete[] inbuf;  
+	return 0;  
+}
+
+int getMinValue(int values[] , int num)
+{
+	int min_value = 0;
+	int value = 0;
+	int min_num = 0;
+	for(int i = 0; i < num; i++)
+	{
+		value = values[i];
+		if (i == 0)
+		{
+			min_value = value;
+			if (min_value == 0)
+				break;
+			continue;
+		}
+		if (value < min_value)
+		{
+			min_value = value;
+			min_num = i;
+			if (min_value == 0)
+				break;
+		}
+	}
+	return min_num;
+}
+
+// 替换字符串中特征字符串为指定字符串
+char * str_strrep(char *pInput,char *pOutput,char *pSrc,char *pDst)
+{
+	char *p;//*p1;
+	char p1[1024] = {0};
+	int len;
+	
+	if (pInput == NULL || pSrc == NULL || pDst == NULL)
+		return NULL;
+	
+	p = strstr(pInput, pSrc);       //返回字符串第一次出现的地址,否则返回NULL
+	if (p == NULL)  /*not found*/
+	{
+		strcpy(pOutput,pInput);
+		return pOutput;
+	}
+	//printf("p=%s\n",p);
+	len = strlen(pInput) + strlen(pDst) - strlen(pSrc);
+	strncpy(p1, pInput, p-pInput);
+	strcat(p1, pDst);
+	//printf("p1=%s\n",p1);
+	p += strlen(pSrc);
+	strcat(p1, p);
+	strcpy(pOutput,p1);
+
+	return pOutput;
+}
+
+char *str_lower(char *str)
+{
+	char *orign = str;
+	for(;*str!='\0';str++)
+	{
+		*str = tolower(*str);
+	}
+	return orign;
+}
+
+int SplitString (const char *buff, char split_char, string key[])
+{
+	int size = 0,j = 0;
+	
+	char tmpBuf[1024];
+	char tStr[1024];
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	
+	strcpy (tmpBuf, buff);
+	
+	int len = strlen(tmpBuf);
+	if (tmpBuf[len-1] != split_char && tmpBuf[len-1] != '\n')
+	{
+		tmpBuf[len] = split_char;
+		len = len+1;
+	}
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == split_char)
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		size++;
+		
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		key[j] = string(tStr);
+		j ++;
+		begin = i;
+	}
+	
+	return j;
+}
+
+int SplitString(char * dstr,char * sstr,char t,int fn)
+{
+	int i;
+	char *tps , *tpe;
+	char lstr[256+1];
+	
+	tps = sstr;
+	for ( i = 1; i < fn; i ++ )
+	{
+    tps = strchr( tps , t );
+    if ( tps == NULL )
+    	return -1;
+    tps ++ ;
+	}
+	
+	tpe = strchr( tps , t );
+	if( tpe == NULL )
+		i = strlen( tps );
+	else
+		i = tpe - tps;
+	memcpy( lstr , tps , i );
+	lstr[i] = '\0';
+	while ( lstr[strlen( lstr ) - 1] == '\n' )
+	{
+		lstr[strlen( lstr ) - 1] = '\0';
+	}
+	strcpy( dstr , lstr );
+	return 0;
+}
+
+int getBinNameByPath(char *fileName,char *binName)
+{
+	char fileName_temp[1024] = {0};
+	char *p;
+	strcpy(fileName_temp,fileName);
+	while (true) 
+	{
+		p = strstr(fileName_temp,"/");
+		if (p == NULL)
+		{
+			strcpy(binName,fileName_temp);
+			return 0;
+		}
+		memcpy(fileName_temp,p+1,strlen(fileName_temp));
+	}
+}
+
+int SplitString (const char *buff,vector<string> *operation,vector<vector<string> > *values)
+{
+	int j = 0;
+	char tmpBuf[1024];
+	char tStr[1024];
+	vector<string> operation_tmp;
+	vector<vector<string> > values_tmp;
+	int i = 0, end = 0, begin = 0;
+	vector<string> value;
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	strcpy (tmpBuf, buff);
+	int len = strlen(tmpBuf);
+	//printf("len=%d\n",len);
+	while (i <= len)
+	{
+		//printf("%c %d\n",tmpBuf[i],i);
+		if (tmpBuf[i] == '|' || i == len)
+		{
+			end = i;
+			i++;
+		}
+		else if (tmpBuf[i] == '+' || tmpBuf[i] == '-')
+		{
+			char op[1+1] = {0};
+			op[0] = tmpBuf[i];
+			operation_tmp.push_back(string(op));
+			//printf("OP：%s,%d\n",op,j);
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		//printf("%d,%d\n",begin,end);
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		begin = i;
+		//printf("tStr：%s,%d\n",tStr,j);
+		value.push_back(string(tStr));
+		
+		if (tmpBuf[i-1] == '+' || tmpBuf[i-1] == '-' || i == len+1)
+		{
+			values_tmp.push_back(value);
+			value.clear();
+			j++;
+		}
+	}
+	
+	*values = values_tmp;
+	*operation = operation_tmp;
+	
+	return 0;
+}
+
+int SplitStringBySP (const char *buff, char split_char, string key[])
+{
+	int size = 0,j = 0;
+	
+	char tmpBuf[1024];
+	char tStr[1024];
+	
+	memset (tmpBuf, 0, sizeof(tmpBuf));
+	
+	strcpy (tmpBuf, buff);
+	
+	int len = strlen(tmpBuf);
+	if (tmpBuf[len-1] != split_char && tmpBuf[len-1] != '\n')
+	{
+		tmpBuf[len] = split_char;
+		len = len+1;
+	}
+	int i = 0, end = 0, begin = 0;
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == split_char)
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		memset (tStr, 0, sizeof(tStr));
+		size++;
+		
+		memcpy (tStr, tmpBuf+begin, end - begin);
+		tStr[end-begin] = '\0';
+		key[j] = string(tStr);
+		j ++;
+		begin = i;
+	}
+	
+	return j;
+}

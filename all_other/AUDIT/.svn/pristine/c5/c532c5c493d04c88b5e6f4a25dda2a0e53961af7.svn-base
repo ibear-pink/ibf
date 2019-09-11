@@ -1,0 +1,85 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/3/1 14:59:14
+ * 编码人员:wangzhia
+*/
+
+#ifndef _CDEAL_DATA_H_
+#define _CDEAL_DATA_H_
+
+#include "CPublicData.h"
+#include "poor.h"
+#include "CLogManager.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class CDealData : public Thread
+{
+public:
+	CDealData(char *className,char *className_deal);
+	
+	~CDealData();
+	
+	void run(void);
+	
+	Ret Init(stAppCfg_Proc_Server *pCfgInfo, stAppCfg_System *pSystemInfo, stAppCfg_ParseFile *pParseFile, int thread_num,Poor<stDealTask> *pDataPoor,map<string,stSqlMap*> sqlconfs,STOP_COMMON_CONF conf_info,stSettings *set);
+	
+	Ret DealRecord (stDealTask *pTask);
+	
+	/*接口表协议解析*/
+	void ParseTableRecord (char *sBuff, stParseField *pField);
+
+	void PutTask (stDealTask *pTask) {m_DealQueue.push_first (pTask);}
+	
+	stDealTask *GetTask () {return m_DealQueue.pop();}
+		
+	void ClearTask () {m_DealQueue.clear();};
+	
+	int GetQueueNum () {return m_DealQueue.sum();};
+	
+	void SetQueueDelayTime (int time) {m_DealQueue.setDelayTime(time);};
+	
+	int InitCfgInfo();
+public:
+	CMutexLock *m_Mutex;
+	
+	pthread_cond_t m_Condition;	
+			
+	int m_DispathKey;
+	
+	char m_ServerName[64];
+	
+	char m_ServerName_tmp[64];
+	
+	int m_pidNum;
+	
+	int m_ThreadNum;
+	
+	CPublicDeal *m_StopDeal;
+	
+	int m_ServerType;								//接口业务类型
+	
+	int m_InterfaceType;							//协议转换接口类型
+	
+	int m_IsRegionSupport;
+	
+	char m_RegionList[128];
+	
+	int *m_DscNum;
+	
+	long m_JSNUM;//计数器,记录处理的数据数
+	
+	deque2<stDealTask> m_DealQueue;
+	
+	stAppCfg_ParseFile m_ParseFiles;
+	stAppCfg_System m_SystemInfo;
+	
+private:
+	DB_INFO m_dbDsc;
+	ibear *m_ibear;
+	Poor<stDealTask> *m_Data_Poor;
+	CPublicData *m_PublicData;
+};
+
+#endif

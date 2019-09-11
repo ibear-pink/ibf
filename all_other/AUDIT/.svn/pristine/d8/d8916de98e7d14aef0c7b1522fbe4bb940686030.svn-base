@@ -1,0 +1,121 @@
+
+/*********************
+* 功能描述:入口函数
+* 编码日期:20160411
+* 编码人员:自动生成
+*********************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include "CommonFun.h"
+#include "ComFile.h"
+#include "ComCfgFile.h"
+#include "ComEncrypt.h"
+
+using namespace COM_SYSFUNC;
+/*
+ 程序说明：将入口的密码文件解析，并生成DSC格式的密码文件，生成的文件名为（servName.login）
+ 启动程序方式：getpwd fileName
+ 入参：
+ 	fileName:需要解析的密码文件
+*/
+int main (int argc,char *argv[])
+{
+	char userName[24] = {0};
+	char passWord[24] = {0};
+	char servName[24] = {0};
+	char loginName[1024] = {0};
+	char shellcont[1024] = {0};
+	char *pathvar;
+	
+	if (argc < 3)
+	{
+		fprintf( stderr, "\n\n解析并密码文件: %s 入参缺失\n\t参数一：type 0-内存库;1-物理库;2-主机\n", argv[0]);
+		fprintf( stderr, "\t参数二：解析的密码文件 or 解析的密码标签\n");
+		fprintf( stderr, "\t\ttype=0,参数二为/account/plat/newkey/billing_data_acctopr.login\n");
+		fprintf( stderr, "\t\ttype=1,参数二为BILLCOLLDEV_DBACCOPR（/etc/.ngpasswordconfig的标签）\n\n");
+		fprintf( stderr, "\t\ttype=2,参数二为WSUD01DD_BIFTP（/etc/.ngpasswordconfig的标签）\n\n");
+		fprintf( stderr, "若参数三传入YES，则会根据解析的密码生成DSCI的专用密码文件\n\n");
+		
+		return -1;
+	}
+	pathvar = getenv("DSCI_PATH");
+	//printf("loginFile:%s\nDSCI_PATH:%s\n",argv[2],pathvar);
+	//内存库密码文件获取
+	if (strcmp(argv[1],"0") == 0)
+	{
+		if ( 0 != getMDBLoginInfo(userName,passWord,servName,argv[2]))
+		{
+			printf("getMDBLoginInfo is error\n!!!");
+			return -1;
+		}
+	}
+	//物理库密码文件获取
+	else if ( strcmp(argv[1],"1") == 0 )
+	{
+		int ret = 0;
+		string DbCfgName = ".ngpasswordconfig";
+		ConfigFile DbCfg("/etc",DbCfgName.c_str(), "r");	/*  数据库配置文件  */
+	
+		ret = DbCfg.OpenFile();
+		if(0 != ret )
+		{
+			printf("ERROR:[%s][%d] DbCfg config error !! ",__FILE__,__LINE__);
+			return -1;
+		}
+
+		char DBSection[32+1] = {0};
+		strcpy(DBSection,argv[2]);
+		ret = DbCfg.GetConfigRecord(DBSection, "DBUSER", userName);
+		ret = DbCfg.GetConfigRecord(DBSection, "DBPASSWD", passWord);
+		ret = DbCfg.GetConfigRecord(DBSection, "DBSERV", servName);
+		DC_Encrypt::decrypt_config_item(userName, (eb1*)ENCRYPT_KEY);
+		DC_Encrypt::decrypt_config_item(passWord, (eb1*)ENCRYPT_KEY);
+
+	}
+	else if ( strcmp(argv[1],"2") == 0 )
+	{
+		int ret = 0;
+		string DbCfgName = ".ngpasswordconfig";
+		ConfigFile DbCfg("/etc",DbCfgName.c_str(), "r");	/*  数据库配置文件  */
+	
+		ret = DbCfg.OpenFile();
+		if(0 != ret )
+		{
+			printf("ERROR:[%s][%d] DbCfg config error !! ",__FILE__,__LINE__);
+			return -1;
+		}
+
+		char DBSection[32+1] = {0};
+		strcpy(DBSection,argv[2]);
+		ret = DbCfg.GetConfigRecord(DBSection, "HOSTUSER", userName);
+		ret = DbCfg.GetConfigRecord(DBSection, "HOSTPASSWD", passWord);
+		ret = DbCfg.GetConfigRecord(DBSection, "HOSTIP", servName);
+		DC_Encrypt::decrypt_config_item(userName, (eb1*)ENCRYPT_KEY);
+		DC_Encrypt::decrypt_config_item(passWord, (eb1*)ENCRYPT_KEY);
+	}
+	else 
+	{
+		printf("ERROR:[%s][%d] input param 1 error:[0/1/2] !! ",__FILE__,__LINE__);
+		return -1;
+	}
+	
+//	printf("%s/%s@%s\n",userName,passWord,servName);
+	printf("%s %s %s\n",userName,passWord,servName);
+	
+	if (argc == 4)
+	{
+		if (strcmp(argv[3],"YES") == 0)
+		{
+			sprintf(loginName,"%s/cfg/%s_%s.login",pathvar,servName,userName);
+			sprintf(shellcont,"cd ${DSCI_PATH}/lib/\ndsci_tools -p %s %s %s",userName,passWord,loginName);
+			//printf("shell:%s\n",shellcont);
+			system(shellcont);
+		}
+	}
+	return 0;
+}
+
+
+

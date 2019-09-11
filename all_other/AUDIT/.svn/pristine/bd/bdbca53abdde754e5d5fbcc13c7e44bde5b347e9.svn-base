@@ -1,0 +1,32 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _CAF_DATA_H_
+#define _CAF_DATA_H_
+
+#include "CPublicData.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class CAFData:public CPublicData,public Object
+{
+	DECLARE_CLASS(CAFData)
+public:
+
+	CAFData();
+	~CAFData();
+	int init(char *serverName, int serverType,CPublicDeal *stopDeal);
+	
+	int process(ibear *br,char *busiName,char *serverName,stAppCfg_System *pSystemInfo,stDealTask *pTask,stParseField *parseField,stSTOPMessage *stopMsg);
+	
+public:
+	
+};
+
+#endif
+
+

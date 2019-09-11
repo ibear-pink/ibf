@@ -1,0 +1,27 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#ifndef _GETKPIDATA_H_
+#define _GETKPIDATA_H_
+
+#include "CPublicDeal.h"
+#include "DynBase.h"
+
+using namespace std;
+
+class GetKPIDataDeal : public CPublicDeal,public Object
+{
+	DECLARE_CLASS(GetKPIDataDeal)
+public:
+
+	GetKPIDataDeal();
+	~GetKPIDataDeal();
+	int Process(stSTOPMessage *stopMsg);
+	int InitStopCfgInfo(stSTOPMessage *stopMsg);
+};
+
+#endif
+

@@ -1,0 +1,501 @@
+
+#include "CDealFile.h"
+
+CDealFileBak::CDealFileBak()
+{
+	m_FileMgr.clear ();
+	
+	memset (&m_BakConfInfo, 0, sizeof(stBakConfigInfo));
+	
+	m_MutexLocker = new CMutexLock();
+	
+	m_BackupFlag = false;
+	
+	m_ProTimes = 0;
+	
+	m_SerialNum = 0;
+	
+	memset (m_LastDay, 0, sizeof(m_LastDay));
+}
+
+CDealFileBak::~CDealFileBak (void)
+{
+	m_MutexLocker->Lock();
+	
+#ifdef _SDFS_DEAL_FILE_
+	map<string, SDFS_GDF_FILE *>::iterator iter;
+	for (iter = m_FileMgr.begin(); iter != m_FileMgr.end(); iter++)
+	{
+		SDFS_GDF_FILE *pFile = iter->second;
+		
+		delete pFile;
+		
+		pFile = NULL;
+	}
+#else
+	map<string, GDF_FILE *>::iterator iter;
+	for (iter = m_FileMgr.begin(); iter != m_FileMgr.end(); iter++)
+	{
+		GDF_FILE *pFile = iter->second;
+		
+		delete pFile;
+		
+		pFile = NULL;
+	}
+#endif
+	
+	m_FileMgr.clear();
+	
+	m_MutexLocker->UnLock();
+	
+	if (NULL != m_MutexLocker)
+	{
+		delete m_MutexLocker;
+		m_MutexLocker = NULL;
+	}
+}
+
+void CDealFileBak::Init (stBakConfigInfo *pBakInfo)
+{
+	printf("init CDealFileBak !!!\n");
+	memcpy (&m_BakConfInfo, pBakInfo, sizeof(stBakConfigInfo));
+}
+
+void CDealFileBak::Process(void)
+{
+	if (m_ProTimes == 0)
+	{
+		if (SERVER_ASYNC_MODE == m_BakConfInfo.writeMode)
+		{
+			this->m_FileContentQueue_Bak.setMaxNum(MAX_DEQUE_NUM);
+			this->start();
+		}
+	}
+	else
+	{
+		printf ("文件备份线程已经启动.\n");
+	}
+	
+	++m_ProTimes;
+}
+
+void CDealFileBak::run(void)
+{
+	stPubFileInfo *pData = NULL;
+	
+	while (getThreadState() == THREAD_STAT_RUNNING)
+	{
+		pData = m_FileContentQueue_Bak.pop();
+		
+		if (NULL == pData)
+		{
+			usleep (50);
+			continue;
+		}
+		
+		if (pData->fileEnd == 1)
+		{
+			delete pData;
+			continue;
+		}
+
+#ifdef _SDFS_DEAL_FILE_
+		SDFS_GDF_FILE *pFile = NULL;
+		
+		m_MutexLocker->Lock();
+		
+		map<string, SDFS_GDF_FILE *>::iterator iter = m_FileMgr.find (string(pData->fileNameHead));
+#else
+		GDF_FILE *pFile = NULL;
+		
+		m_MutexLocker->Lock();
+		
+		map<string, GDF_FILE *>::iterator iter = m_FileMgr.find (string(pData->fileNameHead));
+#endif
+		if (iter == m_FileMgr.end())
+		{
+			//替换字符串中@@@@@@@为流水
+			char needle[10] = {0};
+			char tmpFile[1024] = {0};
+			char curDay[8+1] = {0};
+			
+			getCurDateTime (curDay, "yyyymmdd");
+			if (strcmp (curDay, m_LastDay) != 0)
+			{
+				m_SerialNum = 0;
+				
+				strcpy (m_LastDay, curDay);
+			}
+			
+			strcpy (needle, "@@@@@@@");
+
+			if (strstr (pData->fileName, needle) == NULL)
+			{
+				strcpy (tmpFile, pData->fileName);
+			}
+			else
+			{
+				char beginName[512] ={0};
+				char endName[512] = {0};
+				
+				char tmpStr[1024] = {0};
+				strcpy (tmpStr, pData->fileName);
+				
+				char *p = strtok (tmpStr, needle);
+				strcpy (beginName, p);
+				p = strtok(NULL, needle);
+				strcpy (endName, p);
+				
+				sprintf (tmpFile, "%s%07d%s", beginName, m_SerialNum, endName);
+				
+				m_SerialNum++;
+			}
+			
+			
+#ifdef _SDFS_DEAL_FILE_
+			pFile = new SDFS_GDF_FILE (m_BakConfInfo.tmpDir, tmpFile);
+#else
+			pFile = new GDF_FILE (m_BakConfInfo.tmpDir, tmpFile);
+#endif
+			if (0 != pFile->Open ("a+"))
+			{
+				printf ("FILE[%s]LINE[%d]ERR_MSG[Open File Is Failed.]\n", __FILE__, __LINE__);
+				
+				delete pData;
+				m_MutexLocker->UnLock();
+				continue;
+			}
+#ifdef _SDFS_DEAL_FILE_
+			m_FileMgr.insert(pair<string, SDFS_GDF_FILE *>(string(pData->fileNameHead), pFile));
+#else
+			m_FileMgr.insert(pair<string, GDF_FILE *>(string(pData->fileNameHead), pFile));
+#endif
+		}
+		else
+		{
+			pFile = iter->second;
+		}
+		
+		char tmpbuff[4096] = {0};
+		sprintf (tmpbuff, "%s\n", pData->fileContent);
+		
+		pFile->Write (tmpbuff, strlen(tmpbuff), 1);
+		
+		pFile->Fflush();
+		
+		m_MutexLocker->UnLock();
+		
+		delete pData;
+	}
+}
+
+Ret CDealFileBak::WriteFile (stPubFileInfo *tFileInfo)
+{
+#ifdef _DEBUG_INFO_
+	/*printf ("pData->fileNameHead = %s\n", tFileInfo->fileNameHead);
+	printf ("pData->fileName = %s\n", tFileInfo->fileName);
+	printf ("pData->fileContent = %s\n", tFileInfo->fileContent);*/
+#endif
+	if (m_BakConfInfo.writeMode == SERVER_SYNC_MODE)
+	{
+#ifdef _SDFS_DEAL_FILE_
+		SDFS_GDF_FILE *pFile = NULL;
+		m_MutexLocker->Lock();
+		map<string, SDFS_GDF_FILE *>::iterator iter = m_FileMgr.find (string(tFileInfo->fileNameHead));
+#else
+		GDF_FILE *pFile = NULL;
+		m_MutexLocker->Lock();
+		map<string, GDF_FILE *>::iterator iter = m_FileMgr.find (string(tFileInfo->fileNameHead));
+#endif
+		if (iter == m_FileMgr.end())
+		{
+			//替换字符串中@@@@@@@为流水
+			char needle[10] = {0};
+			char tmpFile[1024] = {0};
+			char curDay[8+1] = {0};
+			
+			getCurDateTime (curDay, "yyyymmdd");
+			if (strcmp (curDay, m_LastDay) != 0)
+			{
+				m_SerialNum = 0;
+				
+				strcpy (m_LastDay, curDay);
+			}
+			
+			strcpy (needle, "@@@@@@@");
+
+			if (strstr (tFileInfo->fileName, needle) == NULL)
+			{
+				strcpy (tmpFile, tFileInfo->fileName);
+			}
+			else
+			{
+				char beginName[512] ={0};
+				char endName[512] = {0};
+				
+				char tmpStr[1024] = {0};
+				strcpy (tmpStr, tFileInfo->fileName);
+				
+				char *p = strtok (tmpStr, needle);
+				strcpy (beginName, p);
+				p = strtok(NULL, needle);
+				strcpy (endName, p);
+				
+				sprintf (tmpFile, "%s%07d%s", beginName, m_SerialNum, endName);
+				
+				m_SerialNum++;
+			}
+
+#ifdef _DEBUG_INFO_
+	printf ("writefile-出口文件名: %s \n", tmpFile);
+#endif
+
+#ifdef _SDFS_DEAL_FILE_
+			pFile = new SDFS_GDF_FILE (m_BakConfInfo.tmpDir, tmpFile);
+				
+			if (0 != pFile->Open ("a+"))
+			{
+				printf ("FILE[%s]LINE[%d]ERR_MSG[Open File Is Failed.]\n", __FILE__, __LINE__);
+				m_MutexLocker->UnLock();
+				return RET_FAIL;
+			}
+			
+			m_FileMgr.insert(pair<string, SDFS_GDF_FILE *>(string(tFileInfo->fileNameHead), pFile));
+#else
+			pFile = new GDF_FILE (m_BakConfInfo.tmpDir, tmpFile);
+				
+			if (0 != pFile->Open ("a+"))
+			{
+				printf ("FILE[%s]LINE[%d]ERR_MSG[Open File Is Failed.]\n", __FILE__, __LINE__);
+				m_MutexLocker->UnLock();
+				return RET_FAIL;
+			}
+			
+			m_FileMgr.insert(pair<string, GDF_FILE *>(string(tFileInfo->fileNameHead), pFile));
+#endif
+		}
+		else
+		{
+			pFile = iter->second;
+		}
+		
+		char tmpbuff[4096] = {0};
+		sprintf (tmpbuff, "%s\n", tFileInfo->fileContent);
+		
+		pFile->Write (tmpbuff, strlen(tmpbuff), 1);
+
+		pFile->Fflush();
+		
+		m_MutexLocker->UnLock();
+	}
+	else if (m_BakConfInfo.writeMode == SERVER_ASYNC_MODE)
+	{
+		stPubFileInfo *pData = new stPubFileInfo;
+		if (pData == NULL)
+		{
+			return RET_FAIL;
+		}
+		
+		memset (pData, 0, sizeof(stPubFileInfo));
+		
+		pData->fileEnd = tFileInfo->fileEnd;
+		strcpy (pData->fileNameHead, tFileInfo->fileNameHead);
+		strcpy (pData->fileName, tFileInfo->fileName);
+		strcpy (pData->fileContent, tFileInfo->fileContent);
+	
+		m_FileContentQueue_Bak.push_first (pData);
+	}
+	else
+	{
+		printf ("FILE[%s]LINE[%d]ERR_MSG[m_BakConfInfo.writeMode<%d> Is Error.]\n", __FILE__, __LINE__, m_BakConfInfo.writeMode);
+		return RET_FAIL;
+	}
+	
+	return RET_OK;
+}
+
+void CDealFileBak::BackUp (void)
+{
+	char backupFile[1024] = {0};
+#ifdef _SDFS_DEAL_FILE_
+	SDFS_GDF_FILE *pFile = NULL;
+#else
+	GDF_FILE *pFile = NULL;
+#endif
+	char sysdate[20+1] = {0};
+	switch (m_BakConfInfo.backupType)
+	{
+		case WRITE_FILE_SIZE_TYPE:
+		case WRITE_FILE_INTERVAL_TIME_TYPE:
+		{
+#ifdef _SDFS_DEAL_FILE_
+	for (map<string, SDFS_GDF_FILE *>::iterator iter = m_FileMgr.begin(); iter != m_FileMgr.end();)
+#else
+	for (map<string, GDF_FILE *>::iterator iter = m_FileMgr.begin(); iter != m_FileMgr.end();)
+#endif
+			{
+				pFile = iter->second;
+				
+				getCurDateTime(sysdate,"yyyymmddhhmiss");
+				memset (backupFile, 0, sizeof(backupFile));
+				sprintf (backupFile, "%s/%s.%s", m_BakConfInfo.bakDir, pFile->GetFileName(),sysdate);
+				if (IsBackup(pFile) || m_BackupFlag)
+				{
+					m_MutexLocker->Lock();
+				
+					pFile->Close ();
+					
+					pFile->Rename (backupFile);
+					
+					pFile->Remove ();
+					
+					delete pFile;
+					
+					m_FileMgr.erase(iter++);
+					
+					m_MutexLocker->UnLock();
+				}
+				else
+					++iter;
+			}
+			
+			break;
+		}
+		case WRITE_FILE_END_FILE_TYPE:
+		case WRITE_FILE_IMMEDIATE_TYPE:
+		{
+			if (m_BackupFlag)
+			{
+				while (m_FileContentQueue_Bak.sum() != 0)
+				{
+					if (m_FileContentQueue_Bak.sum() == 0)
+					{
+						break;
+					}
+					
+					usleep(50);
+				}
+		
+#ifdef _SDFS_DEAL_FILE_
+				for (map<string, SDFS_GDF_FILE *>::iterator iter = m_FileMgr.begin(); iter != m_FileMgr.end();)
+#else
+				for (map<string, GDF_FILE *>::iterator iter = m_FileMgr.begin(); iter != m_FileMgr.end();)
+#endif
+				{
+					pFile = iter->second;
+					
+					getCurDateTime(sysdate,"yyyymmddhhmiss");
+					memset (backupFile, 0, sizeof(backupFile));
+					sprintf (backupFile, "%s/%s.%s", m_BakConfInfo.bakDir, pFile->GetFileName(),sysdate);
+					
+					m_MutexLocker->Lock();
+					
+					pFile->Close ();
+
+					pFile->Rename (backupFile);
+					
+					pFile->Remove ();
+					
+					delete pFile;
+					
+					m_FileMgr.erase(iter++);
+					
+					m_MutexLocker->UnLock();
+				}
+			}
+			
+			break;
+		}
+		default:
+			break;
+	}
+	
+	
+	m_BackupFlag = false;
+	
+	return;
+}
+
+#ifdef _SDFS_DEAL_FILE_
+bool CDealFileBak::IsBackup (SDFS_GDF_FILE *pDealFile)
+#else
+bool CDealFileBak::IsBackup (GDF_FILE *pDealFile)
+#endif
+{
+	switch (m_BakConfInfo.backupType)
+	{
+		case WRITE_FILE_SIZE_TYPE:
+		{
+			break;
+		}
+		case WRITE_FILE_INTERVAL_TIME_TYPE:
+		{
+			time_t tmpT = time(NULL);
+			if (tmpT/m_BakConfInfo.interval != pDealFile->GetFileStartTime()/m_BakConfInfo.interval)
+			{
+				return true;
+			}
+			
+			break;
+		}
+		case WRITE_FILE_END_FILE_TYPE:
+		{
+			break;
+		}
+		case WRITE_FILE_IMMEDIATE_TYPE:
+		{
+			break;
+		}
+		default:
+			return false;
+	}
+	
+	return false;
+}
+
+CDealFileBakManager::CDealFileBakManager()
+{
+	m_ProTimes = 0;
+	
+	memset (&m_BakConfInfo, 0, sizeof(stBakConfigInfo));
+}
+
+CDealFileBakManager::~CDealFileBakManager()
+{
+}
+
+void CDealFileBakManager::Init (stBakConfigInfo *pBakInfo)
+{
+	printf("init CDealFileBakManager !!!\n");
+	memcpy (&m_BakConfInfo, pBakInfo, sizeof(stBakConfigInfo));
+}
+
+void CDealFileBakManager::Process(void)
+{	
+	if (m_ProTimes == 0)
+	{
+		if (m_BakConfInfo.backupType == WRITE_FILE_INTERVAL_TIME_TYPE ||
+			m_BakConfInfo.backupType == WRITE_FILE_SIZE_TYPE)
+		{
+			this->start();
+		}
+	}
+	else
+	{
+		printf ("文件备份线程已经启动.\n");
+	}
+	
+	++m_ProTimes;
+}
+
+void CDealFileBakManager::run()
+{
+	while (getThreadState() == THREAD_STAT_RUNNING)
+	{
+		App_ProDealFileBak::Instance()->BackUp();
+		
+		sleep (1);
+	}
+	
+	return;
+}

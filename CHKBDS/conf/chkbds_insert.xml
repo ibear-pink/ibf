@@ -1,0 +1,7 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="insert_Add">
+	<insert id="INS_USER_ADD" parameterClass="Map" db_no="0">insert into BDS_USER_INFO_ADD values(${VALUE0|long},${VALUE1|long},${VALUE2|char},${VALUE3|char},${VALUE4|char},${VALUE5|char},${VALUE6|char},${VALUE7|char},${VALUE8|char},${VALUE9|char},${VALUE10|char},${VALUE11|char},${VALUE12|char},${VALUE13|long},'0','0','0','0','0',${DML_TYPE|char},sysdate,'0')
+	</insert>
+</sqlMap>
+

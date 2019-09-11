@@ -1,0 +1,56 @@
+/**
+ * describe:
+ * create date:2013-10-28
+ * author:wangzhia
+ */
+#ifndef _CPRO_SERVER_MANAGER_H_
+#define _CPRO_SERVER_MANAGER_H_
+
+#include <stdio.h>
+#include <string>
+#include <iostream>
+
+#include "CDealDataMgr.h"
+#include "cfgfile.h"
+#include "Define.h"
+#include "Singleton.h"
+#include "ComZooKeeper.h"
+#include "ComLogFile.h"
+
+using namespace std;
+
+class CProServerManager
+{
+public:
+	CProServerManager (void);
+	
+	~CProServerManager (void);
+	
+	bool Init (char *fileName,string input[]);
+	
+	bool Start (map<string,string> className);
+
+	bool InitZK (stAppCfg_ZK_Info *zk_info,char *Zk_Name,char *proc_name);
+
+	int GetServerSize () {return m_DealDataMgr.size();}
+	
+	int InitZK_change_path();
+
+private:
+	
+	stAppCfg m_AppCfg;
+	
+	map<string,stSqlMap*> m_sqlconfs;
+	map<string, CDealDataMgr*> m_DealDataMgr;
+	
+	stSettings *m_Set;
+	char m_ProcessName[32];
+	char m_InputStr[1024];
+	DC_AxLogFile logFile;
+	
+};
+
+typedef GDF_Singleton<CProServerManager> App_ProServerManager;
+
+#endif
+

@@ -1,0 +1,366 @@
+/*
+ * 功能描述:
+ * 创建时间:2016/3/1 14:59:14
+ * 编码人员:wangzhia
+*/
+
+#include "CDealData.h"
+
+CDealData::CDealData(char *className,char *className_deal)
+{	
+	m_Mutex = NULL;
+	
+	m_StopDeal = NULL;
+	
+	memset (m_ServerName, 0, sizeof(m_ServerName));
+	
+	memset (&m_ParseFiles, 0, sizeof(stAppCfg_ParseFile));
+
+	memset (&m_SystemInfo, 0, sizeof(stAppCfg_System));
+	
+	m_DispathKey = 0;
+	
+	m_ServerType = 0;
+	
+	m_InterfaceType = 0;
+	
+	//memset (&statInfo, 0, sizeof(RecordStatInfo));
+	
+	memset (m_RegionList, 0, sizeof(m_RegionList));
+	
+	//根据反射实现工厂类
+	Object* poObject = Object::CreateObject(className);
+	m_PublicData = dynamic_cast<CPublicData*>(poObject);
+	
+	Object* dealObject = Object::CreateObject(className_deal);
+	m_StopDeal = dynamic_cast<CPublicDeal*>(dealObject);
+
+	if (m_StopDeal ==NULL)
+	{
+		printf("m_StopDeal is NULL!!!\n");
+	}
+}
+
+CDealData::~CDealData()
+{
+	printf ("CDealData[%d] destructor.\n",m_ThreadNum);
+
+	if (NULL != m_Mutex)
+	{
+		delete m_Mutex;
+		
+		m_Mutex = NULL;
+	}
+	
+	pthread_cond_destroy(&m_Condition);
+	
+	if (NULL != m_StopDeal)
+	{
+		delete m_StopDeal;
+		
+		m_StopDeal = NULL;
+	}
+	
+	if (NULL != m_PublicData)
+	{
+		delete  m_PublicData;
+		m_PublicData = NULL;
+	}
+	printf ("CDealData[%d] destructor. end .\n",m_ThreadNum);
+}
+
+void CDealData::run(void)
+{
+	Ret iRet = RET_OK;
+	
+	stDealTask *pTask = NULL;
+	
+	int threadState = THREAD_STAT_INITIALIZE;
+	while (getThreadState() != THREAD_STAT_EXIT)
+	{
+#ifdef _THREAD_LOG_
+	printf("++++threadnum[%d]GetTask\n",m_ThreadNum);
+#endif
+		pTask = m_Data_Poor->GetRecord();
+		if (pTask == NULL)
+		{
+#ifdef _THREAD_LOG_
+	printf("++++threadnum[%d]pTask is NULL\n",m_ThreadNum);
+#endif
+			usleep (10);
+			continue;
+		}
+#ifdef _THREAD_LOG_
+	printf("++++threadnum[%d] deal_start\n",m_ThreadNum);
+#endif
+		DealRecord(pTask);
+#ifdef _THREAD_LOG_
+printf("++++threadnum[%d] deal_end\n",m_ThreadNum);
+#endif
+		delete pTask;
+		pTask = NULL;
+	}
+	return;
+}
+
+int CDealData::InitCfgInfo()
+{
+	int iRet = 0;
+	stSTOPMessage *stopMsg = new stSTOPMessage();
+	printf("++++pTask is fresh!!!\n");
+	
+	if (0 != m_StopDeal->InitStopCfgInfo(stopMsg))
+	{
+		//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_StopDeal->InitStopCfgInfo is failed.]\n",  __FILE__, __LINE__);
+		iRet = RET_FAIL;
+	}
+	return iRet;
+}
+
+Ret CDealData::Init(stAppCfg_Proc_Server *pCfgInfo, stAppCfg_System *pSystemInfo, stAppCfg_ParseFile *pParseFile,int thread_num,Poor<stDealTask> *pDataPoor,map<string,stSqlMap*> sqlconfs,STOP_COMMON_CONF conf_info,stSettings *set)
+{
+	int iRet = RET_OK;
+	
+	memcpy (&m_ParseFiles, pParseFile, sizeof(stAppCfg_ParseFile));
+	memcpy (&m_SystemInfo, pSystemInfo, sizeof(stAppCfg_System));
+	
+	m_JSNUM = 0;
+	m_Data_Poor = pDataPoor;
+	m_pidNum = pCfgInfo->pid_num;
+	m_ThreadNum = thread_num;
+	m_InterfaceType = pCfgInfo->interface_type;
+	m_ServerType = pCfgInfo->server_type;
+	
+	strcpy(m_ServerName_tmp,pCfgInfo->server_name);
+	sprintf (m_ServerName,"%s_%d_%d", pCfgInfo->server_name,pCfgInfo->pid_num,thread_num);
+	
+	m_DealQueue.setMaxNum (MAX_DEQUE_NUM);
+	printf("stop_common[%s];db_num[%d]\n",pSystemInfo->stop_common,pSystemInfo->db_num);
+	
+	bear_db *pInfo = new bear_db();
+	m_DscNum = m_SystemInfo.db_id;
+	for (int i=0;i<m_SystemInfo.db_num;i++)
+	{
+		printf("CDealData_Init:db[%d]序号为：%d\n",i,m_DscNum[i]);
+		pInfo->db_id[i] = m_DscNum[i];
+	}
+	ibear *br = new ibear(pInfo,sqlconfs,set);
+	m_ibear = br;
+	if (NULL == m_StopDeal)
+	{
+		//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_StopDeal new is failed.]\n",  __FILE__, __LINE__);
+		return RET_FAIL;
+	}
+	
+	stBakConfigInfo tBakInfo;
+	memset (&tBakInfo, 0, sizeof(stBakConfigInfo));
+	sprintf (tBakInfo.bakDir, "%s", pCfgInfo->bak_cfg_info.bakdir);
+	sprintf (tBakInfo.tmpDir, "%s", pCfgInfo->bak_cfg_info.tmpdir);
+	tBakInfo.type = pCfgInfo->bak_cfg_info.tab_type;
+	tBakInfo.writeMode = pCfgInfo->bak_cfg_info.tab_writemode;
+	tBakInfo.interval = pCfgInfo->bak_cfg_info.tab_interval;
+	tBakInfo.backupType = pCfgInfo->bak_cfg_info.tab_backuptype;
+	tBakInfo.backupSize = pCfgInfo->bak_cfg_info.tab_backupsize;
+
+	//调用CPublicDeal中的init方法，加载配置项
+	iRet = m_StopDeal->Init(br, m_ServerType, m_DscNum, &tBakInfo, m_ThreadNum,&conf_info);
+	if (0 != iRet)
+	{
+		//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_Stop_Deal->Init is failed.]\n",  __FILE__, __LINE__);
+		return RET_FAIL;
+	}
+	
+	//调用CPublicDeal中的InitParseField方法，解析入口数据
+	iRet = m_StopDeal->InitParseField(pParseFile);
+	if (0 != iRet)
+	{
+		//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_Stop_Deal->InitParseField is failed.]\n",  __FILE__, __LINE__);
+		return RET_FAIL;
+	}
+	
+	//调用个性化init();
+	m_PublicData->init(m_ServerName,m_ServerType,m_StopDeal);
+	
+	printf("加载完毕!!!\n");
+	
+	return RET_OK;
+}
+
+Ret CDealData::DealRecord (stDealTask *pTask)
+{
+#ifdef _TIME_LOG_
+	long start = 0, process = 0;
+	start = getUTime();
+#endif
+	int cRet = RET_OK;
+	int iRet = RET_OK;
+	Ret rRet = RET_OK;
+	char m_BusiName[20]={0};
+	RecordStatInfo *statInfo = new RecordStatInfo();
+	stSTOPMessage *stopMsg = new stSTOPMessage();
+	
+	memset (m_ServerName,0,sizeof(m_ServerName));
+	sprintf (m_ServerName,"%s_%d_%d", m_ServerName_tmp,m_pidNum,pTask->iDispatchKey);
+	
+	statInfo->interfaceType = m_InterfaceType;
+	statInfo->busiType = pTask->iBusiType;
+	strcpy(statInfo->seq,pTask->seq);
+	getCurUTime (statInfo->strStartTime);
+	statInfo->lStart = getUTime();
+	strcpy (statInfo->msisdn, pTask->sMsisdn);
+	
+	switch (pTask->iBusiType)
+	{
+		case INTERFACE_BUSINESS_TYPE_STOPPH_LOG://信控
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_STOPPH_LOG_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_ACCT_ITEM://定时账务
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_ACCT_ITEM_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_GET_DATA: //获取数据
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_GET_DATA_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_STOP_PATCH: //缴费开机
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_STOP_PATCH_HEAD);
+			break;
+		}
+		case INTERFACE_BUSINESS_TYPE_OTHER: //自定义类型
+		{
+			strcpy(m_BusiName,INTERFACE_TYPE_OTHER_HEAD);
+			break;
+		}
+		default:
+			//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_ServerType<%d> Is Error.]\n",  __FILE__, __LINE__, m_ServerType);
+			break;
+	}
+	
+	do
+	{
+		//业务逻辑处理
+		stopMsg->business_type = pTask->iBusiType;
+		strcpy(stopMsg->busi_key , m_BusiName);
+		stParseField *parseField = NULL;
+		switch (m_InterfaceType)
+		{
+			case INTERFACE_TYPE_FILE:
+			{
+				break;
+			}
+			case INTERFACE_TYPE_TABLE:
+			{
+				parseField = new stParseField();
+				//入口协议解析
+				ParseTableRecord (pTask->sBuff, parseField);
+				
+				parseField->file_type = pTask->iBusiType;
+				stopMsg->business_body_r = parseField;
+				
+#ifdef _THREAD_LOG_
+	printf("++++threadnum[%d] Process_start<%ld>\n",m_ThreadNum,m_JSNUM);
+#endif
+				//调用个性化Process
+				iRet = m_PublicData->process(m_ibear,m_BusiName,m_ServerName,&m_SystemInfo,pTask,parseField,stopMsg);
+				m_JSNUM ++;
+#ifdef _TIME_LOG_
+	process = getUTime();
+	printf("pro:%ld\n",process-start);
+#endif
+				delete parseField;
+				parseField = NULL;
+#ifdef _THREAD_LOG_
+	printf("++++threadnum[%d] Process_end<%ld>\n",m_ThreadNum,m_JSNUM);
+#endif
+				break;
+			}
+			default:
+				//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[m_InterfaceType<%d> is failed.]\n",  __FILE__, __LINE__, m_InterfaceType);
+				
+				iRet = RET_FAIL;
+				break;
+		}
+	} while (0);
+	
+	if (0 != iRet)
+	{
+		statInfo->resultCode = stopMsg->state;
+		//WriteLog(m_ServerName, LOG_SYS_ERROR, 1, "FILE[%s]LINE[%d]ERR_MSG[Err_Code<%d>Err_msg<%s>]\n",  __FILE__, __LINE__, stopMsg->state,stopMsg->err_msg);
+		rRet = RET_FAIL;
+	}
+	else
+	{
+		statInfo->resultCode = STOP_SUCESS;
+		rRet = RET_OK;
+	}
+	
+	statInfo->lEnd = getUTime();
+	statInfo->iInterval = statInfo->lEnd - statInfo->lStart;
+	//WriteLog(m_ServerName, LOG_SYS_RUNNING, 1,"%d|%d|%s|%s|%d|RESULT_CODE|%d|%s|\n", \
+		statInfo->interfaceType,\
+		statInfo->busiType,\
+		statInfo->msisdn,\
+		statInfo->strStartTime,\
+		statInfo->iInterval,\
+		statInfo->resultCode,\
+		stopMsg->code_chg);
+	//WriteLog(m_ServerName, LOG_SYS_NORMAL, 1,"%s",stopMsg->run_msg);
+
+	delete statInfo;
+	statInfo = NULL;
+	
+	delete stopMsg;
+	stopMsg = NULL;
+	
+	return rRet;
+}
+
+void CDealData::ParseTableRecord (char *sBuff, stParseField *pField)
+{
+	int i = 0, end = 0, begin = 0, len = 0;
+	char tmpBuf[1024] = {0};
+	
+	strcpy (tmpBuf, sBuff);
+	len = strlen(tmpBuf);
+
+	if (tmpBuf[len-1] != '|')
+	{
+		tmpBuf[len] = '|';
+		tmpBuf[len+1] = '\0';
+	}
+	else
+	{
+		tmpBuf[len] = '\0';
+	}
+
+	while (tmpBuf[i] != '\0' && i <= len)
+	{
+		if (tmpBuf[i] == '|')
+		{
+			end = i;
+			i++;
+		}
+		else
+		{
+			i++;
+			continue;
+		}
+		
+		pField->size++;
+		memcpy (pField->field[pField->size], tmpBuf+begin, end - begin);
+		pField->field[pField->size][end-begin] = '\0';
+		
+		begin = i;
+	}
+	/*
+	strcpy(pField->file_code ,m_ParseFiles.data[pField->size].file_code);
+#ifdef _DEBUG_INFO_
+	printf ("field=[%s],code=[%s]\n", pField->field[pField->size],pField->file_code);
+#endif*/
+	return ;
+}

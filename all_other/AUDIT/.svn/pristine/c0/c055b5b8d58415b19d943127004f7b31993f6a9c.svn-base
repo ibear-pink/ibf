@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "GETKPIDeal.h"
+
+IMPLEMENT_CLASS(GETKPIDeal)
+
+GETKPIDeal::GETKPIDeal()
+{
+	
+}
+
+GETKPIDeal::~GETKPIDeal()
+{
+
+}
+
+int GETKPIDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int GETKPIDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

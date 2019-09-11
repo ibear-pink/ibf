@@ -1,0 +1,3 @@
+#/account/cx00/pkg/bin/KPIDE_cx00 -s start -p b=F,a=OFAC
+/account/cx00/pkg/bin/KPIDE_x001_cx00 cx00
+

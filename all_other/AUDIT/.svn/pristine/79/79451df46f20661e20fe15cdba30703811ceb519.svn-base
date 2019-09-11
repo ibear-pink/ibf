@@ -1,0 +1,30 @@
+
+/*
+ * 功能描述:
+ * 创建时间:
+ * 编码人员:自动生成
+*/
+#include "GETKPI_TLDeal.h"
+
+IMPLEMENT_CLASS(GETKPI_TLDeal)
+
+GETKPI_TLDeal::GETKPI_TLDeal()
+{
+	
+}
+
+GETKPI_TLDeal::~GETKPI_TLDeal()
+{
+
+}
+
+int GETKPI_TLDeal::Process(stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+
+int GETKPI_TLDeal::InitStopCfgInfo (stSTOPMessage *stopMsg)
+{
+	return RET_OK;
+}
+

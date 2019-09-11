@@ -1,0 +1,55 @@
+/**************************
+* 服务名称:rtStopPub
+* 功能描述:公共头文件
+* 程序版本:V1.0
+* 编码日期:2014/10/20 11:23:53
+* 编码人员:
+**************************/
+#ifndef _IBEAR_PUB_FUNC_H_
+#define _IBEAR_PUB_FUNC_H_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <stdarg.h>
+#include <map>
+#include <iconv.h>
+#include <iostream>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <strings.h>
+
+#include "ibear_com_type.h"
+#include "libxml/libxml.h"
+
+using namespace std;
+
+//文件处理函数
+extern int xmlFileRead(char* filename,string *info);
+extern char *xmlTrim(char *S);
+extern char *xml_strrep(char *pInput, char *pOutput, char *pSrc, char *pDst);
+extern char * xml_deleteEmptyStr(char *src,char *new_src);
+extern char * isEmpty_strrep(char *pInput,char *pOutput);
+extern long ibear_getUTime();
+
+//xml处理函数
+extern int Analysis_ConfXML(char *pSrc,stSqlMapConfig *sql_Conf);	
+extern int Analysis_ConfXML(char *pSrc,char *host_id,stSqlMapConfig *sql_Conf);
+extern int Analysis_SqlXML(stSqlMapConfig *sql_Conf,map<string,stSqlMap*> *sqlconfs);
+extern int xmlbuild_sql(char *tpl_content,char *out_content,map<string,stSQLParam*> *bindParams);
+extern int init_XxmlFile(char *fileName,map<string,stSqlMap*> *sqlconfs,stSettings *settings);
+extern int init_XxmlFile(char *fileName,char *host_id,map<string,stSqlMap*> *sqlconfs,stSettings *settings);
+extern int getSqlContent(map<string,stSqlMap*> *sqlconfs);
+extern int xmlConvSpeChar(char *old_src,char *new_src,map<string,string> repedMap);
+extern int replaceSql(char *src,map<string,stSQLParam*> bindParams,char *new_src);
+
+//清除数据内存
+template<class D> extern void clearXMLList (vector<D*> &vList);
+template<class K, class V> extern void clearXMLList (map<K, V*> &mList);
+template<class K, class V> extern void clearXMLList (multimap<K, V*> &mList);
+template<class K, class V> extern void clearXMLList (map<K, vector<V*> > &mList);
+
+#endif

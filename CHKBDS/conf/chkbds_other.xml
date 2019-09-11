@@ -1,0 +1,47 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<sqlMap namespace="data">
+	<select id="SEL_REL_CFG" parameterClass="Map" resultNum="5" db_no="0">
+		select CHECK_TABLE,KEY_ID,DBNO_KEYS,PRKEY_ID,DBNO_PRKEYS from CHECK_RELATION_CFG
+	</select>
+	<select id="SEL_CON_INFO" parameterClass="Map" resultNum="4" db_no="0">
+		select QRYDB_NUMS,CHECK_NUMS,CHECK_MAX,CTR_FLAG from CHECK_CONTROL_INFO where sysdate between eff_date and exp_date
+	</select>
+	<select id="SEL_TAB_CFG" parameterClass="Map" resultNum="6" db_no="0">
+		select CHECK_TABLE,BDS_SQL,BDS_KEYS,CHECK_SQL,CHECK_KEYS,ADD_SQL from CHECK_MAP_CFG where sysdate between EFF_DATE and EXP_DATE
+	</select>
+	<select id="SEL_INTER" parameterClass="Map" resultNum="3" db_no="0">
+		select CHECK_TABLE,KEY_VALUE,DATA_TYPE from CHECK_DATA_INTERFACE  limit 1000
+	</select>
+	<delete id="DEL_INTER" parameterClass="Map" db_no="0">
+		delete from CHECK_DATA_INTERFACE where CHECK_TABLE=${CHECK_TABLE|char} and KEY_VALUE=${KEY_VALUE|char}
+	</delete>
+	<select id="SEL_COM_COUNT" parameterClass="Map" resultNum="1" db_no="0">
+		select count(1) from CHECK_COMPARE_LOG where KEY_VALUE=${KEY_VALUE|char} and check_table=${CHECK_TABLE|char}
+	</select>
+	<select id="SEL_COM" parameterClass="Map" resultNum="7" db_no="0">
+		select CHECK_SN,CHECK_TABLE,KEY_VALUE,CHECK_TIMES,CHECK_TYPE,DATA_TYPE,FILE_TYPE from CHECK_COMPARE_LOG limit 1000
+	</select>
+	<update id="UPD_COM" parameterClass="Map" db_no="0">
+		update CHECK_COMPARE_LOG set CHECK_TYPE=${CHECK_TYPE|char},CHECK_TIMES=CHECK_TIMES+1,DEAL_TIME=to_char(sysdate,'yyyymmddhh24miss') where KEY_VALUE=${KEY_VALUE|char} and check_table=${CHECK_TABLE|char}
+	</update>
+	<insert id="INS_COM" parameterClass="Map" db_no="0">
+		insert into CHECK_COMPARE_LOG(CHECK_SN,KEY_VALUE,CHECK_TABLE,CHECK_TIMES,CHECK_TYPE,DATA_TYPE,DEAL_TIME,FILE_TYPE) values(${CHECK_SN|char},${KEY_VALUE|char},${CHECK_TABLE|char},0,${CHECK_TYPE|char},${DATA_TYPE|char},to_char(sysdate,'yyyymmddhh24miss'),${FILE_TYPE|char})
+	</insert>
+	<delete id="DEL_COM" parameterClass="Map" db_no="0">
+		delete from CHECK_COMPARE_LOG where KEY_VALUE=${KEY_VALUE|char} and check_table=${CHECK_TABLE|char}
+	</delete>
+	<insert id="INS_REP" parameterClass="Map" db_no="0">
+		insert into CHECK_REPAIR_LOG(CHECK_SN,KEY_VALUE,CHECK_TABLE,CHECK_TYPE,CHECK_RESULT,CHECK_NOTE,IS_DEAL,DEAL_TIME,DATA_TYPE,FILE_TYPE) values(${CHECK_SN|char},${KEY_VALUE|char},${CHECK_TABLE|char},${CHECK_TYPE|char},${CHECK_RESULT|char},${CHECK_NOTE|char},${IS_DEAL|char},to_char(sysdate,'yyyymmddhh24miss'),${DATA_TYPE|char},${FILE_TYPE|char})
+	</insert>
+	<insert id="INS_ERR_COM" parameterClass="Map" db_no="0">
+		insert into CHECK_COMPARE_LOG_ERR(CHECK_SN,KEY_VALUE,CHECK_TABLE,CHECK_TIMES,CHECK_TYPE,DATA_TYPE,DEAL_TIME,ERR_MSG,FILE_TYPE) select CHECK_SN,KEY_VALUE,CHECK_TABLE,CHECK_TIMES,CHECK_TYPE,DATA_TYPE,to_char(sysdate,'yyyymmddhh24miss'),'#ERR_MSG#',FILE_TYPE from CHECK_COMPARE_LOG where KEY_VALUE=${KEY_VALUE|char} and check_table=${CHECK_TABLE|char}
+	</insert>
+	<select id="SEL_COUNT" parameterClass="Map" resultNum="1" db_no="0">
+		select count(1) from CHECK_REPAIR_LOG where check_table=${CHECK_TABLE|char} and IS_DEAL='1' and to_char(to_date(deal_time,'yyyymmddhh24miss'),'yyyymmdd')=to_char(sysdate,'YYYYMMDD')
+	</select>
+	<select id="SEL_COUNT_HIS" parameterClass="Map" resultNum="1" db_no="0">
+		select count(1) from CHECK_REPAIR_LOG_HIS_#YM# where check_table=${CHECK_TABLE|char} and IS_DEAL='1' and to_char(to_date(deal_time,'yyyymmddhh24miss'),'yyyymmdd')=to_char(sysdate,'YYYYMMDD')
+	</select>
+</sqlMap>
+
